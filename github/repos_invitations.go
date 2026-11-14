@@ -23,11 +23,14 @@ type RepositoryInvitation struct {
 	CreatedAt   *Timestamp `json:"created_at,omitempty"`
 	URL         *string    `json:"url,omitempty"`
 	HTMLURL     *string    `json:"html_url,omitempty"`
+	Expired     *bool      `json:"expired,omitempty"`
 }
 
 // ListInvitations lists all currently-open repository invitations.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#list-repository-invitations
+// GitHub API docs: https://docs.github.com/rest/collaborators/invitations?apiVersion=2022-11-28#list-repository-invitations
+//
+//meta:operation GET /repos/{owner}/{repo}/invitations
 func (s *RepositoriesService) ListInvitations(ctx context.Context, owner, repo string, opts *ListOptions) ([]*RepositoryInvitation, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/invitations", owner, repo)
 	u, err := addOptions(u, opts)
@@ -35,13 +38,13 @@ func (s *RepositoriesService) ListInvitations(ctx context.Context, owner, repo s
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	invites := []*RepositoryInvitation{}
-	resp, err := s.client.Do(ctx, req, &invites)
+	resp, err := s.client.Do(req, &invites)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -51,15 +54,17 @@ func (s *RepositoriesService) ListInvitations(ctx context.Context, owner, repo s
 
 // DeleteInvitation deletes a repository invitation.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#delete-a-repository-invitation
+// GitHub API docs: https://docs.github.com/rest/collaborators/invitations?apiVersion=2022-11-28#delete-a-repository-invitation
+//
+//meta:operation DELETE /repos/{owner}/{repo}/invitations/{invitation_id}
 func (s *RepositoriesService) DeleteInvitation(ctx context.Context, owner, repo string, invitationID int64) (*Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/invitations/%v", owner, repo, invitationID)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // UpdateInvitation updates the permissions associated with a repository
@@ -68,19 +73,21 @@ func (s *RepositoriesService) DeleteInvitation(ctx context.Context, owner, repo 
 // permissions represents the permissions that the associated user will have
 // on the repository. Possible values are: "read", "write", "admin".
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#update-a-repository-invitation
+// GitHub API docs: https://docs.github.com/rest/collaborators/invitations?apiVersion=2022-11-28#update-a-repository-invitation
+//
+//meta:operation PATCH /repos/{owner}/{repo}/invitations/{invitation_id}
 func (s *RepositoriesService) UpdateInvitation(ctx context.Context, owner, repo string, invitationID int64, permissions string) (*RepositoryInvitation, *Response, error) {
 	opts := &struct {
 		Permissions string `json:"permissions"`
 	}{Permissions: permissions}
 	u := fmt.Sprintf("repos/%v/%v/invitations/%v", owner, repo, invitationID)
-	req, err := s.client.NewRequest("PATCH", u, opts)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	invite := &RepositoryInvitation{}
-	resp, err := s.client.Do(ctx, req, invite)
+	var invite *RepositoryInvitation
+	resp, err := s.client.Do(req, &invite)
 	if err != nil {
 		return nil, resp, err
 	}

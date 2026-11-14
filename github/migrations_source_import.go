@@ -76,7 +76,7 @@ type Import struct {
 	//         Contact GitHub support for more information.
 	//     detection_needs_auth - the importer requires authentication for
 	//         the originating repository to continue detection. Make an
-	//         UpdatImport request, and include VCSUsername and
+	//         UpdateImport request, and include VCSUsername and
 	//         VCSPassword.
 	//     detection_found_nothing - the importer didn't recognize any
 	//         source control at the URL.
@@ -115,7 +115,7 @@ func (i Import) String() string {
 
 // SourceImportAuthor identifies an author imported from a source repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migration/source_imports/#get-commit-authors
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#get-commit-authors
 type SourceImportAuthor struct {
 	ID         *int64  `json:"id,omitempty"`
 	RemoteID   *string `json:"remote_id,omitempty"`
@@ -132,7 +132,7 @@ func (a SourceImportAuthor) String() string {
 
 // LargeFile identifies a file larger than 100MB found during a repository import.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migration/source_imports/#get-large-files
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#get-large-files
 type LargeFile struct {
 	RefName *string `json:"ref_name,omitempty"`
 	Path    *string `json:"path,omitempty"`
@@ -146,16 +146,20 @@ func (f LargeFile) String() string {
 
 // StartImport initiates a repository import.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#start-an-import
-func (s *MigrationService) StartImport(ctx context.Context, owner, repo string, in *Import) (*Import, *Response, error) {
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#start-an-import
+//
+//meta:operation PUT /repos/{owner}/{repo}/import
+func (s *MigrationService) StartImport(ctx context.Context, owner, repo string, body *Import) (*Import, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/import", owner, repo)
-	req, err := s.client.NewRequest("PUT", u, in)
+	req, err := s.client.NewRequest(ctx, "PUT", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	out := new(Import)
-	resp, err := s.client.Do(ctx, req, out)
+	var out *Import
+	resp, err := s.client.Do(req, &out)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -165,16 +169,20 @@ func (s *MigrationService) StartImport(ctx context.Context, owner, repo string, 
 
 // ImportProgress queries for the status and progress of an ongoing repository import.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#get-an-import-status
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#get-an-import-status
+//
+//meta:operation GET /repos/{owner}/{repo}/import
 func (s *MigrationService) ImportProgress(ctx context.Context, owner, repo string) (*Import, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/import", owner, repo)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	out := new(Import)
-	resp, err := s.client.Do(ctx, req, out)
+	var out *Import
+	resp, err := s.client.Do(req, &out)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -184,16 +192,20 @@ func (s *MigrationService) ImportProgress(ctx context.Context, owner, repo strin
 
 // UpdateImport initiates a repository import.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#update-an-import
-func (s *MigrationService) UpdateImport(ctx context.Context, owner, repo string, in *Import) (*Import, *Response, error) {
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#update-an-import
+//
+//meta:operation PATCH /repos/{owner}/{repo}/import
+func (s *MigrationService) UpdateImport(ctx context.Context, owner, repo string, body *Import) (*Import, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/import", owner, repo)
-	req, err := s.client.NewRequest("PATCH", u, in)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	out := new(Import)
-	resp, err := s.client.Do(ctx, req, out)
+	var out *Import
+	resp, err := s.client.Do(req, &out)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -213,16 +225,20 @@ func (s *MigrationService) UpdateImport(ctx context.Context, owner, repo string,
 // This method and MapCommitAuthor allow you to provide correct Git author
 // information.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#get-commit-authors
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#get-commit-authors
+//
+//meta:operation GET /repos/{owner}/{repo}/import/authors
 func (s *MigrationService) CommitAuthors(ctx context.Context, owner, repo string) ([]*SourceImportAuthor, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/import/authors", owner, repo)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var authors []*SourceImportAuthor
-	resp, err := s.client.Do(ctx, req, &authors)
+	resp, err := s.client.Do(req, &authors)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -234,16 +250,20 @@ func (s *MigrationService) CommitAuthors(ctx context.Context, owner, repo string
 // application can continue updating authors any time before you push new
 // commits to the repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#map-a-commit-author
-func (s *MigrationService) MapCommitAuthor(ctx context.Context, owner, repo string, id int64, author *SourceImportAuthor) (*SourceImportAuthor, *Response, error) {
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#map-a-commit-author
+//
+//meta:operation PATCH /repos/{owner}/{repo}/import/authors/{author_id}
+func (s *MigrationService) MapCommitAuthor(ctx context.Context, owner, repo string, id int64, body *SourceImportAuthor) (*SourceImportAuthor, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/import/authors/%v", owner, repo, id)
-	req, err := s.client.NewRequest("PATCH", u, author)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	out := new(SourceImportAuthor)
-	resp, err := s.client.Do(ctx, req, out)
+	var out *SourceImportAuthor
+	resp, err := s.client.Do(req, &out)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -255,16 +275,20 @@ func (s *MigrationService) MapCommitAuthor(ctx context.Context, owner, repo stri
 // files larger than 100MB. Only the UseLFS field on the provided Import is
 // used.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#update-git-lfs-preference
-func (s *MigrationService) SetLFSPreference(ctx context.Context, owner, repo string, in *Import) (*Import, *Response, error) {
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#update-git-lfs-preference
+//
+//meta:operation PATCH /repos/{owner}/{repo}/import/lfs
+func (s *MigrationService) SetLFSPreference(ctx context.Context, owner, repo string, body *Import) (*Import, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/import/lfs", owner, repo)
-	req, err := s.client.NewRequest("PATCH", u, in)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	out := new(Import)
-	resp, err := s.client.Do(ctx, req, out)
+	var out *Import
+	resp, err := s.client.Do(req, &out)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -274,16 +298,20 @@ func (s *MigrationService) SetLFSPreference(ctx context.Context, owner, repo str
 
 // LargeFiles lists files larger than 100MB found during the import.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#get-large-files
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#get-large-files
+//
+//meta:operation GET /repos/{owner}/{repo}/import/large_files
 func (s *MigrationService) LargeFiles(ctx context.Context, owner, repo string) ([]*LargeFile, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/import/large_files", owner, repo)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var files []*LargeFile
-	resp, err := s.client.Do(ctx, req, &files)
+	resp, err := s.client.Do(req, &files)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -293,13 +321,17 @@ func (s *MigrationService) LargeFiles(ctx context.Context, owner, repo string) (
 
 // CancelImport stops an import for a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#cancel-an-import
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/rest/migrations/source-imports?apiVersion=2022-11-28#cancel-an-import
+//
+//meta:operation DELETE /repos/{owner}/{repo}/import
 func (s *MigrationService) CancelImport(ctx context.Context, owner, repo string) (*Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/import", owner, repo)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

@@ -13,7 +13,7 @@ import (
 // LicensesService handles communication with the license related
 // methods of the GitHub API.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/licenses/
+// GitHub API docs: https://docs.github.com/rest/licenses?apiVersion=2022-11-28
 type LicensesService service
 
 // RepositoryLicense represents the license for a repository.
@@ -58,17 +58,32 @@ func (l License) String() string {
 	return Stringify(l)
 }
 
+// ListLicensesOptions specifies the optional parameters to the LicensesService.List method.
+type ListLicensesOptions struct {
+	Featured *bool `url:"featured,omitempty"`
+
+	ListOptions
+}
+
 // List popular open source licenses.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/licenses/#list-all-licenses
-func (s *LicensesService) List(ctx context.Context) ([]*License, *Response, error) {
-	req, err := s.client.NewRequest("GET", "licenses", nil)
+// GitHub API docs: https://docs.github.com/rest/licenses/licenses?apiVersion=2022-11-28#get-all-commonly-used-licenses
+//
+//meta:operation GET /licenses
+func (s *LicensesService) List(ctx context.Context, opts *ListLicensesOptions) ([]*License, *Response, error) {
+	u := "licenses"
+	u, err := addOptions(u, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var licenses []*License
-	resp, err := s.client.Do(ctx, req, &licenses)
+	resp, err := s.client.Do(req, &licenses)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -78,17 +93,19 @@ func (s *LicensesService) List(ctx context.Context) ([]*License, *Response, erro
 
 // Get extended metadata for one license.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/licenses/#get-a-license
+// GitHub API docs: https://docs.github.com/rest/licenses/licenses?apiVersion=2022-11-28#get-a-license
+//
+//meta:operation GET /licenses/{license}
 func (s *LicensesService) Get(ctx context.Context, licenseName string) (*License, *Response, error) {
-	u := fmt.Sprintf("licenses/%s", licenseName)
+	u := fmt.Sprintf("licenses/%v", licenseName)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	license := new(License)
-	resp, err := s.client.Do(ctx, req, license)
+	var license *License
+	resp, err := s.client.Do(req, &license)
 	if err != nil {
 		return nil, resp, err
 	}

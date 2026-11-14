@@ -6,19 +6,17 @@
 package github
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestIssuesService_List_all(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestIssuesService_ListAllIssues(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/issues", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -29,32 +27,44 @@ func TestIssuesService_List_all(t *testing.T) {
 			"labels":    "a,b",
 			"sort":      "updated",
 			"direction": "asc",
-			"since":     "2002-02-10T15:30:00Z",
-			"page":      "1",
-			"per_page":  "2",
+			"since":     referenceTimeRaw,
+			"collab":    "true",
+			"orgs":      "true",
+			"owned":     "true",
+			"pulls":     "true",
+			"page":      "5",
+			"per_page":  "10",
 		})
 		fmt.Fprint(w, `[{"number":1}]`)
 	})
 
-	opt := &IssueListOptions{
-		"all", "closed", []string{"a", "b"}, "updated", "asc",
-		time.Date(2002, time.February, 10, 15, 30, 0, 0, time.UTC),
-		ListOptions{Page: 1, PerPage: 2},
+	opt := &ListAllIssuesOptions{
+		Filter:      "all",
+		State:       "closed",
+		Labels:      []string{"a", "b"},
+		Sort:        "updated",
+		Direction:   "asc",
+		Since:       referenceTime,
+		Collab:      true,
+		Orgs:        true,
+		Owned:       true,
+		Pulls:       true,
+		ListOptions: ListOptions{Page: 5, PerPage: 10},
 	}
-	ctx := context.Background()
-	issues, _, err := client.Issues.List(ctx, true, opt)
+	ctx := t.Context()
+	issues, _, err := client.Issues.ListAllIssues(ctx, opt)
 	if err != nil {
-		t.Errorf("Issues.List returned error: %v", err)
+		t.Errorf("Issues.ListAllIssues returned error: %v", err)
 	}
 
-	want := []*Issue{{Number: Int(1)}}
+	want := []*Issue{{Number: new(1)}}
 	if !cmp.Equal(issues, want) {
-		t.Errorf("Issues.List returned %+v, want %+v", issues, want)
+		t.Errorf("Issues.ListAllIssues = %+v, want %+v", issues, want)
 	}
 
-	const methodName = "List"
+	const methodName = "ListAllIssues"
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Issues.List(ctx, true, opt)
+		got, resp, err := client.Issues.ListAllIssues(ctx, nil)
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -62,52 +72,101 @@ func TestIssuesService_List_all(t *testing.T) {
 	})
 }
 
-func TestIssuesService_List_owned(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestIssuesService_ListUserIssues(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/issues", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testHeader(t, r, "Accept", mediaTypeReactionsPreview)
+		testFormValues(t, r, values{
+			"filter":    "all",
+			"state":     "closed",
+			"labels":    "a,b",
+			"sort":      "updated",
+			"direction": "asc",
+			"since":     referenceTimeRaw,
+			"per_page":  "4",
+			"page":      "2",
+		})
 		fmt.Fprint(w, `[{"number":1}]`)
 	})
 
-	ctx := context.Background()
-	issues, _, err := client.Issues.List(ctx, false, nil)
+	ctx := t.Context()
+	opts := &ListUserIssuesOptions{
+		Filter:      "all",
+		State:       "closed",
+		Labels:      []string{"a", "b"},
+		Sort:        "updated",
+		Direction:   "asc",
+		Since:       referenceTime,
+		ListOptions: ListOptions{Page: 2, PerPage: 4},
+	}
+	issues, _, err := client.Issues.ListUserIssues(ctx, opts)
 	if err != nil {
-		t.Errorf("Issues.List returned error: %v", err)
+		t.Errorf("Issues.ListUserIssues returned error: %v", err)
 	}
 
-	want := []*Issue{{Number: Int(1)}}
+	want := []*Issue{{Number: new(1)}}
 	if !cmp.Equal(issues, want) {
-		t.Errorf("Issues.List returned %+v, want %+v", issues, want)
+		t.Errorf("Issues.ListUserIssues = %+v, want %+v", issues, want)
 	}
+
+	const methodName = "ListUserIssues"
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Issues.ListUserIssues(ctx, nil)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, nil)
+		}
+		return resp, err
+	})
 }
 
 func TestIssuesService_ListByOrg(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/issues", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
+		testFormValues(t, r, values{
+			"filter":    "all",
+			"state":     "closed",
+			"labels":    "a,b",
+			"type":      "bug",
+			"sort":      "updated",
+			"direction": "asc",
+			"since":     referenceTimeRaw,
+			"per_page":  "4",
+			"page":      "2",
+		})
 		testHeader(t, r, "Accept", mediaTypeReactionsPreview)
 		fmt.Fprint(w, `[{"number":1}]`)
 	})
 
-	ctx := context.Background()
-	issues, _, err := client.Issues.ListByOrg(ctx, "o", nil)
+	ctx := t.Context()
+	opts := &IssueListByOrgOptions{
+		Filter:      "all",
+		State:       "closed",
+		Labels:      []string{"a", "b"},
+		Type:        "bug",
+		Sort:        "updated",
+		Direction:   "asc",
+		Since:       referenceTime,
+		ListOptions: ListOptions{Page: 2, PerPage: 4},
+	}
+	issues, _, err := client.Issues.ListByOrg(ctx, "o", opts)
 	if err != nil {
 		t.Errorf("Issues.ListByOrg returned error: %v", err)
 	}
 
-	want := []*Issue{{Number: Int(1)}}
+	want := []*Issue{{Number: new(1)}}
 	if !cmp.Equal(issues, want) {
-		t.Errorf("Issues.List returned %+v, want %+v", issues, want)
+		t.Errorf("Issues.ListByOrg returned %+v, want %+v", issues, want)
 	}
 
 	const methodName = "ListByOrg"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Issues.ListByOrg(ctx, "\n", nil)
+		_, _, err = client.Issues.ListByOrg(ctx, "\n", opts)
 		return err
 	})
 
@@ -120,18 +179,9 @@ func TestIssuesService_ListByOrg(t *testing.T) {
 	})
 }
 
-func TestIssuesService_ListByOrg_invalidOrg(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
-
-	ctx := context.Background()
-	_, _, err := client.Issues.ListByOrg(ctx, "%", nil)
-	testURLParseError(t, err)
-}
-
 func TestIssuesService_ListByRepo(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -145,25 +195,35 @@ func TestIssuesService_ListByRepo(t *testing.T) {
 			"labels":    "a,b",
 			"sort":      "updated",
 			"direction": "asc",
-			"since":     "2002-02-10T15:30:00Z",
+			"since":     referenceTimeRaw,
+			"per_page":  "1",
 		})
 		fmt.Fprint(w, `[{"number":1}]`)
 	})
 
+	// IssueListByRepoOptions uses standard strings (not pointers) and ListCursorOptions
 	opt := &IssueListByRepoOptions{
-		"*", "closed", "a", "c", "m", []string{"a", "b"}, "updated", "asc",
-		time.Date(2002, time.February, 10, 15, 30, 0, 0, time.UTC),
-		ListOptions{0, 0},
-	}
-	ctx := context.Background()
-	issues, _, err := client.Issues.ListByRepo(ctx, "o", "r", opt)
-	if err != nil {
-		t.Errorf("Issues.ListByOrg returned error: %v", err)
+		Milestone:         "*",
+		State:             "closed",
+		Assignee:          "a",
+		Creator:           "c",
+		Mentioned:         "m",
+		Labels:            []string{"a", "b"},
+		Sort:              "updated",
+		Direction:         "asc",
+		Since:             referenceTime,
+		ListCursorOptions: ListCursorOptions{PerPage: 1},
 	}
 
-	want := []*Issue{{Number: Int(1)}}
+	ctx := t.Context()
+	issues, _, err := client.Issues.ListByRepo(ctx, "o", "r", opt)
+	if err != nil {
+		t.Errorf("Issues.ListByRepo returned error: %v", err)
+	}
+
+	want := []*Issue{{Number: new(1)}}
 	if !cmp.Equal(issues, want) {
-		t.Errorf("Issues.List returned %+v, want %+v", issues, want)
+		t.Errorf("Issues.ListByRepo returned %+v, want %+v", issues, want)
 	}
 
 	const methodName = "ListByRepo"
@@ -173,7 +233,7 @@ func TestIssuesService_ListByRepo(t *testing.T) {
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Issues.ListByRepo(ctx, "o", "r", opt)
+		got, resp, err := client.Issues.ListByRepo(ctx, "o", "r", nil)
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -181,18 +241,9 @@ func TestIssuesService_ListByRepo(t *testing.T) {
 	})
 }
 
-func TestIssuesService_ListByRepo_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
-
-	ctx := context.Background()
-	_, _, err := client.Issues.ListByRepo(ctx, "%", "r", nil)
-	testURLParseError(t, err)
-}
-
 func TestIssuesService_Get(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/issues/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -200,19 +251,19 @@ func TestIssuesService_Get(t *testing.T) {
 		fmt.Fprint(w, `{"number":1, "author_association": "MEMBER","labels": [{"url": "u", "name": "n", "color": "c"}]}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	issue, _, err := client.Issues.Get(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Issues.Get returned error: %v", err)
 	}
 
 	want := &Issue{
-		Number:            Int(1),
-		AuthorAssociation: String("MEMBER"),
+		Number:            new(1),
+		AuthorAssociation: new("MEMBER"),
 		Labels: []*Label{{
-			URL:   String("u"),
-			Name:  String("n"),
-			Color: String("c"),
+			URL:   "u",
+			Name:  "n",
+			Color: "c",
 		}},
 	}
 	if !cmp.Equal(issue, want) {
@@ -235,44 +286,38 @@ func TestIssuesService_Get(t *testing.T) {
 }
 
 func TestIssuesService_Get_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Issues.Get(ctx, "%", "r", 1)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_Create(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &IssueRequest{
-		Title:    String("t"),
-		Body:     String("b"),
-		Assignee: String("a"),
-		Labels:   &[]string{"l1", "l2"},
+	input := CreateIssueRequest{
+		Title:    "t",
+		Body:     new("b"),
+		Assignee: new("a"),
+		Labels:   []string{"l1", "l2"},
 	}
 
 	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
-		v := new(IssueRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"number":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	issue, _, err := client.Issues.Create(ctx, "o", "r", input)
 	if err != nil {
 		t.Errorf("Issues.Create returned error: %v", err)
 	}
 
-	want := &Issue{Number: Int(1)}
+	want := &Issue{Number: new(1)}
 	if !cmp.Equal(issue, want) {
 		t.Errorf("Issues.Create returned %+v, want %+v", issue, want)
 	}
@@ -293,51 +338,45 @@ func TestIssuesService_Create(t *testing.T) {
 }
 
 func TestIssuesService_Create_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
-	_, _, err := client.Issues.Create(ctx, "%", "r", nil)
+	ctx := t.Context()
+	_, _, err := client.Issues.Create(ctx, "%", "r", CreateIssueRequest{})
 	testURLParseError(t, err)
 }
 
-func TestIssuesService_Edit(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestIssuesService_Update(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &IssueRequest{Title: String("t")}
+	input := UpdateIssueRequest{Title: new("t"), Type: new("bug")}
 
 	mux.HandleFunc("/repos/o/r/issues/1", func(w http.ResponseWriter, r *http.Request) {
-		v := new(IssueRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
-		fmt.Fprint(w, `{"number":1}`)
+		testJSONBody(t, r, input)
+		fmt.Fprint(w, `{"number":1, "type": {"name": "bug"}}`)
 	})
 
-	ctx := context.Background()
-	issue, _, err := client.Issues.Edit(ctx, "o", "r", 1, input)
+	ctx := t.Context()
+	issue, _, err := client.Issues.Update(ctx, "o", "r", 1, input)
 	if err != nil {
-		t.Errorf("Issues.Edit returned error: %v", err)
+		t.Errorf("Issues.Update returned error: %v", err)
 	}
 
-	want := &Issue{Number: Int(1)}
+	want := &Issue{Number: new(1), Type: &IssueType{Name: new("bug")}}
 	if !cmp.Equal(issue, want) {
-		t.Errorf("Issues.Edit returned %+v, want %+v", issue, want)
+		t.Errorf("Issues.Update returned %+v, want %+v", issue, want)
 	}
 
-	const methodName = "Edit"
+	const methodName = "Update"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Issues.Edit(ctx, "\n", "\n", -1, input)
+		_, _, err = client.Issues.Update(ctx, "\n", "\n", -1, input)
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Issues.Edit(ctx, "o", "r", 1, input)
+		got, resp, err := client.Issues.Update(ctx, "o", "r", 1, input)
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -345,18 +384,97 @@ func TestIssuesService_Edit(t *testing.T) {
 	})
 }
 
-func TestIssuesService_Edit_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+func TestIssuesService_RemoveMilestone(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	ctx := context.Background()
-	_, _, err := client.Issues.Edit(ctx, "%", "r", 1, nil)
+	mux.HandleFunc("/repos/o/r/issues/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PATCH")
+		fmt.Fprint(w, `{"number":1}`)
+	})
+
+	ctx := t.Context()
+	issue, _, err := client.Issues.RemoveMilestone(ctx, "o", "r", 1)
+	if err != nil {
+		t.Errorf("Issues.RemoveMilestone returned error: %v", err)
+	}
+
+	want := &Issue{Number: new(1)}
+	if !cmp.Equal(issue, want) {
+		t.Errorf("Issues.RemoveMilestone returned %+v, want %+v", issue, want)
+	}
+
+	const methodName = "RemoveMilestone"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Issues.RemoveMilestone(ctx, "\n", "\n", -1)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Issues.RemoveMilestone(ctx, "o", "r", 1)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestIssuesService_Update_invalidOwner(t *testing.T) {
+	t.Parallel()
+	client, _, _ := setup(t)
+
+	ctx := t.Context()
+	_, _, err := client.Issues.Update(ctx, "%", "r", 1, UpdateIssueRequest{})
 	testURLParseError(t, err)
 }
 
+// TestIssueRequest_Marshal_LabelsAndAssignees verifies the omitzero behavior of
+// the Labels and Assignees fields: a nil slice is omitted from the request body
+// (leaving the existing values unchanged), whereas a non-nil slice — including
+// an explicit empty slice — is sent (clearing the values when empty).
+func TestIssueRequest_Marshal_LabelsAndAssignees(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input UpdateIssueRequest
+		want  string
+	}{
+		{
+			name:  "nil labels and assignees are omitted",
+			input: UpdateIssueRequest{},
+			want:  `{}`,
+		},
+		{
+			name:  "empty non-nil labels and assignees are sent to clear them",
+			input: UpdateIssueRequest{Labels: []string{}, Assignees: []string{}},
+			want:  `{"labels":[],"assignees":[]}`,
+		},
+		{
+			name:  "populated labels and assignees are sent",
+			input: UpdateIssueRequest{Labels: []string{"bug"}, Assignees: []string{"octocat"}},
+			want:  `{"labels":["bug"],"assignees":["octocat"]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			b, err := json.Marshal(tt.input)
+			if err != nil {
+				t.Fatalf("json.Marshal(%#v) returned error: %v", tt.input, err)
+			}
+			if got := string(b); got != tt.want {
+				t.Errorf("json.Marshal(%#v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIssuesService_Lock(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/issues/1/lock", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
@@ -364,42 +482,43 @@ func TestIssuesService_Lock(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
-	if _, err := client.Issues.Lock(ctx, "o", "r", 1, nil); err != nil {
+	ctx := t.Context()
+	if _, err := client.Issues.Lock(ctx, "o", "r", 1, LockIssueRequest{}); err != nil {
 		t.Errorf("Issues.Lock returned error: %v", err)
 	}
 
 	const methodName = "Lock"
 	testBadOptions(t, methodName, func() (err error) {
-		_, err = client.Issues.Lock(ctx, "\n", "\n", -1, nil)
+		_, err = client.Issues.Lock(ctx, "\n", "\n", -1, LockIssueRequest{})
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		return client.Issues.Lock(ctx, "o", "r", 1, nil)
+		return client.Issues.Lock(ctx, "o", "r", 1, LockIssueRequest{})
 	})
 }
 
 func TestIssuesService_LockWithReason(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	body := LockIssueRequest{LockReason: new("off-topic")}
 
 	mux.HandleFunc("/repos/o/r/issues/1/lock", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
+		testJSONBody(t, r, body)
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	opt := &LockIssueOptions{LockReason: "off-topic"}
-
-	ctx := context.Background()
-	if _, err := client.Issues.Lock(ctx, "o", "r", 1, opt); err != nil {
+	ctx := t.Context()
+	if _, err := client.Issues.Lock(ctx, "o", "r", 1, body); err != nil {
 		t.Errorf("Issues.Lock returned error: %v", err)
 	}
 }
 
 func TestIssuesService_Unlock(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/issues/1/lock", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
@@ -407,7 +526,7 @@ func TestIssuesService_Unlock(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, err := client.Issues.Unlock(ctx, "o", "r", 1); err != nil {
 		t.Errorf("Issues.Unlock returned error: %v", err)
 	}
@@ -424,172 +543,13 @@ func TestIssuesService_Unlock(t *testing.T) {
 }
 
 func TestIsPullRequest(t *testing.T) {
-	i := new(Issue)
-	if i.IsPullRequest() == true {
+	t.Parallel()
+	var i Issue
+	if i.IsPullRequest() {
 		t.Errorf("expected i.IsPullRequest (%v) to return false, got true", i)
 	}
-	i.PullRequestLinks = &PullRequestLinks{URL: String("http://example.com")}
-	if i.IsPullRequest() == false {
+	i.PullRequestLinks = &PullRequestLinks{URL: new("http://example.com")}
+	if !i.IsPullRequest() {
 		t.Errorf("expected i.IsPullRequest (%v) to return true, got false", i)
 	}
-}
-
-func TestLockIssueOptions_Marshal(t *testing.T) {
-	testJSONMarshal(t, &LockIssueOptions{}, "{}")
-
-	u := &LockIssueOptions{
-		LockReason: "lr",
-	}
-
-	want := `{
-		"lock_reason": "lr"
-		}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestPullRequestLinks_Marshal(t *testing.T) {
-	testJSONMarshal(t, &PullRequestLinks{}, "{}")
-
-	u := &PullRequestLinks{
-		URL:      String("url"),
-		HTMLURL:  String("hurl"),
-		DiffURL:  String("durl"),
-		PatchURL: String("purl"),
-	}
-
-	want := `{
-		"url": "url",
-		"html_url": "hurl",
-		"diff_url": "durl",
-		"patch_url": "purl"
-		}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestIssueRequest_Marshal(t *testing.T) {
-	testJSONMarshal(t, &IssueRequest{}, "{}")
-
-	u := &IssueRequest{
-		Title:     String("url"),
-		Body:      String("url"),
-		Labels:    &[]string{"l"},
-		Assignee:  String("url"),
-		State:     String("url"),
-		Milestone: Int(1),
-		Assignees: &[]string{"a"},
-	}
-
-	want := `{
-		"title": "url",
-		"body": "url",
-		"labels": [
-			"l"
-		],
-		"assignee": "url",
-		"state": "url",
-		"milestone": 1,
-		"assignees": [
-			"a"
-		]
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestIssue_Marshal(t *testing.T) {
-	testJSONMarshal(t, &Issue{}, "{}")
-
-	u := &Issue{
-		ID:                Int64(1),
-		Number:            Int(1),
-		State:             String("s"),
-		Locked:            Bool(false),
-		Title:             String("title"),
-		Body:              String("body"),
-		AuthorAssociation: String("aa"),
-		User:              &User{ID: Int64(1)},
-		Labels:            []*Label{{ID: Int64(1)}},
-		Assignee:          &User{ID: Int64(1)},
-		Comments:          Int(1),
-		ClosedAt:          &referenceTime,
-		CreatedAt:         &referenceTime,
-		UpdatedAt:         &referenceTime,
-		ClosedBy:          &User{ID: Int64(1)},
-		URL:               String("url"),
-		HTMLURL:           String("hurl"),
-		CommentsURL:       String("curl"),
-		EventsURL:         String("eurl"),
-		LabelsURL:         String("lurl"),
-		RepositoryURL:     String("rurl"),
-		Milestone:         &Milestone{ID: Int64(1)},
-		PullRequestLinks:  &PullRequestLinks{URL: String("url")},
-		Repository:        &Repository{ID: Int64(1)},
-		Reactions:         &Reactions{TotalCount: Int(1)},
-		Assignees:         []*User{{ID: Int64(1)}},
-		NodeID:            String("nid"),
-		TextMatches:       []*TextMatch{{ObjectURL: String("ourl")}},
-		ActiveLockReason:  String("alr"),
-	}
-
-	want := `{
-		"id": 1,
-		"number": 1,
-		"state": "s",
-		"locked": false,
-		"title": "title",
-		"body": "body",
-		"author_association": "aa",
-		"user": {
-			"id": 1
-		},
-		"labels": [
-			{
-				"id": 1
-			}
-		],
-		"assignee": {
-			"id": 1
-		},
-		"comments": 1,
-		"closed_at": ` + referenceTimeStr + `,
-		"created_at": ` + referenceTimeStr + `,
-		"updated_at": ` + referenceTimeStr + `,
-		"closed_by": {
-			"id": 1
-		},
-		"url": "url",
-		"html_url": "hurl",
-		"comments_url": "curl",
-		"events_url": "eurl",
-		"labels_url": "lurl",
-		"repository_url": "rurl",
-		"milestone": {
-			"id": 1
-		},
-		"pull_request": {
-			"url": "url"
-		},
-		"repository": {
-			"id": 1
-		},
-		"reactions": {
-			"total_count": 1
-		},
-		"assignees": [
-			{
-				"id": 1
-			}
-		],
-		"node_id": "nid",
-		"text_matches": [
-			{
-				"object_url": "ourl"
-			}
-		],
-		"active_lock_reason": "alr"
-	}`
-
-	testJSONMarshal(t, u, want)
 }

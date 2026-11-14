@@ -13,7 +13,7 @@ import (
 // GitignoresService provides access to the gitignore related functions in the
 // GitHub API.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gitignore/
+// GitHub API docs: https://docs.github.com/rest/gitignore?apiVersion=2022-11-28
 type GitignoresService service
 
 // Gitignore represents a .gitignore file as returned by the GitHub API.
@@ -28,15 +28,17 @@ func (g Gitignore) String() string {
 
 // List all available Gitignore templates.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gitignore/#listing-available-templates
+// GitHub API docs: https://docs.github.com/rest/gitignore/gitignore?apiVersion=2022-11-28#get-all-gitignore-templates
+//
+//meta:operation GET /gitignore/templates
 func (s *GitignoresService) List(ctx context.Context) ([]string, *Response, error) {
-	req, err := s.client.NewRequest("GET", "gitignore/templates", nil)
+	req, err := s.client.NewRequest(ctx, "GET", "gitignore/templates", nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var availableTemplates []string
-	resp, err := s.client.Do(ctx, req, &availableTemplates)
+	resp, err := s.client.Do(req, &availableTemplates)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -46,16 +48,18 @@ func (s *GitignoresService) List(ctx context.Context) ([]string, *Response, erro
 
 // Get a Gitignore by name.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gitignore/#get-a-gitignore-template
+// GitHub API docs: https://docs.github.com/rest/gitignore/gitignore?apiVersion=2022-11-28#get-a-gitignore-template
+//
+//meta:operation GET /gitignore/templates/{name}
 func (s *GitignoresService) Get(ctx context.Context, name string) (*Gitignore, *Response, error) {
 	u := fmt.Sprintf("gitignore/templates/%v", name)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	gitignore := new(Gitignore)
-	resp, err := s.client.Do(ctx, req, gitignore)
+	var gitignore *Gitignore
+	resp, err := s.client.Do(req, &gitignore)
 	if err != nil {
 		return nil, resp, err
 	}

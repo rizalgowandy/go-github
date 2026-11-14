@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -17,8 +15,8 @@ import (
 )
 
 func TestGitService_GetRef_singleRef(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/git/ref/heads/b", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -34,19 +32,19 @@ func TestGitService_GetRef_singleRef(t *testing.T) {
 		  }`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ref, _, err := client.Git.GetRef(ctx, "o", "r", "refs/heads/b")
 	if err != nil {
 		t.Fatalf("Git.GetRef returned error: %v", err)
 	}
 
 	want := &Reference{
-		Ref: String("refs/heads/b"),
-		URL: String("https://api.github.com/repos/o/r/git/refs/heads/b"),
+		Ref: new("refs/heads/b"),
+		URL: new("https://api.github.com/repos/o/r/git/refs/heads/b"),
 		Object: &GitObject{
-			Type: String("commit"),
-			SHA:  String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-			URL:  String("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			Type: new("commit"),
+			SHA:  new("aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			URL:  new("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
 		},
 	}
 	if !cmp.Equal(ref, want) {
@@ -74,21 +72,21 @@ func TestGitService_GetRef_singleRef(t *testing.T) {
 }
 
 func TestGitService_GetRef_noRefs(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/git/refs/heads/b", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		w.WriteHeader(http.StatusNotFound)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ref, resp, err := client.Git.GetRef(ctx, "o", "r", "refs/heads/b")
 	if err == nil {
-		t.Errorf("Expected HTTP 404 response")
+		t.Error("Expected HTTP 404 response")
 	}
 	if got, want := resp.Response.StatusCode, http.StatusNotFound; got != want {
-		t.Errorf("Git.GetRef returned status %d, want %d", got, want)
+		t.Errorf("Git.GetRef returned status %v, want %v", got, want)
 	}
 	if ref != nil {
 		t.Errorf("Git.GetRef return %+v, want nil", ref)
@@ -110,8 +108,8 @@ func TestGitService_GetRef_noRefs(t *testing.T) {
 }
 
 func TestGitService_ListMatchingRefs_singleRef(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/git/matching-refs/heads/b", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -129,41 +127,34 @@ func TestGitService_ListMatchingRefs_singleRef(t *testing.T) {
 		  ]`)
 	})
 
-	opts := &ReferenceListOptions{Ref: "refs/heads/b"}
-	ctx := context.Background()
-	refs, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", opts)
+	ctx := t.Context()
+	refs, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", "heads/b")
 	if err != nil {
 		t.Fatalf("Git.ListMatchingRefs returned error: %v", err)
 	}
 
 	ref := refs[0]
 	want := &Reference{
-		Ref: String("refs/heads/b"),
-		URL: String("https://api.github.com/repos/o/r/git/refs/heads/b"),
+		Ref: new("refs/heads/b"),
+		URL: new("https://api.github.com/repos/o/r/git/refs/heads/b"),
 		Object: &GitObject{
-			Type: String("commit"),
-			SHA:  String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-			URL:  String("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			Type: new("commit"),
+			SHA:  new("aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			URL:  new("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
 		},
 	}
 	if !cmp.Equal(ref, want) {
 		t.Errorf("Git.ListMatchingRefs returned %+v, want %+v", ref, want)
 	}
 
-	// without 'refs/' prefix
-	opts = &ReferenceListOptions{Ref: "heads/b"}
-	if _, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", opts); err != nil {
-		t.Errorf("Git.ListMatchingRefs returned error: %v", err)
-	}
-
 	const methodName = "ListMatchingRefs"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Git.ListMatchingRefs(ctx, "\n", "\n", opts)
+		_, _, err = client.Git.ListMatchingRefs(ctx, "\n", "\n", "")
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Git.ListMatchingRefs(ctx, "o", "r", opts)
+		got, resp, err := client.Git.ListMatchingRefs(ctx, "o", "r", "")
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -172,8 +163,8 @@ func TestGitService_ListMatchingRefs_singleRef(t *testing.T) {
 }
 
 func TestGitService_ListMatchingRefs_multipleRefs(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/git/matching-refs/heads/b", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -201,20 +192,19 @@ func TestGitService_ListMatchingRefs_multipleRefs(t *testing.T) {
 		`)
 	})
 
-	opts := &ReferenceListOptions{Ref: "refs/heads/b"}
-	ctx := context.Background()
-	refs, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", opts)
+	ctx := t.Context()
+	refs, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", "heads/b")
 	if err != nil {
 		t.Errorf("Git.ListMatchingRefs returned error: %v", err)
 	}
 
 	want := &Reference{
-		Ref: String("refs/heads/booger"),
-		URL: String("https://api.github.com/repos/o/r/git/refs/heads/booger"),
+		Ref: new("refs/heads/booger"),
+		URL: new("https://api.github.com/repos/o/r/git/refs/heads/booger"),
 		Object: &GitObject{
-			Type: String("commit"),
-			SHA:  String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-			URL:  String("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			Type: new("commit"),
+			SHA:  new("aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			URL:  new("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
 		},
 	}
 	if !cmp.Equal(refs[0], want) {
@@ -223,12 +213,12 @@ func TestGitService_ListMatchingRefs_multipleRefs(t *testing.T) {
 
 	const methodName = "ListMatchingRefs"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Git.ListMatchingRefs(ctx, "\n", "\n", opts)
+		_, _, err = client.Git.ListMatchingRefs(ctx, "\n", "\n", "")
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Git.ListMatchingRefs(ctx, "o", "r", opts)
+		got, resp, err := client.Git.ListMatchingRefs(ctx, "o", "r", "")
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -237,17 +227,16 @@ func TestGitService_ListMatchingRefs_multipleRefs(t *testing.T) {
 }
 
 func TestGitService_ListMatchingRefs_noRefs(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/git/matching-refs/heads/b", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, "[]")
 	})
 
-	opts := &ReferenceListOptions{Ref: "refs/heads/b"}
-	ctx := context.Background()
-	refs, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", opts)
+	ctx := t.Context()
+	refs, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", "heads/b")
 	if err != nil {
 		t.Errorf("Git.ListMatchingRefs returned error: %v", err)
 	}
@@ -258,12 +247,12 @@ func TestGitService_ListMatchingRefs_noRefs(t *testing.T) {
 
 	const methodName = "ListMatchingRefs"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Git.ListMatchingRefs(ctx, "\n", "\n", opts)
+		_, _, err = client.Git.ListMatchingRefs(ctx, "\n", "\n", "")
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Git.ListMatchingRefs(ctx, "o", "r", opts)
+		got, resp, err := client.Git.ListMatchingRefs(ctx, "o", "r", "")
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -272,8 +261,8 @@ func TestGitService_ListMatchingRefs_noRefs(t *testing.T) {
 }
 
 func TestGitService_ListMatchingRefs_allRefs(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/git/matching-refs/", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -300,29 +289,29 @@ func TestGitService_ListMatchingRefs_allRefs(t *testing.T) {
 		  ]`)
 	})
 
-	ctx := context.Background()
-	refs, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", nil)
+	ctx := t.Context()
+	refs, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", "")
 	if err != nil {
 		t.Errorf("Git.ListMatchingRefs returned error: %v", err)
 	}
 
 	want := []*Reference{
 		{
-			Ref: String("refs/heads/branchA"),
-			URL: String("https://api.github.com/repos/o/r/git/refs/heads/branchA"),
+			Ref: new("refs/heads/branchA"),
+			URL: new("https://api.github.com/repos/o/r/git/refs/heads/branchA"),
 			Object: &GitObject{
-				Type: String("commit"),
-				SHA:  String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-				URL:  String("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
+				Type: new("commit"),
+				SHA:  new("aa218f56b14c9653891f9e74264a383fa43fefbd"),
+				URL:  new("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
 			},
 		},
 		{
-			Ref: String("refs/heads/branchB"),
-			URL: String("https://api.github.com/repos/o/r/git/refs/heads/branchB"),
+			Ref: new("refs/heads/branchB"),
+			URL: new("https://api.github.com/repos/o/r/git/refs/heads/branchB"),
 			Object: &GitObject{
-				Type: String("commit"),
-				SHA:  String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-				URL:  String("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
+				Type: new("commit"),
+				SHA:  new("aa218f56b14c9653891f9e74264a383fa43fefbd"),
+				URL:  new("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
 			},
 		},
 	}
@@ -332,49 +321,12 @@ func TestGitService_ListMatchingRefs_allRefs(t *testing.T) {
 
 	const methodName = "ListMatchingRefs"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Git.ListMatchingRefs(ctx, "\n", "\n", nil)
+		_, _, err = client.Git.ListMatchingRefs(ctx, "\n", "\n", "")
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Git.ListMatchingRefs(ctx, "o", "r", nil)
-		if got != nil {
-			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
-		}
-		return resp, err
-	})
-}
-
-func TestGitService_ListMatchingRefs_options(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
-
-	mux.HandleFunc("/repos/o/r/git/matching-refs/t", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "GET")
-		testFormValues(t, r, values{"page": "2"})
-		fmt.Fprint(w, `[{"ref": "r"}]`)
-	})
-
-	opts := &ReferenceListOptions{Ref: "t", ListOptions: ListOptions{Page: 2}}
-	ctx := context.Background()
-	refs, _, err := client.Git.ListMatchingRefs(ctx, "o", "r", opts)
-	if err != nil {
-		t.Errorf("Git.ListMatchingRefs returned error: %v", err)
-	}
-
-	want := []*Reference{{Ref: String("r")}}
-	if !cmp.Equal(refs, want) {
-		t.Errorf("Git.ListMatchingRefs returned %+v, want %+v", refs, want)
-	}
-
-	const methodName = "ListMatchingRefs"
-	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Git.ListMatchingRefs(ctx, "\n", "\n", opts)
-		return err
-	})
-
-	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Git.ListMatchingRefs(ctx, "o", "r", opts)
+		got, resp, err := client.Git.ListMatchingRefs(ctx, "o", "r", "")
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -383,22 +335,17 @@ func TestGitService_ListMatchingRefs_options(t *testing.T) {
 }
 
 func TestGitService_CreateRef(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	args := &createRefRequest{
-		Ref: String("refs/heads/b"),
-		SHA: String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
+	args := CreateRef{
+		Ref: "refs/heads/b",
+		SHA: "aa218f56b14c9653891f9e74264a383fa43fefbd",
 	}
 
 	mux.HandleFunc("/repos/o/r/git/refs", func(w http.ResponseWriter, r *http.Request) {
-		v := new(createRefRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, args) {
-			t.Errorf("Request body = %+v, want %+v", v, args)
-		}
+		testJSONBody(t, r, args)
 		fmt.Fprint(w, `
 		  {
 		    "ref": "refs/heads/b",
@@ -411,24 +358,22 @@ func TestGitService_CreateRef(t *testing.T) {
 		  }`)
 	})
 
-	ctx := context.Background()
-	ref, _, err := client.Git.CreateRef(ctx, "o", "r", &Reference{
-		Ref: String("refs/heads/b"),
-		Object: &GitObject{
-			SHA: String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-		},
+	ctx := t.Context()
+	ref, _, err := client.Git.CreateRef(ctx, "o", "r", CreateRef{
+		Ref: "refs/heads/b",
+		SHA: "aa218f56b14c9653891f9e74264a383fa43fefbd",
 	})
 	if err != nil {
 		t.Errorf("Git.CreateRef returned error: %v", err)
 	}
 
 	want := &Reference{
-		Ref: String("refs/heads/b"),
-		URL: String("https://api.github.com/repos/o/r/git/refs/heads/b"),
+		Ref: new("refs/heads/b"),
+		URL: new("https://api.github.com/repos/o/r/git/refs/heads/b"),
 		Object: &GitObject{
-			Type: String("commit"),
-			SHA:  String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-			URL:  String("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			Type: new("commit"),
+			SHA:  new("aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			URL:  new("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
 		},
 	}
 	if !cmp.Equal(ref, want) {
@@ -436,11 +381,9 @@ func TestGitService_CreateRef(t *testing.T) {
 	}
 
 	// without 'refs/' prefix
-	_, _, err = client.Git.CreateRef(ctx, "o", "r", &Reference{
-		Ref: String("heads/b"),
-		Object: &GitObject{
-			SHA: String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-		},
+	_, _, err = client.Git.CreateRef(ctx, "o", "r", CreateRef{
+		Ref: "heads/b",
+		SHA: "aa218f56b14c9653891f9e74264a383fa43fefbd",
 	})
 	if err != nil {
 		t.Errorf("Git.CreateRef returned error: %v", err)
@@ -448,21 +391,21 @@ func TestGitService_CreateRef(t *testing.T) {
 
 	const methodName = "CreateRef"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Git.CreateRef(ctx, "\n", "\n", &Reference{
-			Ref: String("refs/heads/b"),
-			Object: &GitObject{
-				SHA: String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-			},
+		_, _, err = client.Git.CreateRef(ctx, "o", "r", CreateRef{Ref: ""})
+		return err
+	})
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Git.CreateRef(ctx, "\n", "\n", CreateRef{
+			Ref: "refs/heads/b",
+			SHA: "aa218f56b14c9653891f9e74264a383fa43fefbd",
 		})
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Git.CreateRef(ctx, "o", "r", &Reference{
-			Ref: String("refs/heads/b"),
-			Object: &GitObject{
-				SHA: String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-			},
+		got, resp, err := client.Git.CreateRef(ctx, "o", "r", CreateRef{
+			Ref: "refs/heads/b",
+			SHA: "aa218f56b14c9653891f9e74264a383fa43fefbd",
 		})
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
@@ -472,22 +415,17 @@ func TestGitService_CreateRef(t *testing.T) {
 }
 
 func TestGitService_UpdateRef(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	args := &updateRefRequest{
-		SHA:   String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-		Force: Bool(true),
+	args := UpdateRef{
+		SHA:   "aa218f56b14c9653891f9e74264a383fa43fefbd",
+		Force: new(true),
 	}
 
 	mux.HandleFunc("/repos/o/r/git/refs/heads/b", func(w http.ResponseWriter, r *http.Request) {
-		v := new(updateRefRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, args) {
-			t.Errorf("Request body = %+v, want %+v", v, args)
-		}
+		testJSONBody(t, r, args)
 		fmt.Fprint(w, `
 		  {
 		    "ref": "refs/heads/b",
@@ -500,22 +438,22 @@ func TestGitService_UpdateRef(t *testing.T) {
 		  }`)
 	})
 
-	ctx := context.Background()
-	ref, _, err := client.Git.UpdateRef(ctx, "o", "r", &Reference{
-		Ref:    String("refs/heads/b"),
-		Object: &GitObject{SHA: String("aa218f56b14c9653891f9e74264a383fa43fefbd")},
-	}, true)
+	ctx := t.Context()
+	ref, _, err := client.Git.UpdateRef(ctx, "o", "r", "refs/heads/b", UpdateRef{
+		SHA:   "aa218f56b14c9653891f9e74264a383fa43fefbd",
+		Force: new(true),
+	})
 	if err != nil {
 		t.Errorf("Git.UpdateRef returned error: %v", err)
 	}
 
 	want := &Reference{
-		Ref: String("refs/heads/b"),
-		URL: String("https://api.github.com/repos/o/r/git/refs/heads/b"),
+		Ref: new("refs/heads/b"),
+		URL: new("https://api.github.com/repos/o/r/git/refs/heads/b"),
 		Object: &GitObject{
-			Type: String("commit"),
-			SHA:  String("aa218f56b14c9653891f9e74264a383fa43fefbd"),
-			URL:  String("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			Type: new("commit"),
+			SHA:  new("aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			URL:  new("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
 		},
 	}
 	if !cmp.Equal(ref, want) {
@@ -523,28 +461,36 @@ func TestGitService_UpdateRef(t *testing.T) {
 	}
 
 	// without 'refs/' prefix
-	_, _, err = client.Git.UpdateRef(ctx, "o", "r", &Reference{
-		Ref:    String("heads/b"),
-		Object: &GitObject{SHA: String("aa218f56b14c9653891f9e74264a383fa43fefbd")},
-	}, true)
+	_, _, err = client.Git.UpdateRef(ctx, "o", "r", "heads/b", UpdateRef{
+		SHA:   "aa218f56b14c9653891f9e74264a383fa43fefbd",
+		Force: new(true),
+	})
 	if err != nil {
 		t.Errorf("Git.UpdateRef returned error: %v", err)
 	}
 
 	const methodName = "UpdateRef"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Git.UpdateRef(ctx, "\n", "\n", &Reference{
-			Ref:    String("refs/heads/b"),
-			Object: &GitObject{SHA: String("aa218f56b14c9653891f9e74264a383fa43fefbd")},
-		}, true)
+		_, _, err = client.Git.UpdateRef(ctx, "o", "r", "", UpdateRef{SHA: "aa218f56b14c9653891f9e74264a383fa43fefbd"})
+		return err
+	})
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Git.UpdateRef(ctx, "o", "r", "refs/heads/b", UpdateRef{SHA: ""})
+		return err
+	})
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Git.UpdateRef(ctx, "\n", "\n", "refs/heads/b", UpdateRef{
+			SHA:   "aa218f56b14c9653891f9e74264a383fa43fefbd",
+			Force: new(true),
+		})
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Git.UpdateRef(ctx, "o", "r", &Reference{
-			Ref:    String("refs/heads/b"),
-			Object: &GitObject{SHA: String("aa218f56b14c9653891f9e74264a383fa43fefbd")},
-		}, true)
+		got, resp, err := client.Git.UpdateRef(ctx, "o", "r", "refs/heads/b", UpdateRef{
+			SHA:   "aa218f56b14c9653891f9e74264a383fa43fefbd",
+			Force: new(true),
+		})
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -553,14 +499,14 @@ func TestGitService_UpdateRef(t *testing.T) {
 }
 
 func TestGitService_DeleteRef(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/git/refs/heads/b", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/git/refs/heads/b", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Git.DeleteRef(ctx, "o", "r", "refs/heads/b")
 	if err != nil {
 		t.Errorf("Git.DeleteRef returned error: %v", err)
@@ -583,8 +529,8 @@ func TestGitService_DeleteRef(t *testing.T) {
 }
 
 func TestGitService_GetRef_pathEscape(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/git/ref/heads/b", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -603,7 +549,7 @@ func TestGitService_GetRef_pathEscape(t *testing.T) {
 		  }`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Git.GetRef(ctx, "o", "r", "refs/heads/b")
 	if err != nil {
 		t.Fatalf("Git.GetRef returned error: %v", err)
@@ -624,80 +570,49 @@ func TestGitService_GetRef_pathEscape(t *testing.T) {
 	})
 }
 
-func TestReference_Marshal(t *testing.T) {
-	testJSONMarshal(t, &Reference{}, "{}")
+func TestGitService_UpdateRef_pathEscape(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	u := &Reference{
-		Ref: String("ref"),
-		URL: String("url"),
+	args := UpdateRef{
+		SHA:   "aa218f56b14c9653891f9e74264a383fa43fefbd",
+		Force: new(true),
+	}
+
+	mux.HandleFunc("/repos/o/r/git/refs/heads/b#1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PATCH")
+		testJSONBody(t, r, args)
+		fmt.Fprint(w, `
+		  {
+		    "ref": "refs/heads/b#1",
+		    "url": "https://api.github.com/repos/o/r/git/refs/heads/b%231",
+		    "object": {
+		      "type": "commit",
+		      "sha": "aa218f56b14c9653891f9e74264a383fa43fefbd",
+		      "url": "https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"
+		    }
+		  }`)
+	})
+
+	ctx := t.Context()
+	ref, _, err := client.Git.UpdateRef(ctx, "o", "r", "refs/heads/b#1", UpdateRef{
+		SHA:   "aa218f56b14c9653891f9e74264a383fa43fefbd",
+		Force: new(true),
+	})
+	if err != nil {
+		t.Errorf("Git.UpdateRef returned error: %v", err)
+	}
+
+	want := &Reference{
+		Ref: new("refs/heads/b#1"),
+		URL: new("https://api.github.com/repos/o/r/git/refs/heads/b%231"),
 		Object: &GitObject{
-			Type: String("type"),
-			SHA:  String("sha"),
-			URL:  String("url"),
+			Type: new("commit"),
+			SHA:  new("aa218f56b14c9653891f9e74264a383fa43fefbd"),
+			URL:  new("https://api.github.com/repos/o/r/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"),
 		},
-		NodeID: String("nid"),
 	}
-
-	want := `{
-		"ref": "ref",
-		"url": "url",
-		"object": {
-			"type": "type",
-			"sha": "sha",
-			"url": "url"
-		},
-		"node_id": "nid"
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestGitObject_Marshal(t *testing.T) {
-	testJSONMarshal(t, &GitObject{}, "{}")
-
-	u := &GitObject{
-		Type: String("type"),
-		SHA:  String("sha"),
-		URL:  String("url"),
+	if !cmp.Equal(ref, want) {
+		t.Errorf("Git.UpdateRef returned %+v, want %+v", ref, want)
 	}
-
-	want := `{
-		"type": "type",
-		"sha": "sha",
-		"url": "url"
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestCreateRefRequest_Marshal(t *testing.T) {
-	testJSONMarshal(t, &createRefRequest{}, "{}")
-
-	u := &createRefRequest{
-		Ref: String("ref"),
-		SHA: String("sha"),
-	}
-
-	want := `{
-		"ref": "ref",
-		"sha": "sha"
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestUpdateRefRequest_Marshal(t *testing.T) {
-	testJSONMarshal(t, &updateRefRequest{}, "{}")
-
-	u := &updateRefRequest{
-		SHA:   String("sha"),
-		Force: Bool(true),
-	}
-
-	want := `{
-		"sha": "sha",
-		"force": true
-	}`
-
-	testJSONMarshal(t, u, want)
 }

@@ -9,7 +9,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 )
 
 var ErrMixedCommentStyles = errors.New("cannot use both position and side/line form comments")
@@ -20,13 +19,17 @@ type PullRequestReview struct {
 	NodeID         *string    `json:"node_id,omitempty"`
 	User           *User      `json:"user,omitempty"`
 	Body           *string    `json:"body,omitempty"`
-	SubmittedAt    *time.Time `json:"submitted_at,omitempty"`
+	SubmittedAt    *Timestamp `json:"submitted_at,omitempty"`
 	CommitID       *string    `json:"commit_id,omitempty"`
 	HTMLURL        *string    `json:"html_url,omitempty"`
 	PullRequestURL *string    `json:"pull_request_url,omitempty"`
 	State          *string    `json:"state,omitempty"`
-	// AuthorAssociation is the comment author's relationship to the issue's repository.
+	// AuthorAssociation is the review author's relationship to the repository.
 	// Possible values are "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MEMBER", "OWNER", or "NONE".
+	//
+	// Deprecated: GitHub will remove this field from Events API payloads on October 7, 2025.
+	// Use the Pull Request Reviews REST API endpoint to retrieve this information.
+	// See: https://docs.github.com/rest/pulls/reviews?apiVersion=2022-11-28#get-a-review-for-a-pull-request
 	AuthorAssociation *string `json:"author_association,omitempty"`
 }
 
@@ -90,32 +93,41 @@ func (r *PullRequestReviewRequest) isComfortFadePreview() (bool, error) {
 	return false, nil
 }
 
-// PullRequestReviewDismissalRequest represents a request to dismiss a review.
-type PullRequestReviewDismissalRequest struct {
-	Message *string `json:"message,omitempty"`
+// PullRequestDismissReviewRequest represents a request to dismiss a review.
+type PullRequestDismissReviewRequest struct {
+	Message string  `json:"message"`
+	Event   *string `json:"event,omitempty"`
 }
 
-func (r PullRequestReviewDismissalRequest) String() string {
+func (r PullRequestDismissReviewRequest) String() string {
 	return Stringify(r)
+}
+
+// PullRequestSubmitReviewRequest represents a request to submit a review.
+type PullRequestSubmitReviewRequest struct {
+	Body  *string `json:"body,omitempty"`
+	Event string  `json:"event"`
 }
 
 // ListReviews lists all reviews on the specified pull request.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls/#list-reviews-for-a-pull-request
+// GitHub API docs: https://docs.github.com/rest/pulls/reviews?apiVersion=2022-11-28#list-reviews-for-a-pull-request
+//
+//meta:operation GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews
 func (s *PullRequestsService) ListReviews(ctx context.Context, owner, repo string, number int, opts *ListOptions) ([]*PullRequestReview, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews", owner, repo, number)
+	u := fmt.Sprintf("repos/%v/%v/pulls/%v/reviews", owner, repo, number)
 	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var reviews []*PullRequestReview
-	resp, err := s.client.Do(ctx, req, &reviews)
+	resp, err := s.client.Do(req, &reviews)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -125,17 +137,19 @@ func (s *PullRequestsService) ListReviews(ctx context.Context, owner, repo strin
 
 // GetReview fetches the specified pull request review.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls/#get-a-review-for-a-pull-request
+// GitHub API docs: https://docs.github.com/rest/pulls/reviews?apiVersion=2022-11-28#get-a-review-for-a-pull-request
+//
+//meta:operation GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}
 func (s *PullRequestsService) GetReview(ctx context.Context, owner, repo string, number int, reviewID int64) (*PullRequestReview, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews/%d", owner, repo, number, reviewID)
+	u := fmt.Sprintf("repos/%v/%v/pulls/%v/reviews/%v", owner, repo, number, reviewID)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	review := new(PullRequestReview)
-	resp, err := s.client.Do(ctx, req, review)
+	var review *PullRequestReview
+	resp, err := s.client.Do(req, &review)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -145,17 +159,19 @@ func (s *PullRequestsService) GetReview(ctx context.Context, owner, repo string,
 
 // DeletePendingReview deletes the specified pull request pending review.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls/#delete-a-pending-review-for-a-pull-request
+// GitHub API docs: https://docs.github.com/rest/pulls/reviews?apiVersion=2022-11-28#delete-a-pending-review-for-a-pull-request
+//
+//meta:operation DELETE /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}
 func (s *PullRequestsService) DeletePendingReview(ctx context.Context, owner, repo string, number int, reviewID int64) (*PullRequestReview, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews/%d", owner, repo, number, reviewID)
+	u := fmt.Sprintf("repos/%v/%v/pulls/%v/reviews/%v", owner, repo, number, reviewID)
 
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	review := new(PullRequestReview)
-	resp, err := s.client.Do(ctx, req, review)
+	var review *PullRequestReview
+	resp, err := s.client.Do(req, &review)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -165,21 +181,23 @@ func (s *PullRequestsService) DeletePendingReview(ctx context.Context, owner, re
 
 // ListReviewComments lists all the comments for the specified review.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls/#list-comments-for-a-pull-request-review
+// GitHub API docs: https://docs.github.com/rest/pulls/reviews?apiVersion=2022-11-28#list-comments-for-a-pull-request-review
+//
+//meta:operation GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments
 func (s *PullRequestsService) ListReviewComments(ctx context.Context, owner, repo string, number int, reviewID int64, opts *ListOptions) ([]*PullRequestComment, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews/%d/comments", owner, repo, number, reviewID)
+	u := fmt.Sprintf("repos/%v/%v/pulls/%v/reviews/%v/comments", owner, repo, number, reviewID)
 	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var comments []*PullRequestComment
-	resp, err := s.client.Do(ctx, req, &comments)
+	resp, err := s.client.Do(req, &comments)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -189,49 +207,53 @@ func (s *PullRequestsService) ListReviewComments(ctx context.Context, owner, rep
 
 // CreateReview creates a new review on the specified pull request.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls/#create-a-review-for-a-pull-request
-//
 // In order to use multi-line comments, you must use the "comfort fade" preview.
 // This replaces the use of the "Position" field in comments with 4 new fields:
-//   [Start]Side, and [Start]Line.
+//
+//	[Start]Side, and [Start]Line.
+//
 // These new fields must be used for ALL comments (including single-line),
 // with the following restrictions (empirically observed, so subject to change).
 //
 // For single-line "comfort fade" comments, you must use:
 //
-//    Path:  &path,  // as before
-//    Body:  &body,  // as before
-//    Side:  &"RIGHT" (or "LEFT")
-//    Line:  &123,  // NOT THE SAME AS POSITION, this is an actual line number.
+//	Path:  &path,  // as before
+//	Body:  &body,  // as before
+//	Side:  &"RIGHT" (or "LEFT")
+//	Line:  &123,  // NOT THE SAME AS POSITION, this is an actual line number.
 //
 // If StartSide or StartLine is used with single-line comments, a 422 is returned.
 //
 // For multi-line "comfort fade" comments, you must use:
 //
-//    Path:      &path,  // as before
-//    Body:      &body,  // as before
-//    StartSide: &"RIGHT" (or "LEFT")
-//    Side:      &"RIGHT" (or "LEFT")
-//    StartLine: &120,
-//    Line:      &125,
+//	Path:      &path,  // as before
+//	Body:      &body,  // as before
+//	StartSide: &"RIGHT" (or "LEFT")
+//	Side:      &"RIGHT" (or "LEFT")
+//	StartLine: &120,
+//	Line:      &125,
 //
 // Suggested edits are made by commenting on the lines to replace, and including the
 // suggested edit in a block like this (it may be surrounded in non-suggestion markdown):
 //
-//    ```suggestion
-//    Use this instead.
-//    It is waaaaaay better.
-//    ```
-func (s *PullRequestsService) CreateReview(ctx context.Context, owner, repo string, number int, review *PullRequestReviewRequest) (*PullRequestReview, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews", owner, repo, number)
+//	```suggestion
+//	Use this instead.
+//	It is waaaaaay better.
+//	```
+//
+// GitHub API docs: https://docs.github.com/rest/pulls/reviews?apiVersion=2022-11-28#create-a-review-for-a-pull-request
+//
+//meta:operation POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+func (s *PullRequestsService) CreateReview(ctx context.Context, owner, repo string, number int, body *PullRequestReviewRequest) (*PullRequestReview, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/pulls/%v/reviews", owner, repo, number)
 
-	req, err := s.client.NewRequest("POST", u, review)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Detect which style of review comment is being used.
-	if isCF, err := review.isComfortFadePreview(); err != nil {
+	if isCF, err := body.isComfortFadePreview(); err != nil {
 		return nil, nil, err
 	} else if isCF {
 		// If the review comments are using the comfort fade preview fields,
@@ -239,8 +261,8 @@ func (s *PullRequestsService) CreateReview(ctx context.Context, owner, repo stri
 		req.Header.Set("Accept", mediaTypeMultiLineCommentsPreview)
 	}
 
-	r := new(PullRequestReview)
-	resp, err := s.client.Do(ctx, req, r)
+	var r *PullRequestReview
+	resp, err := s.client.Do(req, &r)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -250,20 +272,22 @@ func (s *PullRequestsService) CreateReview(ctx context.Context, owner, repo stri
 
 // UpdateReview updates the review summary on the specified pull request.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls/#update-a-review-for-a-pull-request
+// GitHub API docs: https://docs.github.com/rest/pulls/reviews?apiVersion=2022-11-28#update-a-review-for-a-pull-request
+//
+//meta:operation PUT /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}
 func (s *PullRequestsService) UpdateReview(ctx context.Context, owner, repo string, number int, reviewID int64, body string) (*PullRequestReview, *Response, error) {
 	opts := &struct {
 		Body string `json:"body"`
 	}{Body: body}
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews/%d", owner, repo, number, reviewID)
+	u := fmt.Sprintf("repos/%v/%v/pulls/%v/reviews/%v", owner, repo, number, reviewID)
 
-	req, err := s.client.NewRequest("PUT", u, opts)
+	req, err := s.client.NewRequest(ctx, "PUT", u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	review := &PullRequestReview{}
-	resp, err := s.client.Do(ctx, req, review)
+	var review *PullRequestReview
+	resp, err := s.client.Do(req, &review)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -273,17 +297,19 @@ func (s *PullRequestsService) UpdateReview(ctx context.Context, owner, repo stri
 
 // SubmitReview submits a specified review on the specified pull request.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls/#submit-a-review-for-a-pull-request
-func (s *PullRequestsService) SubmitReview(ctx context.Context, owner, repo string, number int, reviewID int64, review *PullRequestReviewRequest) (*PullRequestReview, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews/%d/events", owner, repo, number, reviewID)
+// GitHub API docs: https://docs.github.com/rest/pulls/reviews?apiVersion=2022-11-28#submit-a-review-for-a-pull-request
+//
+//meta:operation POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/events
+func (s *PullRequestsService) SubmitReview(ctx context.Context, owner, repo string, number int, reviewID int64, body PullRequestSubmitReviewRequest) (*PullRequestReview, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/pulls/%v/reviews/%v/events", owner, repo, number, reviewID)
 
-	req, err := s.client.NewRequest("POST", u, review)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	r := new(PullRequestReview)
-	resp, err := s.client.Do(ctx, req, r)
+	var r *PullRequestReview
+	resp, err := s.client.Do(req, &r)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -293,17 +319,19 @@ func (s *PullRequestsService) SubmitReview(ctx context.Context, owner, repo stri
 
 // DismissReview dismisses a specified review on the specified pull request.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls/#dismiss-a-review-for-a-pull-request
-func (s *PullRequestsService) DismissReview(ctx context.Context, owner, repo string, number int, reviewID int64, review *PullRequestReviewDismissalRequest) (*PullRequestReview, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews/%d/dismissals", owner, repo, number, reviewID)
+// GitHub API docs: https://docs.github.com/rest/pulls/reviews?apiVersion=2022-11-28#dismiss-a-review-for-a-pull-request
+//
+//meta:operation PUT /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals
+func (s *PullRequestsService) DismissReview(ctx context.Context, owner, repo string, number int, reviewID int64, body PullRequestDismissReviewRequest) (*PullRequestReview, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/pulls/%v/reviews/%v/dismissals", owner, repo, number, reviewID)
 
-	req, err := s.client.NewRequest("PUT", u, review)
+	req, err := s.client.NewRequest(ctx, "PUT", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	r := new(PullRequestReview)
-	resp, err := s.client.Do(ctx, req, r)
+	var r *PullRequestReview
+	resp, err := s.client.Do(req, &r)
 	if err != nil {
 		return nil, resp, err
 	}

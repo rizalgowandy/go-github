@@ -4,7 +4,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build ignore
-// +build ignore
 
 // gen-stringify-test generates test methods to test the String methods.
 //
@@ -18,13 +17,14 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
+	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -38,13 +38,16 @@ const (
 )
 
 var (
+	check   = flag.Bool("check", false, "Check whether generated files are up to date")
 	verbose = flag.Bool("v", false, "Print verbose log messages")
 
 	// skipStructMethods lists "struct.method" combos to skip.
 	skipStructMethods = map[string]bool{}
 	// skipStructs lists structs to skip.
 	skipStructs = map[string]bool{
-		"RateLimits": true,
+		// Its nested artifact has required value fields; tested manually.
+		"IssueArtifactWithVersions": true,
+		"RateLimits":                true,
 	}
 
 	funcMap = template.FuncMap{
@@ -56,18 +59,28 @@ var (
 		},
 		"processZeroValue": func(v string) string {
 			switch v {
-			case "Bool(false)":
+			case "false":
 				return "false"
-			case "Float64(0.0)":
+			case "new(false)":
+				return "false"
+			case "0.0", "new(0.0)":
 				return "0"
-			case "0", "Int(0)", "Int64(0)":
+			case "0", "new(0)", "new(int64(0))":
 				return "0"
-			case `""`, `String("")`:
+			case `""`, `new("")`:
 				return `""`
 			case "Timestamp{}", "&Timestamp{}":
 				return "github.Timestamp{0001-01-01 00:00:00 +0000 UTC}"
 			case "nil":
 				return "map[]"
+			case `[]int{0}`:
+				return `[0]`
+			case `[]string{""}`:
+				return `[""]`
+			case "[]Scope{ScopeNone}":
+				return `["(no scope)"]`
+			case "[]any{nil}":
+				return "[<nil>]"
 			}
 			log.Fatalf("Unhandled zero value: %q", v)
 			return ""
@@ -76,6 +89,10 @@ var (
 
 	sourceTmpl = template.Must(template.New("source").Funcs(funcMap).Parse(source))
 )
+
+func isCheck() bool {
+	return *check || os.Getenv("CHECK") == "1"
+}
 
 func main() {
 	flag.Parse()
@@ -144,7 +161,18 @@ func (t *templateData) processAST(f *ast.File) error {
 					logf("Got FuncDecl: Name=%q, id.Name=%#v", fn.Name.Name, id.Name)
 					t.StringFuncs[id.Name] = true
 				} else {
-					logf("Ignoring FuncDecl: Name=%q, Type=%T", fn.Name.Name, fn.Recv.List[0].Type)
+					star, ok := fn.Recv.List[0].Type.(*ast.StarExpr)
+					if ok && fn.Name.Name == "String" {
+						id, ok := star.X.(*ast.Ident)
+						if ok {
+							logf("Got FuncDecl: Name=%q, id.Name=%#v", fn.Name.Name, id.Name)
+							t.StringFuncs[id.Name] = true
+						} else {
+							logf("Ignoring FuncDecl: Name=%q, Type=%T", fn.Name.Name, fn.Recv.List[0].Type)
+						}
+					} else {
+						logf("Ignoring FuncDecl: Name=%q, Type=%T", fn.Name.Name, fn.Recv.List[0].Type)
+					}
 				}
 			} else {
 				logf("Ignoring FuncDecl: Name=%q, fn=%#v", fn.Name.Name, fn)
@@ -157,6 +185,7 @@ func (t *templateData) processAST(f *ast.File) error {
 			logf("Ignoring AST decl type %T", decl)
 			continue
 		}
+
 		for _, spec := range gd.Specs {
 			ts, ok := spec.(*ast.TypeSpec)
 			if !ok {
@@ -174,7 +203,7 @@ func (t *templateData) processAST(f *ast.File) error {
 			}
 			st, ok := ts.Type.(*ast.StructType)
 			if !ok {
-				logf("Ignoring AST type %T, Name=%q", ts.Type, ts.Name.String())
+				logf("Ignoring AST type %T, Name=%q", ts.Type, ts.Name)
 				continue
 			}
 			for _, field := range st.Fields.List {
@@ -188,9 +217,16 @@ func (t *templateData) processAST(f *ast.File) error {
 					continue
 				}
 
+				if at, ok := field.Type.(*ast.ArrayType); ok {
+					if id, ok := at.Elt.(*ast.Ident); ok {
+						t.addIdentSlice(id, ts.Name.String(), fieldName.String())
+						continue
+					}
+				}
+
 				se, ok := field.Type.(*ast.StarExpr)
 				if !ok {
-					logf("Ignoring type %T for Name=%q, FieldName=%q", field.Type, ts.Name.String(), fieldName.String())
+					logf("Ignoring type %T for Name=%q, FieldName=%q", field.Type, ts.Name, fieldName)
 					continue
 				}
 
@@ -226,7 +262,7 @@ func (t *templateData) addMapType(receiverType, fieldName string) {
 
 func (t *templateData) addIdent(x *ast.Ident, receiverType, fieldName string) {
 	var zeroValue string
-	var namedStruct = false
+	var namedStruct bool
 	switch x.String() {
 	case "int":
 		zeroValue = "0"
@@ -250,20 +286,48 @@ func (t *templateData) addIdent(x *ast.Ident, receiverType, fieldName string) {
 
 func (t *templateData) addIdentPtr(x *ast.Ident, receiverType, fieldName string) {
 	var zeroValue string
-	var namedStruct = false
+	var namedStruct bool
 	switch x.String() {
 	case "int":
-		zeroValue = "Int(0)"
+		zeroValue = "new(0)"
 	case "int64":
-		zeroValue = "Int64(0)"
+		zeroValue = "new(int64(0))"
 	case "float64":
-		zeroValue = "Float64(0.0)"
+		zeroValue = "new(0.0)"
 	case "string":
-		zeroValue = `String("")`
+		zeroValue = `new("")`
 	case "bool":
-		zeroValue = "Bool(false)"
+		zeroValue = "new(false)"
 	case "Timestamp":
 		zeroValue = "&Timestamp{}"
+	default:
+		zeroValue = "nil"
+		namedStruct = true
+	}
+
+	t.StructFields[receiverType] = append(t.StructFields[receiverType], newStructField(receiverType, fieldName, x.String(), zeroValue, namedStruct))
+}
+
+func (t *templateData) addIdentSlice(x *ast.Ident, receiverType, fieldName string) {
+	var zeroValue string
+	var namedStruct bool
+	switch x.String() {
+	case "int":
+		zeroValue = "[]int{0}"
+	case "int64":
+		zeroValue = "[]int64{0}"
+	case "float64":
+		zeroValue = "[]float64{0}"
+	case "string":
+		zeroValue = `[]string{""}`
+	case "bool":
+		zeroValue = "[]bool{false}"
+	case "Scope":
+		zeroValue = "[]Scope{ScopeNone}"
+	case "any":
+		zeroValue = "[]any{nil}"
+	// case "Timestamp":
+	// 	zeroValue = "&Timestamp{}"
 	default:
 		zeroValue = "nil"
 		namedStruct = true
@@ -296,12 +360,40 @@ func (t *templateData) dump() error {
 	}
 	clean, err := format.Source(buf.Bytes())
 	if err != nil {
-		log.Printf("failed-to-format source:\n%v", buf.String())
+		log.Printf("failed-to-format source:\n%v", buf)
 		return err
 	}
 
+	if isCheck() {
+		logf("Checking %v...", t.filename)
+		old, err := os.ReadFile(t.filename)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("Missing file: %v\n", t.filename)
+			}
+			return err
+		}
+
+		if !bytes.Equal(old, clean) {
+			return fmt.Errorf("Generated files are out of date. Please run go generate ./... and commit the results")
+		}
+		return nil
+	}
+
 	logf("Writing %v...", t.filename)
-	return ioutil.WriteFile(t.filename, clean, 0644)
+	if err := os.Chmod(t.filename, 0o644); err != nil {
+		return fmt.Errorf("os.Chmod(%q, 0644): %v", t.filename, err)
+	}
+
+	if err := os.WriteFile(t.filename, clean, 0o444); err != nil {
+		return err
+	}
+
+	if err := os.Chmod(t.filename, 0o444); err != nil {
+		return fmt.Errorf("os.Chmod(%q, 0444): %v", t.filename, err)
+	}
+
+	return nil
 }
 
 func newStructField(receiverType, fieldName, fieldType, zeroValue string, namedStruct bool) *structField {
@@ -316,18 +408,20 @@ func newStructField(receiverType, fieldName, fieldType, zeroValue string, namedS
 	}
 }
 
-func logf(fmt string, args ...interface{}) {
+func logf(fmt string, args ...any) {
 	if *verbose {
 		log.Printf(fmt, args...)
 	}
 }
 
-const source = `// Copyright {{.Year}} The go-github AUTHORS. All rights reserved.
+const source = `// Code generated by gen-stringify-tests; DO NOT EDIT.
+// Instead, please run "go generate ./..." as described here:
+// https://github.com/google/go-github/blob/master/CONTRIBUTING.md#submitting-a-patch
+
+// Copyright {{.Year}} The go-github AUTHORS. All rights reserved.
 //
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
-
-// Code generated by gen-stringify-tests; DO NOT EDIT.
 
 package {{ $package := .Package}}{{$package}}
 {{with .Imports}}
@@ -337,9 +431,9 @@ import (
   {{end -}}
 )
 {{end}}
-func Float64(v float64) *float64 { return &v }
 {{range $key, $value := .StructFields}}
 func Test{{ $key }}_String(t *testing.T) {
+  t.Parallel()
   v := {{ $key }}{ {{range .}}{{if .NamedStruct}}
     {{ .FieldName }}: &{{ .FieldType }}{},{{else}}
     {{ .FieldName }}: {{.ZeroValue}},{{end}}{{end}}

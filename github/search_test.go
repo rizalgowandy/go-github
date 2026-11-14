@@ -6,17 +6,17 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestSearchService_Repositories(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/search/repositories", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -32,27 +32,35 @@ func TestSearchService_Repositories(t *testing.T) {
 	})
 
 	opts := &SearchOptions{Sort: "forks", Order: "desc", ListOptions: ListOptions{Page: 2, PerPage: 2}}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Repositories(ctx, "blah", opts)
 	if err != nil {
 		t.Errorf("Search.Repositories returned error: %v", err)
 	}
 
 	want := &RepositoriesSearchResult{
-		Total:             Int(4),
-		IncompleteResults: Bool(false),
-		Repositories:      []*Repository{{ID: Int64(1)}, {ID: Int64(2)}},
+		Total:             new(4),
+		IncompleteResults: new(false),
+		Repositories:      []*Repository{{ID: new(int64(1))}, {ID: new(int64(2))}},
 	}
 	if !cmp.Equal(result, want) {
 		t.Errorf("Search.Repositories returned %+v, want %+v", result, want)
 	}
+	const methodName = "Repositories"
+	testNewRequestAndDoFailureCategory(t, methodName, client, SearchCategory, func() (*Response, error) {
+		got, resp, err := client.Search.Repositories(ctx, "blah", opts)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
 }
 
 func TestSearchService_Repositories_coverage(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const methodName = "Repositories"
 	testBadOptions(t, methodName, func() (err error) {
@@ -61,9 +69,89 @@ func TestSearchService_Repositories_coverage(t *testing.T) {
 	})
 }
 
+func TestSearchService_RepositoriesTextMatch(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/search/repositories", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		textMatchResponse := `
+			{
+				"total_count": 1,
+				"incomplete_results": false,
+				"items": [
+					{
+						"name":"gopher1"
+					}
+				]
+			}
+		`
+		list := strings.Split(r.Header.Get("Accept"), ",")
+		aMap := make(map[string]struct{})
+		for _, s := range list {
+			aMap[strings.TrimSpace(s)] = struct{}{}
+		}
+		if _, ok := aMap["application/vnd.github.v3.text-match+json"]; ok {
+			textMatchResponse = `
+					{
+						"total_count": 1,
+						"incomplete_results": false,
+						"items": [
+							{
+								"name":"gopher1",
+								"text_matches": [
+									{
+										"fragment": "I'm afraid my friend what you have found\nIs a gopher who lives to feed",
+										"matches": [
+											{
+												"text": "gopher",
+												"indices": [
+													14,
+													21
+											]
+											}
+									  ]
+								  }
+							  ]
+							}
+						]
+					}
+				`
+		}
+
+		fmt.Fprint(w, textMatchResponse)
+	})
+
+	opts := &SearchOptions{Sort: "forks", Order: "desc", ListOptions: ListOptions{Page: 2, PerPage: 2}, TextMatch: true}
+	ctx := t.Context()
+	result, _, err := client.Search.Repositories(ctx, "blah", opts)
+	if err != nil {
+		t.Errorf("Search.Repositories returned error: %v", err)
+	}
+
+	wantedRepoResult := &Repository{
+		Name: new("gopher1"),
+		TextMatches: []*TextMatch{
+			{
+				Fragment: new("I'm afraid my friend what you have found\nIs a gopher who lives to feed"),
+				Matches:  []*Match{{Text: new("gopher"), Indices: []int{14, 21}}},
+			},
+		},
+	}
+
+	want := &RepositoriesSearchResult{
+		Total:             new(1),
+		IncompleteResults: new(false),
+		Repositories:      []*Repository{wantedRepoResult},
+	}
+	if !cmp.Equal(result, want) {
+		t.Errorf("Search.Repo returned %+v, want %+v", result, want)
+	}
+}
+
 func TestSearchService_Topics(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/search/topics", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -77,27 +165,35 @@ func TestSearchService_Topics(t *testing.T) {
 	})
 
 	opts := &SearchOptions{ListOptions: ListOptions{Page: 2, PerPage: 2}}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Topics(ctx, "blah", opts)
 	if err != nil {
 		t.Errorf("Search.Topics returned error: %v", err)
 	}
 
 	want := &TopicsSearchResult{
-		Total:             Int(4),
-		IncompleteResults: Bool(false),
-		Topics:            []*TopicResult{{Name: String("blah")}, {Name: String("blahblah")}},
+		Total:             new(4),
+		IncompleteResults: new(false),
+		Topics:            []*TopicResult{{Name: new("blah")}, {Name: new("blahblah")}},
 	}
 	if !cmp.Equal(result, want) {
 		t.Errorf("Search.Topics returned %+v, want %+v", result, want)
 	}
+	const methodName = "Topics"
+	testNewRequestAndDoFailureCategory(t, methodName, client, SearchCategory, func() (*Response, error) {
+		got, resp, err := client.Search.Topics(ctx, "blah", opts)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
 }
 
 func TestSearchService_Topics_coverage(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const methodName = "Topics"
 	testBadOptions(t, methodName, func() (err error) {
@@ -107,8 +203,8 @@ func TestSearchService_Topics_coverage(t *testing.T) {
 }
 
 func TestSearchService_Commits(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/search/commits", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -122,27 +218,35 @@ func TestSearchService_Commits(t *testing.T) {
 	})
 
 	opts := &SearchOptions{Sort: "author-date", Order: "desc"}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Commits(ctx, "blah", opts)
 	if err != nil {
 		t.Errorf("Search.Commits returned error: %v", err)
 	}
 
 	want := &CommitsSearchResult{
-		Total:             Int(4),
-		IncompleteResults: Bool(false),
-		Commits:           []*CommitResult{{SHA: String("random_hash1")}, {SHA: String("random_hash2")}},
+		Total:             new(4),
+		IncompleteResults: new(false),
+		Commits:           []*CommitResult{{SHA: new("random_hash1")}, {SHA: new("random_hash2")}},
 	}
 	if !cmp.Equal(result, want) {
 		t.Errorf("Search.Commits returned %+v, want %+v", result, want)
 	}
+	const methodName = "Commits"
+	testNewRequestAndDoFailureCategory(t, methodName, client, SearchCategory, func() (*Response, error) {
+		got, resp, err := client.Search.Commits(ctx, "blah", opts)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
 }
 
 func TestSearchService_Commits_coverage(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const methodName = "Commits"
 	testBadOptions(t, methodName, func() (err error) {
@@ -152,8 +256,8 @@ func TestSearchService_Commits_coverage(t *testing.T) {
 }
 
 func TestSearchService_Issues(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/search/issues", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -169,27 +273,106 @@ func TestSearchService_Issues(t *testing.T) {
 	})
 
 	opts := &SearchOptions{Sort: "forks", Order: "desc", ListOptions: ListOptions{Page: 2, PerPage: 2}}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Issues(ctx, "blah", opts)
 	if err != nil {
 		t.Errorf("Search.Issues returned error: %v", err)
 	}
 
 	want := &IssuesSearchResult{
-		Total:             Int(4),
-		IncompleteResults: Bool(true),
-		Issues:            []*Issue{{Number: Int(1)}, {Number: Int(2)}},
+		Total:             new(4),
+		IncompleteResults: new(true),
+		Issues:            []*Issue{{Number: new(1)}, {Number: new(2)}},
 	}
 	if !cmp.Equal(result, want) {
 		t.Errorf("Search.Issues returned %+v, want %+v", result, want)
 	}
+	const methodName = "Issues"
+	testNewRequestAndDoFailureCategory(t, methodName, client, SearchCategory, func() (*Response, error) {
+		got, resp, err := client.Search.Issues(ctx, "blah", opts)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestSearchService_Issues_advancedSearch(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/search/issues", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{
+			"q":               "blah",
+			"sort":            "forks",
+			"order":           "desc",
+			"page":            "2",
+			"per_page":        "2",
+			"advanced_search": "true",
+		})
+
+		fmt.Fprint(w, `{"total_count": 4, "incomplete_results": true, "items": [{"number":1},{"number":2}]}`)
+	})
+
+	opts := &SearchOptions{Sort: "forks", Order: "desc", ListOptions: ListOptions{Page: 2, PerPage: 2}, AdvancedSearch: new(true)}
+	ctx := t.Context()
+	result, _, err := client.Search.Issues(ctx, "blah", opts)
+	if err != nil {
+		t.Errorf("Search.Issues_advancedSearch returned error: %v", err)
+	}
+
+	want := &IssuesSearchResult{
+		Total:             new(4),
+		IncompleteResults: new(true),
+		Issues:            []*Issue{{Number: new(1)}, {Number: new(2)}},
+	}
+	if !cmp.Equal(result, want) {
+		t.Errorf("Search.Issues_advancedSearch returned %+v, want %+v", result, want)
+	}
+}
+
+func TestSearchService_Issues_searchType(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/search/issues", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{
+			"q":           "blah",
+			"sort":        "forks",
+			"order":       "desc",
+			"page":        "2",
+			"per_page":    "2",
+			"search_type": "hybrid",
+		})
+
+		fmt.Fprint(w, `{"total_count": 4, "incomplete_results": true, "search_type": "hybrid", "items": [{"number":1},{"number":2}]}`)
+	})
+
+	opts := &SearchOptions{Sort: "forks", Order: "desc", ListOptions: ListOptions{Page: 2, PerPage: 2}, SearchType: "hybrid"}
+	ctx := t.Context()
+	result, _, err := client.Search.Issues(ctx, "blah", opts)
+	if err != nil {
+		t.Errorf("Search.Issues_searchType returned error: %v", err)
+	}
+
+	want := &IssuesSearchResult{
+		Total:             new(4),
+		IncompleteResults: new(true),
+		SearchType:        new("hybrid"),
+		Issues:            []*Issue{{Number: new(1)}, {Number: new(2)}},
+	}
+	if !cmp.Equal(result, want) {
+		t.Errorf("Search.Issues_searchType returned %+v, want %+v", result, want)
+	}
 }
 
 func TestSearchService_Issues_coverage(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const methodName = "Issues"
 	testBadOptions(t, methodName, func() (err error) {
@@ -199,8 +382,8 @@ func TestSearchService_Issues_coverage(t *testing.T) {
 }
 
 func TestSearchService_Issues_withQualifiersNoOpts(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	const q = "gopher is:issue label:bug language:c++ pushed:>=2018-01-01 stars:>=200"
 
@@ -216,7 +399,7 @@ func TestSearchService_Issues_withQualifiersNoOpts(t *testing.T) {
 	})
 
 	opts := &SearchOptions{}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Issues(ctx, q, opts)
 	if err != nil {
 		t.Errorf("Search.Issues returned error: %v", err)
@@ -227,9 +410,9 @@ func TestSearchService_Issues_withQualifiersNoOpts(t *testing.T) {
 	}
 
 	want := &IssuesSearchResult{
-		Total:             Int(4),
-		IncompleteResults: Bool(true),
-		Issues:            []*Issue{{Number: Int(1)}, {Number: Int(2)}},
+		Total:             new(4),
+		IncompleteResults: new(true),
+		Issues:            []*Issue{{Number: new(1)}, {Number: new(2)}},
 	}
 	if !cmp.Equal(result, want) {
 		t.Errorf("Search.Issues returned %+v, want %+v", result, want)
@@ -237,8 +420,8 @@ func TestSearchService_Issues_withQualifiersNoOpts(t *testing.T) {
 }
 
 func TestSearchService_Issues_withQualifiersAndOpts(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	const q = "gopher is:issue label:bug language:c++ pushed:>=2018-01-01 stars:>=200"
 
@@ -255,7 +438,7 @@ func TestSearchService_Issues_withQualifiersAndOpts(t *testing.T) {
 	})
 
 	opts := &SearchOptions{Sort: "forks"}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Issues(ctx, q, opts)
 	if err != nil {
 		t.Errorf("Search.Issues returned error: %v", err)
@@ -266,9 +449,9 @@ func TestSearchService_Issues_withQualifiersAndOpts(t *testing.T) {
 	}
 
 	want := &IssuesSearchResult{
-		Total:             Int(4),
-		IncompleteResults: Bool(true),
-		Issues:            []*Issue{{Number: Int(1)}, {Number: Int(2)}},
+		Total:             new(4),
+		IncompleteResults: new(true),
+		Issues:            []*Issue{{Number: new(1)}, {Number: new(2)}},
 	}
 	if !cmp.Equal(result, want) {
 		t.Errorf("Search.Issues returned %+v, want %+v", result, want)
@@ -276,8 +459,8 @@ func TestSearchService_Issues_withQualifiersAndOpts(t *testing.T) {
 }
 
 func TestSearchService_Users(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/search/users", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -293,27 +476,35 @@ func TestSearchService_Users(t *testing.T) {
 	})
 
 	opts := &SearchOptions{Sort: "forks", Order: "desc", ListOptions: ListOptions{Page: 2, PerPage: 2}}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Users(ctx, "blah", opts)
 	if err != nil {
-		t.Errorf("Search.Issues returned error: %v", err)
+		t.Errorf("Search.Users returned error: %v", err)
 	}
 
 	want := &UsersSearchResult{
-		Total:             Int(4),
-		IncompleteResults: Bool(false),
-		Users:             []*User{{ID: Int64(1)}, {ID: Int64(2)}},
+		Total:             new(4),
+		IncompleteResults: new(false),
+		Users:             []*User{{ID: new(int64(1))}, {ID: new(int64(2))}},
 	}
 	if !cmp.Equal(result, want) {
 		t.Errorf("Search.Users returned %+v, want %+v", result, want)
 	}
+	const methodName = "Users"
+	testNewRequestAndDoFailureCategory(t, methodName, client, SearchCategory, func() (*Response, error) {
+		got, resp, err := client.Search.Users(ctx, "blah", opts)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
 }
 
 func TestSearchService_Users_coverage(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const methodName = "Users"
 	testBadOptions(t, methodName, func() (err error) {
@@ -323,8 +514,8 @@ func TestSearchService_Users_coverage(t *testing.T) {
 }
 
 func TestSearchService_Code(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/search/code", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -340,27 +531,35 @@ func TestSearchService_Code(t *testing.T) {
 	})
 
 	opts := &SearchOptions{Sort: "forks", Order: "desc", ListOptions: ListOptions{Page: 2, PerPage: 2}}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Code(ctx, "blah", opts)
 	if err != nil {
 		t.Errorf("Search.Code returned error: %v", err)
 	}
 
 	want := &CodeSearchResult{
-		Total:             Int(4),
-		IncompleteResults: Bool(false),
-		CodeResults:       []*CodeResult{{Name: String("1")}, {Name: String("2")}},
+		Total:             new(4),
+		IncompleteResults: new(false),
+		CodeResults:       []*CodeResult{{Name: new("1")}, {Name: new("2")}},
 	}
 	if !cmp.Equal(result, want) {
 		t.Errorf("Search.Code returned %+v, want %+v", result, want)
 	}
+	const methodName = "Code"
+	testNewRequestAndDoFailureCategory(t, methodName, client, CodeSearchCategory, func() (*Response, error) {
+		got, resp, err := client.Search.Code(ctx, "blah", opts)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
 }
 
 func TestSearchService_Code_coverage(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const methodName = "Code"
 	testBadOptions(t, methodName, func() (err error) {
@@ -370,8 +569,8 @@ func TestSearchService_Code_coverage(t *testing.T) {
 }
 
 func TestSearchService_CodeTextMatch(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/search/code", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -406,24 +605,25 @@ func TestSearchService_CodeTextMatch(t *testing.T) {
 	})
 
 	opts := &SearchOptions{Sort: "forks", Order: "desc", ListOptions: ListOptions{Page: 2, PerPage: 2}, TextMatch: true}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Code(ctx, "blah", opts)
 	if err != nil {
 		t.Errorf("Search.Code returned error: %v", err)
 	}
 
 	wantedCodeResult := &CodeResult{
-		Name: String("gopher1"),
-		TextMatches: []*TextMatch{{
-			Fragment: String("I'm afraid my friend what you have found\nIs a gopher who lives to feed"),
-			Matches:  []*Match{{Text: String("gopher"), Indices: []int{14, 21}}},
-		},
+		Name: new("gopher1"),
+		TextMatches: []*TextMatch{
+			{
+				Fragment: new("I'm afraid my friend what you have found\nIs a gopher who lives to feed"),
+				Matches:  []*Match{{Text: new("gopher"), Indices: []int{14, 21}}},
+			},
 		},
 	}
 
 	want := &CodeSearchResult{
-		Total:             Int(1),
-		IncompleteResults: Bool(false),
+		Total:             new(1),
+		IncompleteResults: new(false),
 		CodeResults:       []*CodeResult{wantedCodeResult},
 	}
 	if !cmp.Equal(result, want) {
@@ -432,8 +632,8 @@ func TestSearchService_CodeTextMatch(t *testing.T) {
 }
 
 func TestSearchService_Labels(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/search/labels", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -450,30 +650,38 @@ func TestSearchService_Labels(t *testing.T) {
 	})
 
 	opts := &SearchOptions{Sort: "updated", Order: "desc", ListOptions: ListOptions{Page: 2, PerPage: 2}}
-	ctx := context.Background()
+	ctx := t.Context()
 	result, _, err := client.Search.Labels(ctx, 1234, "blah", opts)
 	if err != nil {
-		t.Errorf("Search.Code returned error: %v", err)
+		t.Errorf("Search.Labels returned error: %v", err)
 	}
 
 	want := &LabelsSearchResult{
-		Total:             Int(4),
-		IncompleteResults: Bool(false),
+		Total:             new(4),
+		IncompleteResults: new(false),
 		Labels: []*LabelResult{
-			{ID: Int64(1234), Name: String("bug"), Description: String("some text")},
-			{ID: Int64(4567), Name: String("feature")},
+			{ID: new(int64(1234)), Name: new("bug"), Description: new("some text")},
+			{ID: new(int64(4567)), Name: new("feature")},
 		},
 	}
 	if !cmp.Equal(result, want) {
 		t.Errorf("Search.Labels returned %+v, want %+v", result, want)
 	}
+	const methodName = "Labels"
+	testNewRequestAndDoFailureCategory(t, methodName, client, SearchCategory, func() (*Response, error) {
+		got, resp, err := client.Search.Labels(ctx, 1234, "blah", opts)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
 }
 
 func TestSearchService_Labels_coverage(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const methodName = "Labels"
 	testBadOptions(t, methodName, func() (err error) {

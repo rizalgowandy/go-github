@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -16,8 +14,8 @@ import (
 )
 
 func TestInteractionsService_GetRestrictionsForOrgs(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/interaction-limits", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -25,13 +23,13 @@ func TestInteractionsService_GetRestrictionsForOrgs(t *testing.T) {
 		fmt.Fprint(w, `{"origin":"organization"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	organizationInteractions, _, err := client.Interactions.GetRestrictionsForOrg(ctx, "o")
 	if err != nil {
 		t.Errorf("Interactions.GetRestrictionsForOrg returned error: %v", err)
 	}
 
-	want := &InteractionRestriction{Origin: String("organization")}
+	want := &InteractionRestriction{Origin: new("organization")}
 	if !cmp.Equal(organizationInteractions, want) {
 		t.Errorf("Interactions.GetRestrictionsForOrg returned %+v, want %+v", organizationInteractions, want)
 	}
@@ -52,30 +50,25 @@ func TestInteractionsService_GetRestrictionsForOrgs(t *testing.T) {
 }
 
 func TestInteractionsService_UpdateRestrictionsForOrg(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &InteractionRestriction{Limit: String("existing_users")}
+	input := &InteractionRestriction{Limit: new("existing_users")}
 
 	mux.HandleFunc("/orgs/o/interaction-limits", func(w http.ResponseWriter, r *http.Request) {
-		v := new(InteractionRestriction)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PUT")
 		testHeader(t, r, "Accept", mediaTypeInteractionRestrictionsPreview)
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"origin":"organization"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	organizationInteractions, _, err := client.Interactions.UpdateRestrictionsForOrg(ctx, "o", input.GetLimit())
 	if err != nil {
 		t.Errorf("Interactions.UpdateRestrictionsForOrg returned error: %v", err)
 	}
 
-	want := &InteractionRestriction{Origin: String("organization")}
+	want := &InteractionRestriction{Origin: new("organization")}
 	if !cmp.Equal(organizationInteractions, want) {
 		t.Errorf("Interactions.UpdateRestrictionsForOrg returned %+v, want %+v", organizationInteractions, want)
 	}
@@ -96,15 +89,15 @@ func TestInteractionsService_UpdateRestrictionsForOrg(t *testing.T) {
 }
 
 func TestInteractionsService_RemoveRestrictionsFromOrg(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/orgs/o/interaction-limits", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/orgs/o/interaction-limits", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 		testHeader(t, r, "Accept", mediaTypeInteractionRestrictionsPreview)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Interactions.RemoveRestrictionsFromOrg(ctx, "o")
 	if err != nil {
 		t.Errorf("Interactions.RemoveRestrictionsFromOrg returned error: %v", err)

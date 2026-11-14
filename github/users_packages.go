@@ -8,17 +8,22 @@ package github
 import (
 	"context"
 	"fmt"
+	"net/url"
 )
 
-// List the packages for a user. Passing the empty string for "user" will
+// ListPackages lists the packages for a user. Passing the empty string for "user" will
 // list packages for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#list-packages-for-the-authenticated-users-namespace
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#list-packages-for-a-user
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#list-packages-for-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#list-packages-for-the-authenticated-users-namespace
+//
+//meta:operation GET /user/packages
+//meta:operation GET /users/{username}/packages
 func (s *UsersService) ListPackages(ctx context.Context, user string, opts *PackageListOptions) ([]*Package, *Response, error) {
 	var u string
 	if user != "" {
-		u = fmt.Sprintf("user/%v/packages", user)
+		u = fmt.Sprintf("users/%v/packages", user)
 	} else {
 		u = "user/packages"
 	}
@@ -27,13 +32,13 @@ func (s *UsersService) ListPackages(ctx context.Context, user string, opts *Pack
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var packages []*Package
-	resp, err := s.client.Do(ctx, req, &packages)
+	resp, err := s.client.Do(req, &packages)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -41,26 +46,32 @@ func (s *UsersService) ListPackages(ctx context.Context, user string, opts *Pack
 	return packages, resp, nil
 }
 
-// Get a package by name for a user. Passing the empty string for "user" will
+// GetPackage gets a package by name for a user. Passing the empty string for "user" will
 // get the package for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#get-a-package-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#get-a-package-for-a-user
+// Note: the package name is URL path escaped for you. See: https://pkg.go.dev/net/url#PathEscape .
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#get-a-package-for-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#get-a-package-for-the-authenticated-user
+//
+//meta:operation GET /user/packages/{package_type}/{package_name}
+//meta:operation GET /users/{username}/packages/{package_type}/{package_name}
 func (s *UsersService) GetPackage(ctx context.Context, user, packageType, packageName string) (*Package, *Response, error) {
 	var u string
 	if user != "" {
-		u = fmt.Sprintf("users/%v/packages/%v/%v", user, packageType, packageName)
+		u = fmt.Sprintf("users/%v/packages/%v/%v", user, packageType, url.PathEscape(packageName))
 	} else {
-		u = fmt.Sprintf("user/packages/%v/%v", packageType, packageName)
+		u = fmt.Sprintf("user/packages/%v/%v", packageType, url.PathEscape(packageName))
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var pack *Package
-	resp, err := s.client.Do(ctx, req, &pack)
+	resp, err := s.client.Do(req, &pack)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -68,68 +79,89 @@ func (s *UsersService) GetPackage(ctx context.Context, user, packageType, packag
 	return pack, resp, nil
 }
 
-// Delete a package from a user. Passing the empty string for "user" will
+// DeletePackage deletes a package from a user. Passing the empty string for "user" will
 // delete the package for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#delete-a-package-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#delete-a-package-for-a-user
+// Note: the package name is URL path escaped for you. See: https://pkg.go.dev/net/url#PathEscape .
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#delete-a-package-for-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#delete-a-package-for-the-authenticated-user
+//
+//meta:operation DELETE /user/packages/{package_type}/{package_name}
+//meta:operation DELETE /users/{username}/packages/{package_type}/{package_name}
 func (s *UsersService) DeletePackage(ctx context.Context, user, packageType, packageName string) (*Response, error) {
 	var u string
 	if user != "" {
-		u = fmt.Sprintf("users/%v/packages/%v/%v", user, packageType, packageName)
+		u = fmt.Sprintf("users/%v/packages/%v/%v", user, packageType, url.PathEscape(packageName))
 	} else {
-		u = fmt.Sprintf("user/packages/%v/%v", packageType, packageName)
+		u = fmt.Sprintf("user/packages/%v/%v", packageType, url.PathEscape(packageName))
 	}
 
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
-// Restore a package to a user. Passing the empty string for "user" will
+// RestorePackage restores a package to a user. Passing the empty string for "user" will
 // restore the package for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#restore-a-package-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#restore-a-package-for-a-user
+// Note: the package name is URL path escaped for you. See: https://pkg.go.dev/net/url#PathEscape .
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#restore-a-package-for-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#restore-a-package-for-the-authenticated-user
+//
+//meta:operation POST /user/packages/{package_type}/{package_name}/restore
+//meta:operation POST /users/{username}/packages/{package_type}/{package_name}/restore
 func (s *UsersService) RestorePackage(ctx context.Context, user, packageType, packageName string) (*Response, error) {
 	var u string
 	if user != "" {
-		u = fmt.Sprintf("users/%v/packages/%v/%v/restore", user, packageType, packageName)
+		u = fmt.Sprintf("users/%v/packages/%v/%v/restore", user, packageType, url.PathEscape(packageName))
 	} else {
-		u = fmt.Sprintf("user/packages/%v/%v/restore", packageType, packageName)
+		u = fmt.Sprintf("user/packages/%v/%v/restore", packageType, url.PathEscape(packageName))
 	}
 
-	req, err := s.client.NewRequest("POST", u, nil)
+	req, err := s.client.NewRequest(ctx, "POST", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
-// Get all versions of a package for a user. Passing the empty string for "user" will
-// get versions for the authenticated user.
+// ListPackageVersionsOptions specifies the optional parameters to the UsersService.ListPackageVersions.
+type ListPackageVersionsOptions struct {
+	// State of package either "active" or "deleted".
+	State string `url:"state,omitempty"`
+
+	ListOptions
+}
+
+// ListPackageVersions gets all versions of a package for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#get-all-package-versions-for-a-package-owned-by-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/rest/reference/users#delete-an-email-address-for-the-authenticated-user
-func (s *UsersService) PackageGetAllVersions(ctx context.Context, user, packageType, packageName string) ([]*PackageVersion, *Response, error) {
-	var u string
-	if user != "" {
-		u = fmt.Sprintf("users/%v/packages/%v/%v/versions", user, packageType, packageName)
-	} else {
-		u = fmt.Sprintf("user/packages/%v/%v/versions", packageType, packageName)
+// Note: the package name is URL path escaped for you. See: https://pkg.go.dev/net/url#PathEscape .
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#list-package-versions-for-a-package-owned-by-the-authenticated-user
+//
+//meta:operation GET /user/packages/{package_type}/{package_name}/versions
+func (s *UsersService) ListPackageVersions(ctx context.Context, packageType, packageName string, opts *ListPackageVersionsOptions) ([]*PackageVersion, *Response, error) {
+	u := fmt.Sprintf("user/packages/%v/%v/versions", packageType, url.PathEscape(packageName))
+	u, err := addOptions(u, opts)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var versions []*PackageVersion
-	resp, err := s.client.Do(ctx, req, &versions)
+	resp, err := s.client.Do(req, &versions)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -137,26 +169,56 @@ func (s *UsersService) PackageGetAllVersions(ctx context.Context, user, packageT
 	return versions, resp, nil
 }
 
-// Get a specific version of a package for a user. Passing the empty string for "user" will
+// ListUserPackageVersions returns package versions for a public package owned by a specified user.
+//
+// Note: the package name is URL path escaped for you. See: https://pkg.go.dev/net/url#PathEscape .
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#list-package-versions-for-a-package-owned-by-a-user
+//
+//meta:operation GET /users/{username}/packages/{package_type}/{package_name}/versions
+func (s *UsersService) ListUserPackageVersions(ctx context.Context, user, packageType, packageName string) ([]*PackageVersion, *Response, error) {
+	u := fmt.Sprintf("users/%v/packages/%v/%v/versions", user, packageType, url.PathEscape(packageName))
+
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var versions []*PackageVersion
+	resp, err := s.client.Do(req, &versions)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return versions, resp, nil
+}
+
+// PackageGetVersion gets a specific version of a package for a user. Passing the empty string for "user" will
 // get the version for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#get-a-package-version-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#get-a-package-version-for-a-user
+// Note: the package name is URL path escaped for you. See: https://pkg.go.dev/net/url#PathEscape .
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#get-a-package-version-for-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#get-a-package-version-for-the-authenticated-user
+//
+//meta:operation GET /user/packages/{package_type}/{package_name}/versions/{package_version_id}
+//meta:operation GET /users/{username}/packages/{package_type}/{package_name}/versions/{package_version_id}
 func (s *UsersService) PackageGetVersion(ctx context.Context, user, packageType, packageName string, packageVersionID int64) (*PackageVersion, *Response, error) {
 	var u string
 	if user != "" {
-		u = fmt.Sprintf("users/%v/packages/%v/%v/versions/%v", user, packageType, packageName, packageVersionID)
+		u = fmt.Sprintf("users/%v/packages/%v/%v/versions/%v", user, packageType, url.PathEscape(packageName), packageVersionID)
 	} else {
-		u = fmt.Sprintf("user/packages/%v/%v/versions/%v", packageType, packageName, packageVersionID)
+		u = fmt.Sprintf("user/packages/%v/%v/versions/%v", packageType, url.PathEscape(packageName), packageVersionID)
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var version *PackageVersion
-	resp, err := s.client.Do(ctx, req, &version)
+	resp, err := s.client.Do(req, &version)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -164,44 +226,88 @@ func (s *UsersService) PackageGetVersion(ctx context.Context, user, packageType,
 	return version, resp, nil
 }
 
-// Delete a package version for a user. Passing the empty string for "user" will
+// PackageDeleteVersion deletes a package version for a user. Passing the empty string for "user" will
 // delete the version for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#delete-a-package-version-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#delete-package-version-for-a-user
+// Note: the package name is URL path escaped for you. See: https://pkg.go.dev/net/url#PathEscape .
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#delete-a-package-version-for-the-authenticated-user
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#delete-package-version-for-a-user
+//
+//meta:operation DELETE /user/packages/{package_type}/{package_name}/versions/{package_version_id}
+//meta:operation DELETE /users/{username}/packages/{package_type}/{package_name}/versions/{package_version_id}
 func (s *UsersService) PackageDeleteVersion(ctx context.Context, user, packageType, packageName string, packageVersionID int64) (*Response, error) {
 	var u string
 	if user != "" {
-		u = fmt.Sprintf("users/%v/packages/%v/%v/versions/%v", user, packageType, packageName, packageVersionID)
+		u = fmt.Sprintf("users/%v/packages/%v/%v/versions/%v", user, packageType, url.PathEscape(packageName), packageVersionID)
 	} else {
-		u = fmt.Sprintf("user/packages/%v/%v/versions/%v", packageType, packageName, packageVersionID)
+		u = fmt.Sprintf("user/packages/%v/%v/versions/%v", packageType, url.PathEscape(packageName), packageVersionID)
 	}
 
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
-// Restore a package version to a user. Passing the empty string for "user" will
+// PackageRestoreVersion restores a package version to a user. Passing the empty string for "user" will
 // restore the version for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#restore-a-package-version-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#restore-package-version-for-a-user
+// Note: the package name is URL path escaped for you. See: https://pkg.go.dev/net/url#PathEscape .
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#restore-a-package-version-for-the-authenticated-user
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#restore-package-version-for-a-user
+//
+//meta:operation POST /user/packages/{package_type}/{package_name}/versions/{package_version_id}/restore
+//meta:operation POST /users/{username}/packages/{package_type}/{package_name}/versions/{package_version_id}/restore
 func (s *UsersService) PackageRestoreVersion(ctx context.Context, user, packageType, packageName string, packageVersionID int64) (*Response, error) {
 	var u string
 	if user != "" {
-		u = fmt.Sprintf("users/%v/packages/%v/%v/versions/%v/restore", user, packageType, packageName, packageVersionID)
+		u = fmt.Sprintf("users/%v/packages/%v/%v/versions/%v/restore", user, packageType, url.PathEscape(packageName), packageVersionID)
 	} else {
-		u = fmt.Sprintf("user/packages/%v/%v/versions/%v/restore", packageType, packageName, packageVersionID)
+		u = fmt.Sprintf("user/packages/%v/%v/versions/%v/restore", packageType, url.PathEscape(packageName), packageVersionID)
 	}
 
-	req, err := s.client.NewRequest("POST", u, nil)
+	req, err := s.client.NewRequest(ctx, "POST", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
+}
+
+// ListDockerMigrationConflictingPackages lists all packages in a user's namespace
+// that encountered a conflict during a Docker migration. Passing the empty string
+// for "user" will list them for the authenticated user.
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#get-list-of-conflicting-packages-during-docker-migration-for-authenticated-user
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#get-list-of-conflicting-packages-during-docker-migration-for-user
+//
+//meta:operation GET /user/docker/conflicts
+//meta:operation GET /users/{username}/docker/conflicts
+func (s *UsersService) ListDockerMigrationConflictingPackages(ctx context.Context, user string) ([]*Package, *Response, error) {
+	var u string
+	if user != "" {
+		u = fmt.Sprintf("users/%v/docker/conflicts", user)
+	} else {
+		u = "user/docker/conflicts"
+	}
+
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var packages []*Package
+	resp, err := s.client.Do(req, &packages)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return packages, resp, nil
 }

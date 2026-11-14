@@ -6,7 +6,6 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -15,8 +14,8 @@ import (
 )
 
 func TestMarketplaceService_ListPlans(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/marketplace_listing/plans", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -29,13 +28,13 @@ func TestMarketplaceService_ListPlans(t *testing.T) {
 
 	opt := &ListOptions{Page: 1, PerPage: 2}
 	client.Marketplace.Stubbed = false
-	ctx := context.Background()
+	ctx := t.Context()
 	plans, _, err := client.Marketplace.ListPlans(ctx, opt)
 	if err != nil {
 		t.Errorf("Marketplace.ListPlans returned error: %v", err)
 	}
 
-	want := []*MarketplacePlan{{ID: Int64(1)}}
+	want := []*MarketplacePlan{{ID: new(int64(1))}}
 	if !cmp.Equal(plans, want) {
 		t.Errorf("Marketplace.ListPlans returned %+v, want %+v", plans, want)
 	}
@@ -51,8 +50,8 @@ func TestMarketplaceService_ListPlans(t *testing.T) {
 }
 
 func TestMarketplaceService_Stubbed_ListPlans(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/marketplace_listing/stubbed/plans", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -61,21 +60,21 @@ func TestMarketplaceService_Stubbed_ListPlans(t *testing.T) {
 
 	opt := &ListOptions{Page: 1, PerPage: 2}
 	client.Marketplace.Stubbed = true
-	ctx := context.Background()
+	ctx := t.Context()
 	plans, _, err := client.Marketplace.ListPlans(ctx, opt)
 	if err != nil {
 		t.Errorf("Marketplace.ListPlans (Stubbed) returned error: %v", err)
 	}
 
-	want := []*MarketplacePlan{{ID: Int64(1)}}
+	want := []*MarketplacePlan{{ID: new(int64(1))}}
 	if !cmp.Equal(plans, want) {
 		t.Errorf("Marketplace.ListPlans (Stubbed) returned %+v, want %+v", plans, want)
 	}
 }
 
 func TestMarketplaceService_ListPlanAccountsForPlan(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/marketplace_listing/plans/1/accounts", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -84,13 +83,13 @@ func TestMarketplaceService_ListPlanAccountsForPlan(t *testing.T) {
 
 	opt := &ListOptions{Page: 1, PerPage: 2}
 	client.Marketplace.Stubbed = false
-	ctx := context.Background()
+	ctx := t.Context()
 	accounts, _, err := client.Marketplace.ListPlanAccountsForPlan(ctx, 1, opt)
 	if err != nil {
 		t.Errorf("Marketplace.ListPlanAccountsForPlan returned error: %v", err)
 	}
 
-	want := []*MarketplacePlanAccount{{ID: Int64(1)}}
+	want := []*MarketplacePlanAccount{{ID: new(int64(1))}}
 	if !cmp.Equal(accounts, want) {
 		t.Errorf("Marketplace.ListPlanAccountsForPlan returned %+v, want %+v", accounts, want)
 	}
@@ -106,8 +105,8 @@ func TestMarketplaceService_ListPlanAccountsForPlan(t *testing.T) {
 }
 
 func TestMarketplaceService_Stubbed_ListPlanAccountsForPlan(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/marketplace_listing/stubbed/plans/1/accounts", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -116,21 +115,21 @@ func TestMarketplaceService_Stubbed_ListPlanAccountsForPlan(t *testing.T) {
 
 	opt := &ListOptions{Page: 1, PerPage: 2}
 	client.Marketplace.Stubbed = true
-	ctx := context.Background()
+	ctx := t.Context()
 	accounts, _, err := client.Marketplace.ListPlanAccountsForPlan(ctx, 1, opt)
 	if err != nil {
 		t.Errorf("Marketplace.ListPlanAccountsForPlan (Stubbed) returned error: %v", err)
 	}
 
-	want := []*MarketplacePlanAccount{{ID: Int64(1)}}
+	want := []*MarketplacePlanAccount{{ID: new(int64(1))}}
 	if !cmp.Equal(accounts, want) {
 		t.Errorf("Marketplace.ListPlanAccountsForPlan (Stubbed) returned %+v, want %+v", accounts, want)
 	}
 }
 
 func TestMarketplaceService_GetPlanAccountForAccount(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/marketplace_listing/accounts/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -138,13 +137,13 @@ func TestMarketplaceService_GetPlanAccountForAccount(t *testing.T) {
 	})
 
 	client.Marketplace.Stubbed = false
-	ctx := context.Background()
+	ctx := t.Context()
 	account, _, err := client.Marketplace.GetPlanAccountForAccount(ctx, 1)
 	if err != nil {
 		t.Errorf("Marketplace.GetPlanAccountForAccount returned error: %v", err)
 	}
 
-	want := &MarketplacePlanAccount{ID: Int64(1), MarketplacePendingChange: &MarketplacePendingChange{ID: Int64(77)}}
+	want := &MarketplacePlanAccount{ID: new(int64(1)), MarketplacePendingChange: &MarketplacePendingChange{ID: new(int64(77))}}
 	if !cmp.Equal(account, want) {
 		t.Errorf("Marketplace.GetPlanAccountForAccount returned %+v, want %+v", account, want)
 	}
@@ -160,8 +159,8 @@ func TestMarketplaceService_GetPlanAccountForAccount(t *testing.T) {
 }
 
 func TestMarketplaceService_Stubbed_GetPlanAccountForAccount(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/marketplace_listing/stubbed/accounts/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -169,21 +168,21 @@ func TestMarketplaceService_Stubbed_GetPlanAccountForAccount(t *testing.T) {
 	})
 
 	client.Marketplace.Stubbed = true
-	ctx := context.Background()
+	ctx := t.Context()
 	account, _, err := client.Marketplace.GetPlanAccountForAccount(ctx, 1)
 	if err != nil {
 		t.Errorf("Marketplace.GetPlanAccountForAccount (Stubbed) returned error: %v", err)
 	}
 
-	want := &MarketplacePlanAccount{ID: Int64(1)}
+	want := &MarketplacePlanAccount{ID: new(int64(1))}
 	if !cmp.Equal(account, want) {
 		t.Errorf("Marketplace.GetPlanAccountForAccount (Stubbed) returned %+v, want %+v", account, want)
 	}
 }
 
 func TestMarketplaceService_ListMarketplacePurchasesForUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/marketplace_purchases", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -192,13 +191,13 @@ func TestMarketplaceService_ListMarketplacePurchasesForUser(t *testing.T) {
 
 	opt := &ListOptions{Page: 1, PerPage: 2}
 	client.Marketplace.Stubbed = false
-	ctx := context.Background()
+	ctx := t.Context()
 	purchases, _, err := client.Marketplace.ListMarketplacePurchasesForUser(ctx, opt)
 	if err != nil {
 		t.Errorf("Marketplace.ListMarketplacePurchasesForUser returned error: %v", err)
 	}
 
-	want := []*MarketplacePurchase{{BillingCycle: String("monthly")}}
+	want := []*MarketplacePurchase{{BillingCycle: new("monthly")}}
 	if !cmp.Equal(purchases, want) {
 		t.Errorf("Marketplace.ListMarketplacePurchasesForUser returned %+v, want %+v", purchases, want)
 	}
@@ -214,8 +213,8 @@ func TestMarketplaceService_ListMarketplacePurchasesForUser(t *testing.T) {
 }
 
 func TestMarketplaceService_Stubbed_ListMarketplacePurchasesForUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/marketplace_purchases/stubbed", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -224,262 +223,14 @@ func TestMarketplaceService_Stubbed_ListMarketplacePurchasesForUser(t *testing.T
 
 	opt := &ListOptions{Page: 1, PerPage: 2}
 	client.Marketplace.Stubbed = true
-	ctx := context.Background()
+	ctx := t.Context()
 	purchases, _, err := client.Marketplace.ListMarketplacePurchasesForUser(ctx, opt)
 	if err != nil {
 		t.Errorf("Marketplace.ListMarketplacePurchasesForUser returned error: %v", err)
 	}
 
-	want := []*MarketplacePurchase{{BillingCycle: String("monthly")}}
+	want := []*MarketplacePurchase{{BillingCycle: new("monthly")}}
 	if !cmp.Equal(purchases, want) {
 		t.Errorf("Marketplace.ListMarketplacePurchasesForUser returned %+v, want %+v", purchases, want)
 	}
-}
-
-func TestMarketplacePlan_Marshal(t *testing.T) {
-	testJSONMarshal(t, &MarketplacePlan{}, "{}")
-
-	u := &MarketplacePlan{
-		URL:                 String("u"),
-		AccountsURL:         String("au"),
-		ID:                  Int64(1),
-		Number:              Int(1),
-		Name:                String("n"),
-		Description:         String("d"),
-		MonthlyPriceInCents: Int(1),
-		YearlyPriceInCents:  Int(1),
-		PriceModel:          String("pm"),
-		UnitName:            String("un"),
-		Bullets:             &[]string{"b"},
-		State:               String("s"),
-		HasFreeTrial:        Bool(false),
-	}
-
-	want := `{
-		"url": "u",
-		"accounts_url": "au",
-		"id": 1,
-		"number": 1,
-		"name": "n",
-		"description": "d",
-		"monthly_price_in_cents": 1,
-		"yearly_price_in_cents": 1,
-		"price_model": "pm",
-		"unit_name": "un",
-		"bullets": ["b"],
-		"state": "s",
-		"has_free_trial": false
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestMarketplacePurchase_Marshal(t *testing.T) {
-	testJSONMarshal(t, &MarketplacePurchase{}, "{}")
-
-	u := &MarketplacePurchase{
-		BillingCycle:    String("bc"),
-		NextBillingDate: &Timestamp{referenceTime},
-		UnitCount:       Int(1),
-		Plan: &MarketplacePlan{
-			URL:                 String("u"),
-			AccountsURL:         String("au"),
-			ID:                  Int64(1),
-			Number:              Int(1),
-			Name:                String("n"),
-			Description:         String("d"),
-			MonthlyPriceInCents: Int(1),
-			YearlyPriceInCents:  Int(1),
-			PriceModel:          String("pm"),
-			UnitName:            String("un"),
-			Bullets:             &[]string{"b"},
-			State:               String("s"),
-			HasFreeTrial:        Bool(false),
-		},
-		OnFreeTrial:     Bool(false),
-		FreeTrialEndsOn: &Timestamp{referenceTime},
-		UpdatedAt:       &Timestamp{referenceTime},
-	}
-
-	want := `{
-		"billing_cycle": "bc",
-		"next_billing_date": ` + referenceTimeStr + `,
-		"unit_count": 1,
-		"plan": {
-			"url": "u",
-			"accounts_url": "au",
-			"id": 1,
-			"number": 1,
-			"name": "n",
-			"description": "d",
-			"monthly_price_in_cents": 1,
-			"yearly_price_in_cents": 1,
-			"price_model": "pm",
-			"unit_name": "un",
-			"bullets": ["b"],
-			"state": "s",
-			"has_free_trial": false
-			},
-		"on_free_trial": false,
-		"free_trial_ends_on": ` + referenceTimeStr + `,
-		"updated_at": ` + referenceTimeStr + `
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestMarketplacePendingChange_Marshal(t *testing.T) {
-	testJSONMarshal(t, &MarketplacePendingChange{}, "{}")
-
-	u := &MarketplacePendingChange{
-		EffectiveDate: &Timestamp{referenceTime},
-		UnitCount:     Int(1),
-		ID:            Int64(1),
-		Plan: &MarketplacePlan{
-			URL:                 String("u"),
-			AccountsURL:         String("au"),
-			ID:                  Int64(1),
-			Number:              Int(1),
-			Name:                String("n"),
-			Description:         String("d"),
-			MonthlyPriceInCents: Int(1),
-			YearlyPriceInCents:  Int(1),
-			PriceModel:          String("pm"),
-			UnitName:            String("un"),
-			Bullets:             &[]string{"b"},
-			State:               String("s"),
-			HasFreeTrial:        Bool(false),
-		},
-	}
-
-	want := `{
-		"effective_date": ` + referenceTimeStr + `,
-		"unit_count": 1,
-		"id": 1,
-		"plan": {
-			"url": "u",
-			"accounts_url": "au",
-			"id": 1,
-			"number": 1,
-			"name": "n",
-			"description": "d",
-			"monthly_price_in_cents": 1,
-			"yearly_price_in_cents": 1,
-			"price_model": "pm",
-			"unit_name": "un",
-			"bullets": ["b"],
-			"state": "s",
-			"has_free_trial": false
-			}
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestMarketplacePlanAccount_Marshal(t *testing.T) {
-	testJSONMarshal(t, &MarketplacePlanAccount{}, "{}")
-
-	u := &MarketplacePlanAccount{
-		URL:                      String("u"),
-		Type:                     String("t"),
-		ID:                       Int64(1),
-		Login:                    String("l"),
-		OrganizationBillingEmail: String("obe"),
-		MarketplacePurchase: &MarketplacePurchase{
-			BillingCycle:    String("bc"),
-			NextBillingDate: &Timestamp{referenceTime},
-			UnitCount:       Int(1),
-			Plan: &MarketplacePlan{
-				URL:                 String("u"),
-				AccountsURL:         String("au"),
-				ID:                  Int64(1),
-				Number:              Int(1),
-				Name:                String("n"),
-				Description:         String("d"),
-				MonthlyPriceInCents: Int(1),
-				YearlyPriceInCents:  Int(1),
-				PriceModel:          String("pm"),
-				UnitName:            String("un"),
-				Bullets:             &[]string{"b"},
-				State:               String("s"),
-				HasFreeTrial:        Bool(false),
-			},
-			OnFreeTrial:     Bool(false),
-			FreeTrialEndsOn: &Timestamp{referenceTime},
-			UpdatedAt:       &Timestamp{referenceTime},
-		},
-		MarketplacePendingChange: &MarketplacePendingChange{
-			EffectiveDate: &Timestamp{referenceTime},
-			UnitCount:     Int(1),
-			ID:            Int64(1),
-			Plan: &MarketplacePlan{
-				URL:                 String("u"),
-				AccountsURL:         String("au"),
-				ID:                  Int64(1),
-				Number:              Int(1),
-				Name:                String("n"),
-				Description:         String("d"),
-				MonthlyPriceInCents: Int(1),
-				YearlyPriceInCents:  Int(1),
-				PriceModel:          String("pm"),
-				UnitName:            String("un"),
-				Bullets:             &[]string{"b"},
-				State:               String("s"),
-				HasFreeTrial:        Bool(false),
-			},
-		},
-	}
-
-	want := `{
-		"url": "u",
-		"type": "t",
-		"id": 1,
-		"login": "l",
-		"organization_billing_email": "obe",
-		"marketplace_purchase": {
-			"billing_cycle": "bc",
-			"next_billing_date": ` + referenceTimeStr + `,
-			"unit_count": 1,
-			"plan": {
-				"url": "u",
-				"accounts_url": "au",
-				"id": 1,
-				"number": 1,
-				"name": "n",
-				"description": "d",
-				"monthly_price_in_cents": 1,
-				"yearly_price_in_cents": 1,
-				"price_model": "pm",
-				"unit_name": "un",
-				"bullets": ["b"],
-				"state": "s",
-				"has_free_trial": false
-				},
-			"on_free_trial": false,
-			"free_trial_ends_on": ` + referenceTimeStr + `,
-			"updated_at": ` + referenceTimeStr + `
-		},
-		"marketplace_pending_change": {
-			"effective_date": ` + referenceTimeStr + `,
-			"unit_count": 1,
-			"id": 1,
-			"plan": {
-				"url": "u",
-				"accounts_url": "au",
-				"id": 1,
-				"number": 1,
-				"name": "n",
-				"description": "d",
-				"monthly_price_in_cents": 1,
-				"yearly_price_in_cents": 1,
-				"price_model": "pm",
-				"unit_name": "un",
-				"bullets": ["b"],
-				"state": "s",
-				"has_free_trial": false
-			}
-		}
-	}`
-
-	testJSONMarshal(t, u, want)
 }

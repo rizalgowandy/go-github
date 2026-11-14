@@ -67,26 +67,27 @@ type startUserMigration struct {
 // StartUserMigration starts the generation of a migration archive.
 // repos is a slice of repository names to migrate.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#start-a-user-migration
+// GitHub API docs: https://docs.github.com/rest/migrations/users?apiVersion=2022-11-28#start-a-user-migration
+//
+//meta:operation POST /user/migrations
 func (s *MigrationService) StartUserMigration(ctx context.Context, repos []string, opts *UserMigrationOptions) (*UserMigration, *Response, error) {
 	u := "user/migrations"
 
 	body := &startUserMigration{Repositories: repos}
 	if opts != nil {
-		body.LockRepositories = Bool(opts.LockRepositories)
-		body.ExcludeAttachments = Bool(opts.ExcludeAttachments)
+		body.LockRepositories = &opts.LockRepositories
+		body.ExcludeAttachments = &opts.ExcludeAttachments
 	}
 
-	req, err := s.client.NewRequest("POST", u, body)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeMigrationsPreview)
 
-	m := &UserMigration{}
-	resp, err := s.client.Do(ctx, req, m)
+	var m *UserMigration
+	resp, err := s.client.Do(req, &m)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -96,20 +97,25 @@ func (s *MigrationService) StartUserMigration(ctx context.Context, repos []strin
 
 // ListUserMigrations lists the most recent migrations.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#list-user-migrations
-func (s *MigrationService) ListUserMigrations(ctx context.Context) ([]*UserMigration, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/migrations/users?apiVersion=2022-11-28#list-user-migrations
+//
+//meta:operation GET /user/migrations
+func (s *MigrationService) ListUserMigrations(ctx context.Context, opts *ListOptions) ([]*UserMigration, *Response, error) {
 	u := "user/migrations"
-
-	req, err := s.client.NewRequest("GET", u, nil)
+	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	req.Header.Set("Accept", mediaTypeMigrationsPreview)
 
 	var m []*UserMigration
-	resp, err := s.client.Do(ctx, req, &m)
+	resp, err := s.client.Do(req, &m)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -120,20 +126,21 @@ func (s *MigrationService) ListUserMigrations(ctx context.Context) ([]*UserMigra
 // UserMigrationStatus gets the status of a specific migration archive.
 // id is the migration ID.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#get-a-user-migration-status
+// GitHub API docs: https://docs.github.com/rest/migrations/users?apiVersion=2022-11-28#get-a-user-migration-status
+//
+//meta:operation GET /user/migrations/{migration_id}
 func (s *MigrationService) UserMigrationStatus(ctx context.Context, id int64) (*UserMigration, *Response, error) {
 	u := fmt.Sprintf("user/migrations/%v", id)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeMigrationsPreview)
 
-	m := &UserMigration{}
-	resp, err := s.client.Do(ctx, req, m)
+	var m *UserMigration
+	resp, err := s.client.Do(req, &m)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -144,33 +151,35 @@ func (s *MigrationService) UserMigrationStatus(ctx context.Context, id int64) (*
 // UserMigrationArchiveURL gets the URL for a specific migration archive.
 // id is the migration ID.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#download-a-user-migration-archive
+// GitHub API docs: https://docs.github.com/rest/migrations/users?apiVersion=2022-11-28#download-a-user-migration-archive
+//
+//meta:operation GET /user/migrations/{migration_id}/archive
 func (s *MigrationService) UserMigrationArchiveURL(ctx context.Context, id int64) (string, error) {
 	url := fmt.Sprintf("user/migrations/%v/archive", id)
 
-	req, err := s.client.NewRequest("GET", url, nil)
+	req, err := s.client.NewRequest(ctx, "GET", url, nil)
 	if err != nil {
 		return "", err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeMigrationsPreview)
-
-	m := &UserMigration{}
 
 	var loc string
 	originalRedirect := s.client.client.CheckRedirect
-	s.client.client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+	s.client.client.CheckRedirect = func(req *http.Request, _ []*http.Request) error {
 		loc = req.URL.String()
 		return http.ErrUseLastResponse
 	}
 	defer func() {
 		s.client.client.CheckRedirect = originalRedirect
 	}()
-	resp, err := s.client.Do(ctx, req, m)
+
+	var m *UserMigration
+	resp, err := s.client.Do(req, &m)
 	if err == nil {
 		return "", errors.New("expected redirect, none provided")
 	}
+
 	loc = resp.Header.Get("Location")
 	return loc, nil
 }
@@ -178,19 +187,20 @@ func (s *MigrationService) UserMigrationArchiveURL(ctx context.Context, id int64
 // DeleteUserMigration will delete a previous migration archive.
 // id is the migration ID.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#delete-a-user-migration-archive
+// GitHub API docs: https://docs.github.com/rest/migrations/users?apiVersion=2022-11-28#delete-a-user-migration-archive
+//
+//meta:operation DELETE /user/migrations/{migration_id}/archive
 func (s *MigrationService) DeleteUserMigration(ctx context.Context, id int64) (*Response, error) {
 	url := fmt.Sprintf("user/migrations/%v/archive", id)
 
-	req, err := s.client.NewRequest("DELETE", url, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeMigrationsPreview)
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // UnlockUserRepo will unlock a repo that was locked for migration.
@@ -198,17 +208,44 @@ func (s *MigrationService) DeleteUserMigration(ctx context.Context, id int64) (*
 // You should unlock each migrated repository and delete them when the migration
 // is complete and you no longer need the source data.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/migrations/#unlock-a-user-repository
+// GitHub API docs: https://docs.github.com/rest/migrations/users?apiVersion=2022-11-28#unlock-a-user-repository
+//
+//meta:operation DELETE /user/migrations/{migration_id}/repos/{repo_name}/lock
 func (s *MigrationService) UnlockUserRepo(ctx context.Context, id int64, repo string) (*Response, error) {
 	url := fmt.Sprintf("user/migrations/%v/repos/%v/lock", id, repo)
 
-	req, err := s.client.NewRequest("DELETE", url, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeMigrationsPreview)
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
+}
+
+// ListUserRepositories lists all the repositories for a user migration.
+//
+// GitHub API docs: https://docs.github.com/rest/migrations/users?apiVersion=2022-11-28#list-repositories-for-a-user-migration
+//
+//meta:operation GET /user/migrations/{migration_id}/repositories
+func (s *MigrationService) ListUserRepositories(ctx context.Context, migrationID int64, opts *ListOptions) ([]*Repository, *Response, error) {
+	u := fmt.Sprintf("user/migrations/%v/repositories", migrationID)
+	u, err := addOptions(u, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var repos []*Repository
+	resp, err := s.client.Do(req, &repos)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return repos, resp, nil
 }

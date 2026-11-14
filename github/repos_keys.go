@@ -14,21 +14,23 @@ import (
 
 // ListKeys lists the deploy keys for a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#list-deploy-keys
-func (s *RepositoriesService) ListKeys(ctx context.Context, owner string, repo string, opts *ListOptions) ([]*Key, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/deploy-keys/deploy-keys?apiVersion=2022-11-28#list-deploy-keys
+//
+//meta:operation GET /repos/{owner}/{repo}/keys
+func (s *RepositoriesService) ListKeys(ctx context.Context, owner, repo string, opts *ListOptions) ([]*Key, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/keys", owner, repo)
 	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var keys []*Key
-	resp, err := s.client.Do(ctx, req, &keys)
+	resp, err := s.client.Do(req, &keys)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -38,17 +40,19 @@ func (s *RepositoriesService) ListKeys(ctx context.Context, owner string, repo s
 
 // GetKey fetches a single deploy key.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#get-a-deploy-key
-func (s *RepositoriesService) GetKey(ctx context.Context, owner string, repo string, id int64) (*Key, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/deploy-keys/deploy-keys?apiVersion=2022-11-28#get-a-deploy-key
+//
+//meta:operation GET /repos/{owner}/{repo}/keys/{key_id}
+func (s *RepositoriesService) GetKey(ctx context.Context, owner, repo string, id int64) (*Key, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/keys/%v", owner, repo, id)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	key := new(Key)
-	resp, err := s.client.Do(ctx, req, key)
+	var key *Key
+	resp, err := s.client.Do(req, &key)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -56,19 +60,28 @@ func (s *RepositoriesService) GetKey(ctx context.Context, owner string, repo str
 	return key, resp, nil
 }
 
+// CreateDeployKeyRequest represents a request to create a deploy key.
+type CreateDeployKeyRequest struct {
+	Title    *string `json:"title,omitempty"`
+	Key      string  `json:"key"`
+	ReadOnly *bool   `json:"read_only,omitempty"`
+}
+
 // CreateKey adds a deploy key for a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#create-a-deploy-key
-func (s *RepositoriesService) CreateKey(ctx context.Context, owner string, repo string, key *Key) (*Key, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/deploy-keys/deploy-keys?apiVersion=2022-11-28#create-a-deploy-key
+//
+//meta:operation POST /repos/{owner}/{repo}/keys
+func (s *RepositoriesService) CreateKey(ctx context.Context, owner, repo string, body CreateDeployKeyRequest) (*Key, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/keys", owner, repo)
 
-	req, err := s.client.NewRequest("POST", u, key)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	k := new(Key)
-	resp, err := s.client.Do(ctx, req, k)
+	var k *Key
+	resp, err := s.client.Do(req, &k)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -78,14 +91,16 @@ func (s *RepositoriesService) CreateKey(ctx context.Context, owner string, repo 
 
 // DeleteKey deletes a deploy key.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#delete-a-deploy-key
-func (s *RepositoriesService) DeleteKey(ctx context.Context, owner string, repo string, id int64) (*Response, error) {
+// GitHub API docs: https://docs.github.com/rest/deploy-keys/deploy-keys?apiVersion=2022-11-28#delete-a-deploy-key
+//
+//meta:operation DELETE /repos/{owner}/{repo}/keys/{key_id}
+func (s *RepositoriesService) DeleteKey(ctx context.Context, owner, repo string, id int64) (*Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/keys/%v", owner, repo, id)
 
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -19,6 +20,7 @@ import (
 )
 
 func TestMessageMAC_BadHashTypePrefix(t *testing.T) {
+	t.Parallel()
 	const signature = "bogus1=1234567"
 	if _, _, err := messageMAC(signature); err == nil {
 		t.Fatal("messageMAC returned nil; wanted error")
@@ -26,55 +28,47 @@ func TestMessageMAC_BadHashTypePrefix(t *testing.T) {
 }
 
 func TestValidatePayload(t *testing.T) {
+	t.Parallel()
 	const defaultBody = `{"yo":true}` // All tests below use the default request body and signature.
 	const defaultSignature = "sha1=126f2c800419c60137ce748d7672e77b65cf16d6"
 	secretKey := []byte("0123456789abcdef")
 	tests := []struct {
+		secretKey       []byte
 		signature       string
 		signatureHeader string
-		eventID         string
-		event           string
-		wantEventID     string
-		wantEvent       string
 		wantPayload     string
 	}{
 		// The following tests generate expected errors:
-		{},                         // Missing signature
-		{signature: "yo"},          // Missing signature prefix
-		{signature: "sha1=yo"},     // Signature not hex string
-		{signature: "sha1=012345"}, // Invalid signature
+		{secretKey: secretKey},                           // Missing signature
+		{secretKey: secretKey, signature: "yo"},          // Missing signature prefix
+		{secretKey: secretKey, signature: "sha1=yo"},     // Signature not hex string
+		{secretKey: secretKey, signature: "sha1=012345"}, // Invalid signature
+		{signature: defaultSignature},                    // signature without secretKey
+
 		// The following tests expect err=nil:
 		{
-			signature:   defaultSignature,
-			eventID:     "dead-beef",
-			event:       "ping",
-			wantEventID: "dead-beef",
-			wantEvent:   "ping",
+			// no secretKey and no signature still passes validation
 			wantPayload: defaultBody,
 		},
 		{
+			secretKey:   secretKey,
 			signature:   defaultSignature,
-			event:       "ping",
-			wantEvent:   "ping",
 			wantPayload: defaultBody,
 		},
 		{
+			secretKey:   secretKey,
 			signature:   "sha256=b1f8020f5b4cd42042f807dd939015c4a418bc1ff7f604dd55b0a19b5d953d9b",
-			event:       "ping",
-			wantEvent:   "ping",
 			wantPayload: defaultBody,
 		},
 		{
+			secretKey:       secretKey,
 			signature:       "sha256=b1f8020f5b4cd42042f807dd939015c4a418bc1ff7f604dd55b0a19b5d953d9b",
 			signatureHeader: SHA256SignatureHeader,
-			event:           "ping",
-			wantEvent:       "ping",
 			wantPayload:     defaultBody,
 		},
 		{
+			secretKey:   secretKey,
 			signature:   "sha512=8456767023c1195682e182a23b3f5d19150ecea598fde8cb85918f7281b16079471b1329f92b912c4d8bd7455cb159777db8f29608b20c7c87323ba65ae62e1f",
-			event:       "ping",
-			wantEvent:   "ping",
 			wantPayload: defaultBody,
 		},
 	}
@@ -94,7 +88,7 @@ func TestValidatePayload(t *testing.T) {
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		got, err := ValidatePayload(req, secretKey)
+		got, err := ValidatePayload(req, test.secretKey)
 		if err != nil {
 			if test.wantPayload != "" {
 				t.Errorf("ValidatePayload(%#v): err = %v, want nil", test, err)
@@ -108,6 +102,7 @@ func TestValidatePayload(t *testing.T) {
 }
 
 func TestValidatePayload_FormGet(t *testing.T) {
+	t.Parallel()
 	payload := `{"yo":true}`
 	signature := "sha1=3374ef144403e8035423b23b02e2c9d7a4c50368"
 	secretKey := []byte("0123456789abcdef")
@@ -138,6 +133,7 @@ func TestValidatePayload_FormGet(t *testing.T) {
 }
 
 func TestValidatePayload_FormPost(t *testing.T) {
+	t.Parallel()
 	payload := `{"yo":true}`
 	signature := "sha1=3374ef144403e8035423b23b02e2c9d7a4c50368"
 	secretKey := []byte("0123456789abcdef")
@@ -168,6 +164,7 @@ func TestValidatePayload_FormPost(t *testing.T) {
 }
 
 func TestValidatePayload_InvalidContentType(t *testing.T) {
+	t.Parallel()
 	req, err := http.NewRequest("POST", "http://localhost/event", nil)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
@@ -179,6 +176,7 @@ func TestValidatePayload_InvalidContentType(t *testing.T) {
 }
 
 func TestValidatePayload_NoSecretKey(t *testing.T) {
+	t.Parallel()
 	payload := `{"yo":true}`
 
 	form := url.Values{}
@@ -202,13 +200,18 @@ func TestValidatePayload_NoSecretKey(t *testing.T) {
 // badReader satisfies io.Reader but always returns an error.
 type badReader struct{}
 
-func (b *badReader) Read(p []byte) (int, error) {
+func (b *badReader) Read([]byte) (int, error) {
 	return 0, errors.New("bad reader")
 }
 
 func (b *badReader) Close() error { return errors.New("bad reader") }
 
+type readerFunc func([]byte) (int, error)
+
+func (f readerFunc) Read(p []byte) (int, error) { return f(p) }
+
 func TestValidatePayload_BadRequestBody(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		contentType string
 	}{
@@ -218,6 +221,7 @@ func TestValidatePayload_BadRequestBody(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("test #%v", i), func(t *testing.T) {
+			t.Parallel()
 			req := &http.Request{
 				Header: http.Header{"Content-Type": []string{tt.contentType}},
 				Body:   &badReader{},
@@ -229,7 +233,42 @@ func TestValidatePayload_BadRequestBody(t *testing.T) {
 	}
 }
 
+func TestValidatePayload_OversizedBody(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		contentType string
+	}{
+		{contentType: "application/json"},
+		{contentType: "application/x-www-form-urlencoded"},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("test #%v", i), func(t *testing.T) {
+			t.Parallel()
+			// Simulate a reader that reports more than maxPayloadSize bytes.
+			oversized := io.LimitReader(readerFunc(func(p []byte) (int, error) {
+				for i := range p {
+					p[i] = 0
+				}
+				return len(p), nil
+			}), maxPayloadSize+1)
+			req := &http.Request{
+				Header: http.Header{"Content-Type": []string{tt.contentType}},
+				Body:   io.NopCloser(oversized),
+			}
+			_, err := ValidatePayload(req, nil)
+			if err == nil {
+				t.Fatal("ValidatePayload returned nil; want error for oversized body")
+			}
+			if want := "webhook payload exceeds maximum allowed size"; err.Error() != want {
+				t.Errorf("ValidatePayload error = %q, want %q", err.Error(), want)
+			}
+		})
+	}
+}
+
 func TestValidatePayload_InvalidContentTypeParams(t *testing.T) {
+	t.Parallel()
 	req, err := http.NewRequest("POST", "http://localhost/event", nil)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
@@ -241,7 +280,8 @@ func TestValidatePayload_InvalidContentTypeParams(t *testing.T) {
 }
 
 func TestValidatePayload_ValidContentTypeParams(t *testing.T) {
-	var requestBody = `{"yo":true}`
+	t.Parallel()
+	requestBody := `{"yo":true}`
 	buf := bytes.NewBufferString(requestBody)
 
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
@@ -257,10 +297,15 @@ func TestValidatePayload_ValidContentTypeParams(t *testing.T) {
 }
 
 func TestParseWebHook(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
-		payload     interface{}
+		payload     any
 		messageType string
 	}{
+		{
+			payload:     &BranchProtectionConfigurationEvent{},
+			messageType: "branch_protection_configuration",
+		},
 		{
 			payload:     &BranchProtectionRuleEvent{},
 			messageType: "branch_protection_rule",
@@ -272,6 +317,10 @@ func TestParseWebHook(t *testing.T) {
 		{
 			payload:     &CheckSuiteEvent{},
 			messageType: "check_suite",
+		},
+		{
+			payload:     &CodeScanningAlertEvent{},
+			messageType: "code_scanning_alert",
 		},
 		{
 			payload:     &CommitCommentEvent{},
@@ -286,8 +335,20 @@ func TestParseWebHook(t *testing.T) {
 			messageType: "create",
 		},
 		{
+			payload:     &CustomPropertyEvent{},
+			messageType: "custom_property",
+		},
+		{
+			payload:     &CustomPropertyValuesEvent{},
+			messageType: "custom_property_values",
+		},
+		{
 			payload:     &DeleteEvent{},
 			messageType: "delete",
+		},
+		{
+			payload:     &DependabotAlertEvent{},
+			messageType: "dependabot_alert",
 		},
 		{
 			payload:     &DeployKeyEvent{},
@@ -297,10 +358,25 @@ func TestParseWebHook(t *testing.T) {
 			payload:     &DeploymentEvent{},
 			messageType: "deployment",
 		},
-
+		{
+			payload:     &DeploymentProtectionRuleEvent{},
+			messageType: "deployment_protection_rule",
+		},
+		{
+			payload:     &DeploymentReviewEvent{},
+			messageType: "deployment_review",
+		},
 		{
 			payload:     &DeploymentStatusEvent{},
 			messageType: "deployment_status",
+		},
+		{
+			payload:     &DiscussionCommentEvent{},
+			messageType: "discussion_comment",
+		},
+		{
+			payload:     &DiscussionEvent{},
+			messageType: "discussion",
 		},
 		{
 			payload:     &ForkEvent{},
@@ -321,6 +397,10 @@ func TestParseWebHook(t *testing.T) {
 		{
 			payload:     &InstallationRepositoriesEvent{},
 			messageType: "installation_repositories",
+		},
+		{
+			payload:     &InstallationTargetEvent{},
+			messageType: "installation_target",
 		},
 		{
 			payload:     &IssueCommentEvent{},
@@ -347,6 +427,10 @@ func TestParseWebHook(t *testing.T) {
 			messageType: "membership",
 		},
 		{
+			payload:     &MergeGroupEvent{},
+			messageType: "merge_group",
+		},
+		{
 			payload:     &MetaEvent{},
 			messageType: "meta",
 		},
@@ -371,20 +455,20 @@ func TestParseWebHook(t *testing.T) {
 			messageType: "page_build",
 		},
 		{
+			payload:     &PersonalAccessTokenRequestEvent{},
+			messageType: "personal_access_token_request",
+		},
+		{
 			payload:     &PingEvent{},
 			messageType: "ping",
 		},
 		{
-			payload:     &ProjectEvent{},
-			messageType: "project",
+			payload:     &ProjectV2Event{},
+			messageType: "projects_v2",
 		},
 		{
-			payload:     &ProjectCardEvent{},
-			messageType: "project_card",
-		},
-		{
-			payload:     &ProjectColumnEvent{},
-			messageType: "project_column",
+			payload:     &ProjectV2ItemEvent{},
+			messageType: "projects_v2_item",
 		},
 		{
 			payload:     &PublicEvent{},
@@ -403,12 +487,20 @@ func TestParseWebHook(t *testing.T) {
 			messageType: "pull_request_review_comment",
 		},
 		{
+			payload:     &PullRequestReviewThreadEvent{},
+			messageType: "pull_request_review_thread",
+		},
+		{
 			payload:     &PullRequestTargetEvent{},
 			messageType: "pull_request_target",
 		},
 		{
 			payload:     &PushEvent{},
 			messageType: "push",
+		},
+		{
+			payload:     &RegistryPackageEvent{},
+			messageType: "registry_package",
 		},
 		{
 			payload:     &ReleaseEvent{},
@@ -419,8 +511,32 @@ func TestParseWebHook(t *testing.T) {
 			messageType: "repository",
 		},
 		{
+			payload:     &RepositoryRulesetEvent{},
+			messageType: "repository_ruleset",
+		},
+		{
 			payload:     &RepositoryVulnerabilityAlertEvent{},
 			messageType: "repository_vulnerability_alert",
+		},
+		{
+			payload:     &SecretScanningAlertEvent{},
+			messageType: "secret_scanning_alert",
+		},
+		{
+			payload:     &SecretScanningAlertLocationEvent{},
+			messageType: "secret_scanning_alert_location",
+		},
+		{
+			payload:     &SecurityAdvisoryEvent{},
+			messageType: "security_advisory",
+		},
+		{
+			payload:     &SecurityAndAnalysisEvent{},
+			messageType: "security_and_analysis",
+		},
+		{
+			payload:     &SponsorshipEvent{},
+			messageType: "sponsorship",
 		},
 		{
 			payload:     &StarEvent{},
@@ -445,6 +561,10 @@ func TestParseWebHook(t *testing.T) {
 		{
 			payload:     &WatchEvent{},
 			messageType: "watch",
+		},
+		{
+			payload:     &RepositoryImportEvent{},
+			messageType: "repository_import",
 		},
 		{
 			payload:     &RepositoryDispatchEvent{},
@@ -479,25 +599,48 @@ func TestParseWebHook(t *testing.T) {
 	}
 }
 
+func TestAllMessageTypesMapped(t *testing.T) {
+	t.Parallel()
+	for _, mt := range MessageTypes() {
+		if obj := EventForType(mt); obj == nil {
+			t.Errorf("messageMap missing message type %q", mt)
+		}
+	}
+}
+
+func TestUnknownMessageType(t *testing.T) {
+	t.Parallel()
+	if obj := EventForType("unknown"); obj != nil {
+		t.Errorf("EventForType(unknown) = %#v, want nil", obj)
+	}
+	if obj := EventForType(""); obj != nil {
+		t.Errorf(`EventForType("") = %#v, want nil`, obj)
+	}
+}
+
 func TestParseWebHook_BadMessageType(t *testing.T) {
+	t.Parallel()
 	if _, err := ParseWebHook("bogus message type", []byte("{}")); err == nil {
 		t.Fatal("ParseWebHook returned nil; wanted error")
 	}
 }
 
 func TestValidatePayloadFromBody_UnableToParseBody(t *testing.T) {
+	t.Parallel()
 	if _, err := ValidatePayloadFromBody("application/x-www-form-urlencoded", bytes.NewReader([]byte(`%`)), "sha1=", []byte{}); err == nil {
-		t.Errorf("ValidatePayloadFromBody returned nil; wanted error")
+		t.Error("ValidatePayloadFromBody returned nil; wanted error")
 	}
 }
 
 func TestValidatePayloadFromBody_UnsupportedContentType(t *testing.T) {
+	t.Parallel()
 	if _, err := ValidatePayloadFromBody("invalid", bytes.NewReader([]byte(`{}`)), "sha1=", []byte{}); err == nil {
-		t.Errorf("ValidatePayloadFromBody returned nil; wanted error")
+		t.Error("ValidatePayloadFromBody returned nil; wanted error")
 	}
 }
 
 func TestDeliveryID(t *testing.T) {
+	t.Parallel()
 	id := "8970a780-244e-11e7-91ca-da3aabcb9793"
 	req, err := http.NewRequest("POST", "http://localhost", nil)
 	if err != nil {
@@ -512,11 +655,77 @@ func TestDeliveryID(t *testing.T) {
 }
 
 func TestWebHookType(t *testing.T) {
+	t.Parallel()
 	want := "yo"
 	req := &http.Request{
 		Header: http.Header{EventTypeHeader: []string{want}},
 	}
 	if got := WebHookType(req); got != want {
 		t.Errorf("WebHookType = %q, want %q", got, want)
+	}
+}
+
+func TestParseWebHook_ReleaseEvent_Edited(t *testing.T) {
+	t.Parallel()
+	rawJSON := []byte(`{
+		"action": "edited",
+		"changes": {
+			"body": {
+				"from": "Old body"
+			},
+			"name": {
+				"from": "Old name"
+			},
+			"tag_name": {
+				"from": "v1.0.0-rc1"
+			},
+			"make_latest": {
+				"to": true
+			}
+		},
+		"release": {
+			"id": 12345,
+			"tag_name": "v1.0.0",
+			"name": "Release 1.0.0",
+			"body": "New body"
+		},
+		"enterprise": {
+			"id": 1,
+			"slug": "octocat-enterprise"
+		}
+	}`)
+
+	got, err := ParseWebHook("release", rawJSON)
+	if err != nil {
+		t.Fatalf("ParseWebHook failed: %v", err)
+	}
+
+	event, ok := got.(*ReleaseEvent)
+	if !ok {
+		t.Fatalf("ParseWebHook returned %v, want *ReleaseEvent", got)
+	}
+
+	want := &ReleaseEvent{
+		Action: new("edited"),
+		Changes: &ReleaseChanges{
+			Body:       &ReleaseChangeFrom{From: "Old body"},
+			Name:       &ReleaseChangeFrom{From: "Old name"},
+			TagName:    &ReleaseChangeFrom{From: "v1.0.0-rc1"},
+			MakeLatest: &ReleaseChangeToBool{To: true},
+		},
+		Release: &RepositoryRelease{
+			ID:      12345,
+			TagName: "v1.0.0",
+			Name:    new("Release 1.0.0"),
+			Body:    new("New body"),
+		},
+		Enterprise: &Enterprise{
+			ID:   new(1),
+			Slug: new("octocat-enterprise"),
+		},
+	}
+
+	if !cmp.Equal(event, want) {
+		t.Errorf("ParseWebHook() diff (-got +want):\n%v", cmp.Diff(event, want))
 	}
 }

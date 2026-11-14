@@ -6,24 +6,20 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestUsersService_PromoteSiteAdmin(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/site_admin", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Users.PromoteSiteAdmin(ctx, "u")
 	if err != nil {
 		t.Errorf("Users.PromoteSiteAdmin returned error: %v", err)
@@ -41,15 +37,15 @@ func TestUsersService_PromoteSiteAdmin(t *testing.T) {
 }
 
 func TestUsersService_DemoteSiteAdmin(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/site_admin", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Users.DemoteSiteAdmin(ctx, "u")
 	if err != nil {
 		t.Errorf("Users.DemoteSiteAdmin returned error: %v", err)
@@ -67,78 +63,91 @@ func TestUsersService_DemoteSiteAdmin(t *testing.T) {
 }
 
 func TestUsersService_Suspend(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/suspended", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
-	_, err := client.Users.Suspend(ctx, "u", nil)
+	ctx := t.Context()
+	_, err := client.Users.Suspend(ctx, "u", SuspendUserRequest{})
 	if err != nil {
 		t.Errorf("Users.Suspend returned error: %v", err)
 	}
 
 	const methodName = "Suspend"
 	testBadOptions(t, methodName, func() (err error) {
-		_, err = client.Users.Suspend(ctx, "\n", nil)
+		_, err = client.Users.Suspend(ctx, "\n", SuspendUserRequest{})
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		return client.Users.Suspend(ctx, "u", nil)
+		return client.Users.Suspend(ctx, "u", SuspendUserRequest{})
 	})
 }
 
 func TestUsersServiceReason_Suspend(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &UserSuspendOptions{Reason: String("test")}
+	body := SuspendUserRequest{Reason: new("test")}
 
 	mux.HandleFunc("/users/u/suspended", func(w http.ResponseWriter, r *http.Request) {
-		v := new(UserSuspendOptions)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PUT")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, body)
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
-	_, err := client.Users.Suspend(ctx, "u", input)
+	ctx := t.Context()
+	_, err := client.Users.Suspend(ctx, "u", body)
 	if err != nil {
 		t.Errorf("Users.Suspend returned error: %v", err)
 	}
 }
 
 func TestUsersService_Unsuspend(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/suspended", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
-	_, err := client.Users.Unsuspend(ctx, "u")
+	ctx := t.Context()
+	_, err := client.Users.Unsuspend(ctx, "u", UnsuspendUserRequest{})
 	if err != nil {
 		t.Errorf("Users.Unsuspend returned error: %v", err)
 	}
 
 	const methodName = "Unsuspend"
 	testBadOptions(t, methodName, func() (err error) {
-		_, err = client.Users.Unsuspend(ctx, "\n")
+		_, err = client.Users.Unsuspend(ctx, "\n", UnsuspendUserRequest{})
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		return client.Users.Unsuspend(ctx, "u")
+		return client.Users.Unsuspend(ctx, "u", UnsuspendUserRequest{})
 	})
+}
+
+func TestUsersServiceReason_Unsuspend(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	body := UnsuspendUserRequest{Reason: new("test")}
+
+	mux.HandleFunc("/users/u/suspended", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "DELETE")
+		testJSONBody(t, r, body)
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ctx := t.Context()
+	_, err := client.Users.Unsuspend(ctx, "u", body)
+	if err != nil {
+		t.Errorf("Users.Unsuspend returned error: %v", err)
+	}
 }

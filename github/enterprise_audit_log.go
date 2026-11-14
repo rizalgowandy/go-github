@@ -12,7 +12,9 @@ import (
 
 // GetAuditLog gets the audit-log entries for an organization.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/enterprise-admin#get-the-audit-log-for-an-enterprise
+// GitHub API docs: https://docs.github.com/enterprise-cloud@latest/rest/enterprise-admin/audit-log?apiVersion=2022-11-28#get-the-audit-log-for-an-enterprise
+//
+//meta:operation GET /enterprises/{enterprise}/audit-log
 func (s *EnterpriseService) GetAuditLog(ctx context.Context, enterprise string, opts *GetAuditLogOptions) ([]*AuditEntry, *Response, error) {
 	u := fmt.Sprintf("enterprises/%v/audit-log", enterprise)
 	u, err := addOptions(u, opts)
@@ -20,13 +22,13 @@ func (s *EnterpriseService) GetAuditLog(ctx context.Context, enterprise string, 
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var auditEntries []*AuditEntry
-	resp, err := s.client.Do(ctx, req, &auditEntries)
+	resp, err := s.client.Do(req, &auditEntries)
 	if err != nil {
 		return nil, resp, err
 	}

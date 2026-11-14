@@ -69,10 +69,14 @@ type ListMembersOptions struct {
 
 // ListMembers lists the members for an organization. If the authenticated
 // user is an owner of the organization, this will return both concealed and
-// public members, otherwise it will only return public members.
+// public members; otherwise, it will only return public members.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-organization-members
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-public-organization-members
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#list-organization-members
+//
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#list-public-organization-members
+//
+//meta:operation GET /orgs/{org}/members
+//meta:operation GET /orgs/{org}/public_members
 func (s *OrganizationsService) ListMembers(ctx context.Context, org string, opts *ListMembersOptions) ([]*User, *Response, error) {
 	var u string
 	if opts != nil && opts.PublicOnly {
@@ -85,13 +89,13 @@ func (s *OrganizationsService) ListMembers(ctx context.Context, org string, opts
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var members []*User
-	resp, err := s.client.Do(ctx, req, &members)
+	resp, err := s.client.Do(req, &members)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -101,72 +105,96 @@ func (s *OrganizationsService) ListMembers(ctx context.Context, org string, opts
 
 // IsMember checks if a user is a member of an organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#check-organization-membership-for-a-user
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#check-organization-membership-for-a-user
+//
+//meta:operation GET /orgs/{org}/members/{username}
 func (s *OrganizationsService) IsMember(ctx context.Context, org, user string) (bool, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/members/%v", org, user)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return false, nil, err
 	}
 
-	resp, err := s.client.Do(ctx, req, nil)
+	resp, err := s.client.Do(req, nil)
 	member, err := parseBoolResponse(err)
 	return member, resp, err
 }
 
 // IsPublicMember checks if a user is a public member of an organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#check-public-organization-membership-for-a-user
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#check-public-organization-membership-for-a-user
+//
+//meta:operation GET /orgs/{org}/public_members/{username}
 func (s *OrganizationsService) IsPublicMember(ctx context.Context, org, user string) (bool, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/public_members/%v", org, user)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return false, nil, err
 	}
 
-	resp, err := s.client.Do(ctx, req, nil)
+	resp, err := s.client.Do(req, nil)
 	member, err := parseBoolResponse(err)
 	return member, resp, err
 }
 
 // RemoveMember removes a user from all teams of an organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#remove-an-organization-member
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#remove-an-organization-member
+//
+//meta:operation DELETE /orgs/{org}/members/{username}
 func (s *OrganizationsService) RemoveMember(ctx context.Context, org, user string) (*Response, error) {
 	u := fmt.Sprintf("orgs/%v/members/%v", org, user)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
+}
+
+// CancelInvite cancels an organization invitation.
+//
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#cancel-an-organization-invitation
+//
+//meta:operation DELETE /orgs/{org}/invitations/{invitation_id}
+func (s *OrganizationsService) CancelInvite(ctx context.Context, org string, invitationID int64) (*Response, error) {
+	u := fmt.Sprintf("orgs/%v/invitations/%v", org, invitationID)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	return s.client.Do(req, nil)
 }
 
 // PublicizeMembership publicizes a user's membership in an organization. (A
 // user cannot publicize the membership for another user.)
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#set-public-organization-membership-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#set-public-organization-membership-for-the-authenticated-user
+//
+//meta:operation PUT /orgs/{org}/public_members/{username}
 func (s *OrganizationsService) PublicizeMembership(ctx context.Context, org, user string) (*Response, error) {
 	u := fmt.Sprintf("orgs/%v/public_members/%v", org, user)
-	req, err := s.client.NewRequest("PUT", u, nil)
+	req, err := s.client.NewRequest(ctx, "PUT", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // ConcealMembership conceals a user's membership in an organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#remove-public-organization-membership-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#remove-public-organization-membership-for-the-authenticated-user
+//
+//meta:operation DELETE /orgs/{org}/public_members/{username}
 func (s *OrganizationsService) ConcealMembership(ctx context.Context, org, user string) (*Response, error) {
 	u := fmt.Sprintf("orgs/%v/public_members/%v", org, user)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // ListOrgMembershipsOptions specifies optional parameters to the
@@ -181,7 +209,9 @@ type ListOrgMembershipsOptions struct {
 
 // ListOrgMemberships lists the organization memberships for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-organization-memberships-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#list-organization-memberships-for-the-authenticated-user
+//
+//meta:operation GET /user/memberships/orgs
 func (s *OrganizationsService) ListOrgMemberships(ctx context.Context, opts *ListOrgMembershipsOptions) ([]*Membership, *Response, error) {
 	u := "user/memberships/orgs"
 	u, err := addOptions(u, opts)
@@ -189,13 +219,13 @@ func (s *OrganizationsService) ListOrgMemberships(ctx context.Context, opts *Lis
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var memberships []*Membership
-	resp, err := s.client.Do(ctx, req, &memberships)
+	resp, err := s.client.Do(req, &memberships)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -207,8 +237,12 @@ func (s *OrganizationsService) ListOrgMemberships(ctx context.Context, opts *Lis
 // Passing an empty string for user will get the membership for the
 // authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#get-an-organization-membership-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#get-organization-membership-for-a-user
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#get-an-organization-membership-for-the-authenticated-user
+//
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#get-organization-membership-for-a-user
+//
+//meta:operation GET /orgs/{org}/memberships/{username}
+//meta:operation GET /user/memberships/orgs/{org}
 func (s *OrganizationsService) GetOrgMembership(ctx context.Context, user, org string) (*Membership, *Response, error) {
 	var u string
 	if user != "" {
@@ -217,13 +251,13 @@ func (s *OrganizationsService) GetOrgMembership(ctx context.Context, user, org s
 		u = fmt.Sprintf("user/memberships/orgs/%v", org)
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	membership := new(Membership)
-	resp, err := s.client.Do(ctx, req, membership)
+	var membership *Membership
+	resp, err := s.client.Do(req, &membership)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -235,8 +269,12 @@ func (s *OrganizationsService) GetOrgMembership(ctx context.Context, user, org s
 // Passing an empty string for user will edit the membership for the
 // authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#update-an-organization-membership-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#set-organization-membership-for-a-user
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#set-organization-membership-for-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#update-an-organization-membership-for-the-authenticated-user
+//
+//meta:operation PUT /orgs/{org}/memberships/{username}
+//meta:operation PATCH /user/memberships/orgs/{org}
 func (s *OrganizationsService) EditOrgMembership(ctx context.Context, user, org string, membership *Membership) (*Membership, *Response, error) {
 	var u, method string
 	if user != "" {
@@ -247,13 +285,13 @@ func (s *OrganizationsService) EditOrgMembership(ctx context.Context, user, org 
 		method = "PATCH"
 	}
 
-	req, err := s.client.NewRequest(method, u, membership)
+	req, err := s.client.NewRequest(ctx, method, u, membership)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	m := new(Membership)
-	resp, err := s.client.Do(ctx, req, m)
+	var m *Membership
+	resp, err := s.client.Do(req, &m)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -264,20 +302,24 @@ func (s *OrganizationsService) EditOrgMembership(ctx context.Context, user, org 
 // RemoveOrgMembership removes user from the specified organization. If the
 // user has been invited to the organization, this will cancel their invitation.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#remove-organization-membership-for-a-user
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#remove-organization-membership-for-a-user
+//
+//meta:operation DELETE /orgs/{org}/memberships/{username}
 func (s *OrganizationsService) RemoveOrgMembership(ctx context.Context, user, org string) (*Response, error) {
 	u := fmt.Sprintf("orgs/%v/memberships/%v", org, user)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // ListPendingOrgInvitations returns a list of pending invitations.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-pending-organization-invitations
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#list-pending-organization-invitations
+//
+//meta:operation GET /orgs/{org}/invitations
 func (s *OrganizationsService) ListPendingOrgInvitations(ctx context.Context, org string, opts *ListOptions) ([]*Invitation, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/invitations", org)
 	u, err := addOptions(u, opts)
@@ -285,22 +327,22 @@ func (s *OrganizationsService) ListPendingOrgInvitations(ctx context.Context, or
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var pendingInvitations []*Invitation
-	resp, err := s.client.Do(ctx, req, &pendingInvitations)
+	resp, err := s.client.Do(req, &pendingInvitations)
 	if err != nil {
 		return nil, resp, err
 	}
+
 	return pendingInvitations, resp, nil
 }
 
-// CreateOrgInvitationOptions specifies the parameters to the OrganizationService.Invite
-// method.
-type CreateOrgInvitationOptions struct {
+// CreateOrgInvitationRequest specifies the request body for OrganizationsService.CreateOrgInvitation.
+type CreateOrgInvitationRequest struct {
 	// GitHub user ID for the person you are inviting. Not required if you provide Email.
 	InviteeID *int64 `json:"invitee_id,omitempty"`
 	// Email address of the person you are inviting, which can be an existing GitHub user.
@@ -314,35 +356,40 @@ type CreateOrgInvitationOptions struct {
 	// * billing_manager - Non-owner organization members with ability to
 	//   manage the billing settings of your organization.
 	// Default is "direct_member".
-	Role   *string `json:"role"`
-	TeamID []int64 `json:"team_ids"`
+	Role    *string `json:"role,omitempty"`
+	TeamIDs []int64 `json:"team_ids,omitempty"`
 }
 
 // CreateOrgInvitation invites people to an organization by using their GitHub user ID or their email address.
 // In order to create invitations in an organization,
 // the authenticated user must be an organization owner.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#create-an-organization-invitation
-func (s *OrganizationsService) CreateOrgInvitation(ctx context.Context, org string, opts *CreateOrgInvitationOptions) (*Invitation, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#create-an-organization-invitation
+//
+//meta:operation POST /orgs/{org}/invitations
+func (s *OrganizationsService) CreateOrgInvitation(ctx context.Context, org string, body CreateOrgInvitationRequest) (*Invitation, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/invitations", org)
 
-	req, err := s.client.NewRequest("POST", u, opts)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var invitation *Invitation
-	resp, err := s.client.Do(ctx, req, &invitation)
+	resp, err := s.client.Do(req, &invitation)
 	if err != nil {
 		return nil, resp, err
 	}
+
 	return invitation, resp, nil
 }
 
 // ListOrgInvitationTeams lists all teams associated with an invitation. In order to see invitations in an organization,
 // the authenticated user must be an organization owner.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-organization-invitation-teams
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#list-organization-invitation-teams
+//
+//meta:operation GET /orgs/{org}/invitations/{invitation_id}/teams
 func (s *OrganizationsService) ListOrgInvitationTeams(ctx context.Context, org, invitationID string, opts *ListOptions) ([]*Team, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/invitations/%v/teams", org, invitationID)
 	u, err := addOptions(u, opts)
@@ -350,22 +397,25 @@ func (s *OrganizationsService) ListOrgInvitationTeams(ctx context.Context, org, 
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var orgInvitationTeams []*Team
-	resp, err := s.client.Do(ctx, req, &orgInvitationTeams)
+	resp, err := s.client.Do(req, &orgInvitationTeams)
 	if err != nil {
 		return nil, resp, err
 	}
+
 	return orgInvitationTeams, resp, nil
 }
 
-// ListFailedOrgInvitations returns a list of failed inviatations.
+// ListFailedOrgInvitations returns a list of failed invitations.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/orgs#list-failed-organization-invitations
+// GitHub API docs: https://docs.github.com/rest/orgs/members?apiVersion=2022-11-28#list-failed-organization-invitations
+//
+//meta:operation GET /orgs/{org}/failed_invitations
 func (s *OrganizationsService) ListFailedOrgInvitations(ctx context.Context, org string, opts *ListOptions) ([]*Invitation, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/failed_invitations", org)
 	u, err := addOptions(u, opts)
@@ -373,13 +423,13 @@ func (s *OrganizationsService) ListFailedOrgInvitations(ctx context.Context, org
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var failedInvitations []*Invitation
-	resp, err := s.client.Do(ctx, req, &failedInvitations)
+	resp, err := s.client.Do(req, &failedInvitations)
 	if err != nil {
 		return nil, resp, err
 	}

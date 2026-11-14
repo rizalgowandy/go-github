@@ -13,7 +13,7 @@ import (
 // ChecksService provides access to the Checks API in the
 // GitHub API.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/
+// GitHub API docs: https://docs.github.com/rest/checks?apiVersion=2022-11-28
 type ChecksService service
 
 // CheckRun represents a GitHub check run on a repository associated with a GitHub app.
@@ -85,7 +85,10 @@ type CheckSuite struct {
 	PullRequests []*PullRequest `json:"pull_requests,omitempty"`
 
 	// The following fields are only populated by Webhook events.
-	HeadCommit *Commit `json:"head_commit,omitempty"`
+	HeadCommit           *Commit `json:"head_commit,omitempty"`
+	LatestCheckRunsCount *int64  `json:"latest_check_runs_count,omitempty"`
+	Rerequestable        *bool   `json:"rerequestable,omitempty"`
+	RunsRerequestable    *bool   `json:"runs_rerequestable,omitempty"`
 }
 
 func (c CheckRun) String() string {
@@ -98,16 +101,20 @@ func (c CheckSuite) String() string {
 
 // GetCheckRun gets a check-run for a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#get-a-check-run
+// GitHub API docs: https://docs.github.com/rest/checks/runs?apiVersion=2022-11-28#get-a-check-run
+//
+//meta:operation GET /repos/{owner}/{repo}/check-runs/{check_run_id}
 func (s *ChecksService) GetCheckRun(ctx context.Context, owner, repo string, checkRunID int64) (*CheckRun, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/check-runs/%v", owner, repo, checkRunID)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	checkRun := new(CheckRun)
-	resp, err := s.client.Do(ctx, req, checkRun)
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
+	var checkRun *CheckRun
+	resp, err := s.client.Do(req, &checkRun)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -117,16 +124,20 @@ func (s *ChecksService) GetCheckRun(ctx context.Context, owner, repo string, che
 
 // GetCheckSuite gets a single check suite.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#get-a-check-suite
+// GitHub API docs: https://docs.github.com/rest/checks/suites?apiVersion=2022-11-28#get-a-check-suite
+//
+//meta:operation GET /repos/{owner}/{repo}/check-suites/{check_suite_id}
 func (s *ChecksService) GetCheckSuite(ctx context.Context, owner, repo string, checkSuiteID int64) (*CheckSuite, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/check-suites/%v", owner, repo, checkSuiteID)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	checkSuite := new(CheckSuite)
-	resp, err := s.client.Do(ctx, req, checkSuite)
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
+	var checkSuite *CheckSuite
+	resp, err := s.client.Do(req, &checkSuite)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -134,8 +145,8 @@ func (s *ChecksService) GetCheckSuite(ctx context.Context, owner, repo string, c
 	return checkSuite, resp, nil
 }
 
-// CreateCheckRunOptions sets up parameters needed to create a CheckRun.
-type CreateCheckRunOptions struct {
+// CreateCheckRunRequest sets up parameters needed to create a CheckRun.
+type CreateCheckRunRequest struct {
 	Name        string            `json:"name"`                   // The name of the check (e.g., "code-coverage"). (Required.)
 	HeadSHA     string            `json:"head_sha"`               // The SHA of the commit. (Required.)
 	DetailsURL  *string           `json:"details_url,omitempty"`  // The URL of the integrator's site that has the full details of the check. (Optional.)
@@ -145,7 +156,7 @@ type CreateCheckRunOptions struct {
 	StartedAt   *Timestamp        `json:"started_at,omitempty"`   // The time that the check run began. (Optional.)
 	CompletedAt *Timestamp        `json:"completed_at,omitempty"` // The time the check completed. (Optional. Required if you provide conclusion.)
 	Output      *CheckRunOutput   `json:"output,omitempty"`       // Provide descriptive details about the run. (Optional)
-	Actions     []*CheckRunAction `json:"actions,omitempty"`      // Possible further actions the integrator can perform, which a user may trigger. (Optional.)
+	Actions     []*CheckRunAction `json:"actions,omitzero"`       // Possible further actions the integrator can perform, which a user may trigger. (Optional.)
 }
 
 // CheckRunAction exposes further actions the integrator can perform, which a user may trigger.
@@ -157,16 +168,20 @@ type CheckRunAction struct {
 
 // CreateCheckRun creates a check run for repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#create-a-check-run
-func (s *ChecksService) CreateCheckRun(ctx context.Context, owner, repo string, opts CreateCheckRunOptions) (*CheckRun, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/checks/runs?apiVersion=2022-11-28#create-a-check-run
+//
+//meta:operation POST /repos/{owner}/{repo}/check-runs
+func (s *ChecksService) CreateCheckRun(ctx context.Context, owner, repo string, body CreateCheckRunRequest) (*CheckRun, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/check-runs", owner, repo)
-	req, err := s.client.NewRequest("POST", u, opts)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	checkRun := new(CheckRun)
-	resp, err := s.client.Do(ctx, req, checkRun)
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
+	var checkRun *CheckRun
+	resp, err := s.client.Do(req, &checkRun)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -174,30 +189,35 @@ func (s *ChecksService) CreateCheckRun(ctx context.Context, owner, repo string, 
 	return checkRun, resp, nil
 }
 
-// UpdateCheckRunOptions sets up parameters needed to update a CheckRun.
-type UpdateCheckRunOptions struct {
-	Name        string            `json:"name"`                   // The name of the check (e.g., "code-coverage"). (Required.)
+// UpdateCheckRunRequest sets up parameters needed to update a CheckRun.
+type UpdateCheckRunRequest struct {
+	Name        *string           `json:"name,omitempty"`         // The name of the check (e.g., "code-coverage"). (Optional.)
 	DetailsURL  *string           `json:"details_url,omitempty"`  // The URL of the integrator's site that has the full details of the check. (Optional.)
 	ExternalID  *string           `json:"external_id,omitempty"`  // A reference for the run on the integrator's system. (Optional.)
+	StartedAt   *Timestamp        `json:"started_at,omitempty"`   // The time that the check run began. (Optional.)
 	Status      *string           `json:"status,omitempty"`       // The current status. Can be one of "queued", "in_progress", or "completed". Default: "queued". (Optional.)
 	Conclusion  *string           `json:"conclusion,omitempty"`   // Can be one of "success", "failure", "neutral", "cancelled", "skipped", "timed_out", or "action_required". (Optional. Required if you provide a status of "completed".)
 	CompletedAt *Timestamp        `json:"completed_at,omitempty"` // The time the check completed. (Optional. Required if you provide conclusion.)
 	Output      *CheckRunOutput   `json:"output,omitempty"`       // Provide descriptive details about the run. (Optional)
-	Actions     []*CheckRunAction `json:"actions,omitempty"`      // Possible further actions the integrator can perform, which a user may trigger. (Optional.)
+	Actions     []*CheckRunAction `json:"actions,omitzero"`       // Possible further actions the integrator can perform, which a user may trigger. (Optional.)
 }
 
 // UpdateCheckRun updates a check run for a specific commit in a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#update-a-check-run
-func (s *ChecksService) UpdateCheckRun(ctx context.Context, owner, repo string, checkRunID int64, opts UpdateCheckRunOptions) (*CheckRun, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/checks/runs?apiVersion=2022-11-28#update-a-check-run
+//
+//meta:operation PATCH /repos/{owner}/{repo}/check-runs/{check_run_id}
+func (s *ChecksService) UpdateCheckRun(ctx context.Context, owner, repo string, checkRunID int64, body UpdateCheckRunRequest) (*CheckRun, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/check-runs/%v", owner, repo, checkRunID)
-	req, err := s.client.NewRequest("PATCH", u, opts)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	checkRun := new(CheckRun)
-	resp, err := s.client.Do(ctx, req, checkRun)
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
+	var checkRun *CheckRun
+	resp, err := s.client.Do(req, &checkRun)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -207,7 +227,9 @@ func (s *ChecksService) UpdateCheckRun(ctx context.Context, owner, repo string, 
 
 // ListCheckRunAnnotations lists the annotations for a check run.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#list-check-run-annotations
+// GitHub API docs: https://docs.github.com/rest/checks/runs?apiVersion=2022-11-28#list-check-run-annotations
+//
+//meta:operation GET /repos/{owner}/{repo}/check-runs/{check_run_id}/annotations
 func (s *ChecksService) ListCheckRunAnnotations(ctx context.Context, owner, repo string, checkRunID int64, opts *ListOptions) ([]*CheckRunAnnotation, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/check-runs/%v/annotations", owner, repo, checkRunID)
 	u, err := addOptions(u, opts)
@@ -215,13 +237,15 @@ func (s *ChecksService) ListCheckRunAnnotations(ctx context.Context, owner, repo
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
 	var checkRunAnnotations []*CheckRunAnnotation
-	resp, err := s.client.Do(ctx, req, &checkRunAnnotations)
+	resp, err := s.client.Do(req, &checkRunAnnotations)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -234,6 +258,7 @@ type ListCheckRunsOptions struct {
 	CheckName *string `url:"check_name,omitempty"` // Returns check runs with the specified name.
 	Status    *string `url:"status,omitempty"`     // Returns check runs with the specified status. Can be one of "queued", "in_progress", or "completed".
 	Filter    *string `url:"filter,omitempty"`     // Filters check runs by their completed_at timestamp. Can be one of "latest" (returning the most recent check runs) or "all". Default: "latest"
+	AppID     *int64  `url:"app_id,omitempty"`     // Filters check runs by GitHub App ID.
 
 	ListOptions
 }
@@ -245,8 +270,12 @@ type ListCheckRunsResults struct {
 }
 
 // ListCheckRunsForRef lists check runs for a specific ref.
+// The ref can be a commit SHA, branch name `heads/<branch name>`, or tag name `tags/<tag name>`.
+// For more information, see "Git References" in the Git documentation https://git-scm.com/book/en/v2/Git-Internals-Git-References.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#list-check-runs-for-a-git-reference
+// GitHub API docs: https://docs.github.com/rest/checks/runs?apiVersion=2022-11-28#list-check-runs-for-a-git-reference
+//
+//meta:operation GET /repos/{owner}/{repo}/commits/{ref}/check-runs
 func (s *ChecksService) ListCheckRunsForRef(ctx context.Context, owner, repo, ref string, opts *ListCheckRunsOptions) (*ListCheckRunsResults, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/commits/%v/check-runs", owner, repo, refURLEscape(ref))
 	u, err := addOptions(u, opts)
@@ -254,13 +283,15 @@ func (s *ChecksService) ListCheckRunsForRef(ctx context.Context, owner, repo, re
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
 	var checkRunResults *ListCheckRunsResults
-	resp, err := s.client.Do(ctx, req, &checkRunResults)
+	resp, err := s.client.Do(req, &checkRunResults)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -270,7 +301,9 @@ func (s *ChecksService) ListCheckRunsForRef(ctx context.Context, owner, repo, re
 
 // ListCheckRunsCheckSuite lists check runs for a check suite.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#list-check-runs-in-a-check-suite
+// GitHub API docs: https://docs.github.com/rest/checks/runs?apiVersion=2022-11-28#list-check-runs-in-a-check-suite
+//
+//meta:operation GET /repos/{owner}/{repo}/check-suites/{check_suite_id}/check-runs
 func (s *ChecksService) ListCheckRunsCheckSuite(ctx context.Context, owner, repo string, checkSuiteID int64, opts *ListCheckRunsOptions) (*ListCheckRunsResults, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/check-suites/%v/check-runs", owner, repo, checkSuiteID)
 	u, err := addOptions(u, opts)
@@ -278,13 +311,15 @@ func (s *ChecksService) ListCheckRunsCheckSuite(ctx context.Context, owner, repo
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
 	var checkRunResults *ListCheckRunsResults
-	resp, err := s.client.Do(ctx, req, &checkRunResults)
+	resp, err := s.client.Do(req, &checkRunResults)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -292,10 +327,28 @@ func (s *ChecksService) ListCheckRunsCheckSuite(ctx context.Context, owner, repo
 	return checkRunResults, resp, nil
 }
 
+// ReRequestCheckRun triggers GitHub to rerequest an existing check run.
+//
+// GitHub API docs: https://docs.github.com/rest/checks/runs?apiVersion=2022-11-28#rerequest-a-check-run
+//
+//meta:operation POST /repos/{owner}/{repo}/check-runs/{check_run_id}/rerequest
+func (s *ChecksService) ReRequestCheckRun(ctx context.Context, owner, repo string, checkRunID int64) (*Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/check-runs/%v/rerequest", owner, repo, checkRunID)
+
+	req, err := s.client.NewRequest(ctx, "POST", u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
+	return s.client.Do(req, nil)
+}
+
 // ListCheckSuiteOptions represents parameters to list check suites.
 type ListCheckSuiteOptions struct {
 	CheckName *string `url:"check_name,omitempty"` // Filters checks suites by the name of the check run.
-	AppID     *int    `url:"app_id,omitempty"`     // Filters check suites by GitHub App id.
+	AppID     *int64  `url:"app_id,omitempty"`     // Filters check suites by GitHub App id.
 
 	ListOptions
 }
@@ -307,8 +360,12 @@ type ListCheckSuiteResults struct {
 }
 
 // ListCheckSuitesForRef lists check suite for a specific ref.
+// The ref can be a commit SHA, branch name `heads/<branch name>`, or tag name `tags/<tag name>`.
+// For more information, see "Git References" in the Git documentation https://git-scm.com/book/en/v2/Git-Internals-Git-References.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#list-check-suites-for-a-git-reference
+// GitHub API docs: https://docs.github.com/rest/checks/suites?apiVersion=2022-11-28#list-check-suites-for-a-git-reference
+//
+//meta:operation GET /repos/{owner}/{repo}/commits/{ref}/check-suites
 func (s *ChecksService) ListCheckSuitesForRef(ctx context.Context, owner, repo, ref string, opts *ListCheckSuiteOptions) (*ListCheckSuiteResults, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/commits/%v/check-suites", owner, repo, refURLEscape(ref))
 	u, err := addOptions(u, opts)
@@ -316,13 +373,15 @@ func (s *ChecksService) ListCheckSuitesForRef(ctx context.Context, owner, repo, 
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
 	var checkSuiteResults *ListCheckSuiteResults
-	resp, err := s.client.Do(ctx, req, &checkSuiteResults)
+	resp, err := s.client.Do(req, &checkSuiteResults)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -332,13 +391,13 @@ func (s *ChecksService) ListCheckSuitesForRef(ctx context.Context, owner, repo, 
 
 // AutoTriggerCheck enables or disables automatic creation of CheckSuite events upon pushes to the repository.
 type AutoTriggerCheck struct {
-	AppID   *int64 `json:"app_id,omitempty"`  // The id of the GitHub App. (Required.)
-	Setting *bool  `json:"setting,omitempty"` // Set to "true" to enable automatic creation of CheckSuite events upon pushes to the repository, or "false" to disable them. Default: "true" (Required.)
+	AppID   int64 `json:"app_id"`  // The id of the GitHub App. (Required.)
+	Setting bool  `json:"setting"` // Set to "true" to enable automatic creation of CheckSuite events upon pushes to the repository, or "false" to disable them. Default: "true" (Required.)
 }
 
-// CheckSuitePreferenceOptions set options for check suite preferences for a repository.
-type CheckSuitePreferenceOptions struct {
-	AutoTriggerChecks []*AutoTriggerCheck `json:"auto_trigger_checks,omitempty"` // A slice of auto trigger checks that can be set for a check suite in a repository.
+// UpdateCheckSuitePreferencesRequest sets options for check suite preferences for a repository.
+type UpdateCheckSuitePreferencesRequest struct {
+	AutoTriggerChecks []*AutoTriggerCheck `json:"auto_trigger_checks,omitzero"` // A slice of auto trigger checks that can be set for a check suite in a repository.
 }
 
 // CheckSuitePreferenceResults represents the results of the preference set operation.
@@ -347,23 +406,27 @@ type CheckSuitePreferenceResults struct {
 	Repository  *Repository     `json:"repository,omitempty"`
 }
 
-// PreferenceList represents a list of auto trigger checks for repository
+// PreferenceList represents a list of auto trigger checks for repository.
 type PreferenceList struct {
 	AutoTriggerChecks []*AutoTriggerCheck `json:"auto_trigger_checks,omitempty"` // A slice of auto trigger checks that can be set for a check suite in a repository.
 }
 
-// SetCheckSuitePreferences changes the default automatic flow when creating check suites.
+// UpdateCheckSuitePreferences changes the default automatic flow when creating check suites.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#update-repository-preferences-for-check-suites
-func (s *ChecksService) SetCheckSuitePreferences(ctx context.Context, owner, repo string, opts CheckSuitePreferenceOptions) (*CheckSuitePreferenceResults, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/checks/suites?apiVersion=2022-11-28#update-repository-preferences-for-check-suites
+//
+//meta:operation PATCH /repos/{owner}/{repo}/check-suites/preferences
+func (s *ChecksService) UpdateCheckSuitePreferences(ctx context.Context, owner, repo string, body UpdateCheckSuitePreferencesRequest) (*CheckSuitePreferenceResults, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/check-suites/preferences", owner, repo)
-	req, err := s.client.NewRequest("PATCH", u, opts)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
 	var checkSuitePrefResults *CheckSuitePreferenceResults
-	resp, err := s.client.Do(ctx, req, &checkSuitePrefResults)
+	resp, err := s.client.Do(req, &checkSuitePrefResults)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -371,24 +434,27 @@ func (s *ChecksService) SetCheckSuitePreferences(ctx context.Context, owner, rep
 	return checkSuitePrefResults, resp, nil
 }
 
-// CreateCheckSuiteOptions sets up parameters to manually create a check suites
-type CreateCheckSuiteOptions struct {
-	HeadSHA    string  `json:"head_sha"`              // The sha of the head commit. (Required.)
-	HeadBranch *string `json:"head_branch,omitempty"` // The name of the head branch where the code changes are implemented.
+// CreateCheckSuiteRequest sets up parameters to manually create a check suite.
+type CreateCheckSuiteRequest struct {
+	HeadSHA string `json:"head_sha"` // The sha of the head commit. (Required.)
 }
 
 // CreateCheckSuite manually creates a check suite for a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#create-a-check-suite
-func (s *ChecksService) CreateCheckSuite(ctx context.Context, owner, repo string, opts CreateCheckSuiteOptions) (*CheckSuite, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/checks/suites?apiVersion=2022-11-28#create-a-check-suite
+//
+//meta:operation POST /repos/{owner}/{repo}/check-suites
+func (s *ChecksService) CreateCheckSuite(ctx context.Context, owner, repo string, body CreateCheckSuiteRequest) (*CheckSuite, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/check-suites", owner, repo)
-	req, err := s.client.NewRequest("POST", u, opts)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	checkSuite := new(CheckSuite)
-	resp, err := s.client.Do(ctx, req, checkSuite)
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
+	var checkSuite *CheckSuite
+	resp, err := s.client.Do(req, &checkSuite)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -398,15 +464,19 @@ func (s *ChecksService) CreateCheckSuite(ctx context.Context, owner, repo string
 
 // ReRequestCheckSuite triggers GitHub to rerequest an existing check suite, without pushing new code to a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/checks/#rerequest-a-check-suite
+// GitHub API docs: https://docs.github.com/rest/checks/suites?apiVersion=2022-11-28#rerequest-a-check-suite
+//
+//meta:operation POST /repos/{owner}/{repo}/check-suites/{check_suite_id}/rerequest
 func (s *ChecksService) ReRequestCheckSuite(ctx context.Context, owner, repo string, checkSuiteID int64) (*Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/check-suites/%v/rerequest", owner, repo, checkSuiteID)
 
-	req, err := s.client.NewRequest("POST", u, nil)
+	req, err := s.client.NewRequest(ctx, "POST", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := s.client.Do(ctx, req, nil)
+	req.Header.Set("Accept", mediaTypeCheckRunsPreview)
+
+	resp, err := s.client.Do(req, nil)
 	return resp, err
 }

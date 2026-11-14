@@ -31,6 +31,10 @@ Run tests using:
 
     GITHUB_AUTH_TOKEN=XXX go test -v -tags=integration ./integration
 
+Some tests create repositories. By default, the new repositories will be owned
+by the user identified by the OAuth token. Set the `GITHUB_OWNER='<GH_OWNER>'`
+environment variable to specify a different owner, such as an organization.
+
 Additionally there are a set of integration tests for the Authorizations API.
 These tests require a GitHub user (username and password), and also that a
 [GitHub Application](https://github.com/settings/applications/new) (with
@@ -41,22 +45,3 @@ Authorization tests:
 
 If some or all of these environment variables are not available, certain of the
 Authorization integration tests will be skipped.
-
-fields
-------
-
-This will identify the fields being returned by the live GitHub API that are
-not currently being mapped into the relevant Go data type. Sometimes fields
-are deliberately not mapped, so the results of this tool should just be taken
-as a hint.
-
-This test sends real network traffic to the GitHub API and will exhaust the
-default unregistered rate limit (60 requests per hour) very quickly.
-Additionally, some data is only returned for authenticated API calls. Unlike
-the integration tests above, these tests only read data, so it's less
-imperative that these be run using a dedicated test account (though you still
-really should).
-
-Run the fields tool using:
-
-    GITHUB_AUTH_TOKEN=XXX go run ./fields/fields.go

@@ -25,29 +25,89 @@ type Stargazer struct {
 
 // ListStargazers lists people who have starred the specified repo.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#list-stargazers
+// GitHub API docs: https://docs.github.com/rest/activity/starring?apiVersion=2022-11-28#list-stargazers
+//
+//meta:operation GET /repos/{owner}/{repo}/stargazers
 func (s *ActivityService) ListStargazers(ctx context.Context, owner, repo string, opts *ListOptions) ([]*Stargazer, *Response, error) {
-	u := fmt.Sprintf("repos/%s/%s/stargazers", owner, repo)
+	u := fmt.Sprintf("repos/%v/%v/stargazers", owner, repo)
 	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches
-	req.Header.Set("Accept", mediaTypeStarringPreview)
+	req.Header.Set("Accept", mediaTypeStarring)
 
 	var stargazers []*Stargazer
-	resp, err := s.client.Do(ctx, req, &stargazers)
+	resp, err := s.client.Do(req, &stargazers)
 	if err != nil {
 		return nil, resp, err
 	}
 
 	return stargazers, resp, nil
+}
+
+// StargazerCount represents the number of users who have starred a repository.
+type StargazerCount struct {
+	Count int `json:"count"`
+}
+
+// GetStargazerCount gets the number of people who have starred the specified repo.
+//
+// GitHub API docs: https://docs.github.com/rest/activity/starring?apiVersion=2022-11-28#get-stargazer-count
+//
+//meta:operation GET /repos/{owner}/{repo}/stargazers/count
+func (s *ActivityService) GetStargazerCount(ctx context.Context, owner, repo string) (*StargazerCount, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/stargazers/count", owner, repo)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var count *StargazerCount
+	resp, err := s.client.Do(req, &count)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return count, resp, nil
+}
+
+// StargazerHistory represents the stars a repository received during one week.
+type StargazerHistory struct {
+	Days  []int     `json:"days"`
+	Total int       `json:"total"`
+	Week  Timestamp `json:"week"`
+}
+
+// ListStargazerHistory lists the stars of the specified repo grouped by week.
+//
+// GitHub API docs: https://docs.github.com/rest/activity/starring?apiVersion=2022-11-28#get-repository-star-history
+//
+//meta:operation GET /repos/{owner}/{repo}/stargazers/history
+func (s *ActivityService) ListStargazerHistory(ctx context.Context, owner, repo string, opts *ListOptions) ([]*StargazerHistory, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/stargazers/history", owner, repo)
+	u, err := addOptions(u, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var history []*StargazerHistory
+	resp, err := s.client.Do(req, &history)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return history, resp, nil
 }
 
 // ActivityListStarredOptions specifies the optional parameters to the
@@ -58,7 +118,7 @@ type ActivityListStarredOptions struct {
 	Sort string `url:"sort,omitempty"`
 
 	// Direction in which to sort repositories. Possible values are: asc, desc.
-	// Default is "asc" when sort is "full_name", otherwise default is "desc".
+	// Default is "asc" when sort is "full_name"; otherwise, default is "desc".
 	Direction string `url:"direction,omitempty"`
 
 	ListOptions
@@ -67,8 +127,12 @@ type ActivityListStarredOptions struct {
 // ListStarred lists all the repos starred by a user. Passing the empty string
 // will list the starred repositories for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#list-repositories-starred-by-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#list-repositories-starred-by-a-user
+// GitHub API docs: https://docs.github.com/rest/activity/starring?apiVersion=2022-11-28#list-repositories-starred-by-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/activity/starring?apiVersion=2022-11-28#list-repositories-starred-by-the-authenticated-user
+//
+//meta:operation GET /user/starred
+//meta:operation GET /users/{username}/starred
 func (s *ActivityService) ListStarred(ctx context.Context, user string, opts *ActivityListStarredOptions) ([]*StarredRepository, *Response, error) {
 	var u string
 	if user != "" {
@@ -81,17 +145,16 @@ func (s *ActivityService) ListStarred(ctx context.Context, user string, opts *Ac
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when APIs fully launch
-	acceptHeaders := []string{mediaTypeStarringPreview, mediaTypeTopicsPreview}
+	acceptHeaders := []string{mediaTypeStarring, mediaTypeTopicsPreview}
 	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
 
 	var repos []*StarredRepository
-	resp, err := s.client.Do(ctx, req, &repos)
+	resp, err := s.client.Do(req, &repos)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -101,38 +164,47 @@ func (s *ActivityService) ListStarred(ctx context.Context, user string, opts *Ac
 
 // IsStarred checks if a repository is starred by authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#check-if-a-repository-is-starred-by-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/activity/starring?apiVersion=2022-11-28#check-if-a-repository-is-starred-by-the-authenticated-user
+//
+//meta:operation GET /user/starred/{owner}/{repo}
 func (s *ActivityService) IsStarred(ctx context.Context, owner, repo string) (bool, *Response, error) {
 	u := fmt.Sprintf("user/starred/%v/%v", owner, repo)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return false, nil, err
 	}
-	resp, err := s.client.Do(ctx, req, nil)
+
+	resp, err := s.client.Do(req, nil)
 	starred, err := parseBoolResponse(err)
 	return starred, resp, err
 }
 
 // Star a repository as the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#star-a-repository-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/activity/starring?apiVersion=2022-11-28#star-a-repository-for-the-authenticated-user
+//
+//meta:operation PUT /user/starred/{owner}/{repo}
 func (s *ActivityService) Star(ctx context.Context, owner, repo string) (*Response, error) {
 	u := fmt.Sprintf("user/starred/%v/%v", owner, repo)
-	req, err := s.client.NewRequest("PUT", u, nil)
+	req, err := s.client.NewRequest(ctx, "PUT", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+
+	return s.client.Do(req, nil)
 }
 
 // Unstar a repository as the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#unstar-a-repository-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/activity/starring?apiVersion=2022-11-28#unstar-a-repository-for-the-authenticated-user
+//
+//meta:operation DELETE /user/starred/{owner}/{repo}
 func (s *ActivityService) Unstar(ctx context.Context, owner, repo string) (*Response, error) {
 	u := fmt.Sprintf("user/starred/%v/%v", owner, repo)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+
+	return s.client.Do(req, nil)
 }

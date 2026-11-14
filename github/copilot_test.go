@@ -1,0 +1,5135 @@
+// Copyright 2023 The go-github AUTHORS. All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+package github
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+)
+
+func TestCopilotSpace_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	var got CopilotSpace
+	err := got.UnmarshalJSON([]byte(`{`))
+	if err == nil {
+		t.Error("CopilotSpace.UnmarshalJSON returned nil instead of an error")
+	}
+	tests := []struct {
+		name    string
+		json    string
+		want    *CopilotSpace
+		wantErr bool
+	}{
+		{
+			name: "user owner with large ID",
+			json: `{"owner":{"id":9007199254740993,"type":"User"}}`,
+			want: &CopilotSpace{
+				Owner: &User{
+					ID:   new(int64(9007199254740993)),
+					Type: new("User"),
+				},
+			},
+		},
+		{
+			name: "organization owner with large ID",
+			json: `{"owner":{"id":9007199254740993,"type":"Organization"}}`,
+			want: &CopilotSpace{
+				Owner: &Organization{
+					ID:   new(int64(9007199254740993)),
+					Type: new("Organization"),
+				},
+			},
+		},
+		{
+			name: "organization owner without type with large ID",
+			json: `{"owner":{"id":9007199254740993,"hooks_url":"https://api.github.com/orgs/octo-org/hooks"}}`,
+			want: &CopilotSpace{
+				Owner: &Organization{
+					ID:       new(int64(9007199254740993)),
+					HooksURL: new("https://api.github.com/orgs/octo-org/hooks"),
+				},
+			},
+		},
+		{
+			name: "user owner",
+			json: `{
+				"id": 12,
+				"number": 6,
+				"name": "Test Planning Space",
+				"owner": {
+					"login": "octocat",
+					"id": 1,
+					"type": "User"
+				},
+				"creator": {
+					"login": "octocat",
+					"id": 1,
+					"type": "User"
+				},
+				"created_at": ` + refTimeStr(1136178000) + `,
+				"updated_at": ` + refTimeStr(1136178001) + `,
+				"html_url": "https://github.com/copilot/spaces/octocat/6",
+				"api_url": "https://api.github.com/users/octocat/copilot-spaces/6",
+				"base_role": "read"
+			}`,
+			want: &CopilotSpace{
+				ID:        int64(12),
+				Number:    6,
+				Name:      "Test Planning Space",
+				Owner:     &User{Login: new("octocat"), ID: new(int64(1)), Type: new("User")},
+				Creator:   User{Login: new("octocat"), ID: new(int64(1)), Type: new("User")},
+				CreatedAt: *refTimestamp(1136178000),
+				UpdatedAt: *refTimestamp(1136178001),
+				HTMLURL:   "https://github.com/copilot/spaces/octocat/6",
+				APIURL:    "https://api.github.com/users/octocat/copilot-spaces/6",
+				BaseRole:  "read",
+			},
+		},
+		{
+			name: "organization owner without type",
+			json: `{
+				"id": 12,
+				"number": 6,
+				"name": "Test Planning Space",
+				"owner": {
+					"login": "octo-org",
+					"id": 1,
+					"node_id": "MDEyOk9yZ2FuaXphdGlvbjE=",
+					"url": "https://api.github.com/orgs/octo-org",
+					"repos_url": "https://api.github.com/orgs/octo-org/repos",
+					"events_url": "https://api.github.com/orgs/octo-org/events",
+					"hooks_url": "https://api.github.com/orgs/octo-org/hooks",
+					"issues_url": "https://api.github.com/orgs/octo-org/issues",
+					"members_url": "https://api.github.com/orgs/octo-org/members{/member}",
+					"public_members_url": "https://api.github.com/orgs/octo-org/public_members{/member}",
+					"avatar_url": "https://github.com/images/error/octocat_happy.gif",
+					"description": "A great organization"
+				},
+				"creator": {
+					"login": "octocat",
+					"id": 1,
+					"type": "User"
+				},
+				"created_at": ` + refTimeStr(1136178000) + `,
+				"updated_at": ` + refTimeStr(1136178001) + `,
+				"html_url": "https://github.com/copilot/spaces/octo-org/6",
+				"api_url": "https://api.github.com/orgs/octo-org/copilot-spaces/6",
+				"base_role": "read"
+			}`,
+			want: &CopilotSpace{
+				ID:     int64(12),
+				Number: 6,
+				Name:   "Test Planning Space",
+				Owner: &Organization{
+					Login:            new("octo-org"),
+					ID:               new(int64(1)),
+					NodeID:           new("MDEyOk9yZ2FuaXphdGlvbjE="),
+					URL:              new("https://api.github.com/orgs/octo-org"),
+					ReposURL:         new("https://api.github.com/orgs/octo-org/repos"),
+					EventsURL:        new("https://api.github.com/orgs/octo-org/events"),
+					HooksURL:         new("https://api.github.com/orgs/octo-org/hooks"),
+					IssuesURL:        new("https://api.github.com/orgs/octo-org/issues"),
+					MembersURL:       new("https://api.github.com/orgs/octo-org/members{/member}"),
+					PublicMembersURL: new("https://api.github.com/orgs/octo-org/public_members{/member}"),
+					AvatarURL:        new("https://github.com/images/error/octocat_happy.gif"),
+					Description:      new("A great organization"),
+				},
+				Creator:   User{Login: new("octocat"), ID: new(int64(1)), Type: new("User")},
+				CreatedAt: *refTimestamp(1136178000),
+				UpdatedAt: *refTimestamp(1136178001),
+				HTMLURL:   "https://github.com/copilot/spaces/octo-org/6",
+				APIURL:    "https://api.github.com/orgs/octo-org/copilot-spaces/6",
+				BaseRole:  "read",
+			},
+		},
+		{
+			name: "Unsupported owner type",
+			json: `{
+				"id": 12,
+				"owner": {
+					"login": "octo-bot",
+					"id": 1,
+					"type": "Bot"
+				}
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "Owner without discriminator",
+			json: `{
+				"id": 12,
+				"owner": {
+					"login": "octo-org",
+					"id": 1
+				}
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "Unsupported owner json type",
+			json: `{
+				"id": 12,
+				"owner": "octo-cat"
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "User owner decode error",
+			json: `{
+				"id": 12,
+				"owner": {
+					"login": "octocat",
+					"id": "not-an-int",
+					"type": "User"
+				}
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "Null owner",
+			json: `{
+				"id": 12,
+				"owner": null
+			}`,
+			want: &CopilotSpace{
+				ID:    12,
+				Owner: nil,
+			},
+		},
+		{
+			name: "Organization owner decode error",
+			json: `{
+				"id": 12,
+				"owner": {
+					"login": "octo-org",
+					"id": "not-an-int",
+					"type": "Organization"
+				}
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "Organization owner fallback decode error",
+			json: `{
+				"id": 12,
+				"owner": {
+					"login": "octo-org",
+					"id": "not-an-int",
+					"hooks_url": "https://api.github.com/orgs/octo-org/hooks"
+				}
+			}`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var got *CopilotSpace
+			err := json.Unmarshal([]byte(tt.json), &got)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("CopilotSpace.UnmarshalJSON returned nil instead of an error")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("CopilotSpace.UnmarshalJSON returned error: %v", err)
+			}
+
+			if !cmp.Equal(got, tt.want) {
+				t.Errorf("CopilotSpace.UnmarshalJSON returned %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCopilotSeatDetails_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		data    string
+		want    *CopilotSeatDetails
+		wantErr bool
+	}{
+		{
+			name:    "Invalid JSON",
+			data:    `{`,
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Invalid top level type",
+			data: `{
+					"assignee": {
+						"type": "User",
+						"name": "octokittens",
+						"id": 1
+					},
+					"assigning_team": "this should be an object"
+				}`,
+			want:    &CopilotSeatDetails{},
+			wantErr: true,
+		},
+		{
+			name: "No Type Field",
+			data: `{
+					"assignee": {
+						"name": "octokittens",
+						"id": 1
+					}
+				}`,
+			want:    &CopilotSeatDetails{},
+			wantErr: true,
+		},
+		{
+			name: "Null Assignee",
+			data: `{
+					"assignee": null
+				}`,
+			want: &CopilotSeatDetails{
+				Assignee: nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid Assignee Field Type",
+			data: `{
+					"assignee": "test"
+				}`,
+			want:    &CopilotSeatDetails{},
+			wantErr: true,
+		},
+		{
+			name: "Invalid Assignee Type",
+			data: `{
+					"assignee": {
+						"name": "octokittens",
+						"id": 1,
+						"type": []
+					}
+				}`,
+			want:    &CopilotSeatDetails{},
+			wantErr: true,
+		},
+		{
+			name: "Invalid User",
+			data: `{
+					"assignee": {
+						"type": "User",
+						"id": "bad"
+					}
+				}`,
+			want:    &CopilotSeatDetails{},
+			wantErr: true,
+		},
+		{
+			name: "Invalid Team",
+			data: `{
+					"assignee": {
+						"type": "Team",
+						"id": "bad"
+					}
+				}`,
+			want:    &CopilotSeatDetails{},
+			wantErr: true,
+		},
+		{
+			name: "Invalid Organization",
+			data: `{
+					"assignee": {
+						"type": "Organization",
+						"id": "bad"
+					}
+				}`,
+			want:    &CopilotSeatDetails{},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		var seatDetails *CopilotSeatDetails
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := json.Unmarshal([]byte(tc.data), &seatDetails)
+			if err == nil && tc.wantErr {
+				t.Error("CopilotSeatDetails.UnmarshalJSON returned nil instead of an error")
+			}
+			if err != nil && !tc.wantErr {
+				t.Errorf("CopilotSeatDetails.UnmarshalJSON returned an unexpected error: %v", err)
+			}
+			if !cmp.Equal(tc.want, seatDetails) {
+				t.Errorf("CopilotSeatDetails.UnmarshalJSON expected %+v, got %+v", tc.want, seatDetails)
+			}
+		})
+	}
+}
+
+func TestCopilotService_GetSeatDetailsUser(t *testing.T) {
+	t.Parallel()
+	data := `{
+				"assignee": {
+					"type": "User",
+					"id": 1
+				}
+			}`
+
+	var seatDetails *CopilotSeatDetails
+
+	err := json.Unmarshal([]byte(data), &seatDetails)
+	if err != nil {
+		t.Errorf("CopilotSeatDetails.UnmarshalJSON returned an unexpected error: %v", err)
+	}
+
+	want := &User{
+		ID:   new(int64(1)),
+		Type: new("User"),
+	}
+
+	if got, ok := seatDetails.GetUser(); ok && !cmp.Equal(got, want) {
+		t.Errorf("CopilotSeatDetails.GetTeam returned %+v, want %+v", got, want)
+	} else if !ok {
+		t.Error("CopilotSeatDetails.GetUser returned false, expected true")
+	}
+
+	data = `{
+				"assignee": {
+					"type": "Organization",
+					"id": 1
+				}
+			}`
+
+	bad := &Organization{
+		ID:   new(int64(1)),
+		Type: new("Organization"),
+	}
+
+	err = json.Unmarshal([]byte(data), seatDetails)
+	if err != nil {
+		t.Errorf("CopilotSeatDetails.UnmarshalJSON returned an unexpected error: %v", err)
+	}
+
+	if got, ok := seatDetails.GetUser(); ok {
+		t.Errorf("CopilotSeatDetails.GetUser returned true, expected false. Returned %v, expected %v", got, bad)
+	}
+}
+
+func TestCopilotService_GetSeatDetailsTeam(t *testing.T) {
+	t.Parallel()
+	data := `{
+				"assignee": {
+					"type": "Team",
+					"id": 1
+				}
+			}`
+
+	var seatDetails *CopilotSeatDetails
+
+	err := json.Unmarshal([]byte(data), &seatDetails)
+	if err != nil {
+		t.Errorf("CopilotSeatDetails.UnmarshalJSON returned an unexpected error: %v", err)
+	}
+
+	want := &Team{
+		ID:   new(int64(1)),
+		Type: new("Team"),
+	}
+
+	if got, ok := seatDetails.GetTeam(); ok && !cmp.Equal(got, want) {
+		t.Errorf("CopilotSeatDetails.GetTeam returned %+v, want %+v", got, want)
+	} else if !ok {
+		t.Error("CopilotSeatDetails.GetTeam returned false, expected true")
+	}
+
+	data = `{
+				"assignee": {
+					"type": "User",
+					"id": 1
+				}
+			}`
+
+	bad := &User{
+		ID:   new(int64(1)),
+		Type: new("User"),
+	}
+
+	err = json.Unmarshal([]byte(data), seatDetails)
+	if err != nil {
+		t.Errorf("CopilotSeatDetails.UnmarshalJSON returned an unexpected error: %v", err)
+	}
+
+	if got, ok := seatDetails.GetTeam(); ok {
+		t.Errorf("CopilotSeatDetails.GetTeam returned true, expected false. Returned %v, expected %v", got, bad)
+	}
+}
+
+func TestCopilotService_GetSeatDetailsOrganization(t *testing.T) {
+	t.Parallel()
+	data := `{
+				"assignee": {
+					"type": "Organization",
+					"id": 1
+				}
+			}`
+
+	var seatDetails *CopilotSeatDetails
+
+	err := json.Unmarshal([]byte(data), &seatDetails)
+	if err != nil {
+		t.Errorf("CopilotSeatDetails.UnmarshalJSON returned an unexpected error: %v", err)
+	}
+
+	want := &Organization{
+		ID:   new(int64(1)),
+		Type: new("Organization"),
+	}
+
+	if got, ok := seatDetails.GetOrganization(); ok && !cmp.Equal(got, want) {
+		t.Errorf("CopilotSeatDetails.GetOrganization returned %+v, want %+v", got, want)
+	} else if !ok {
+		t.Error("CopilotSeatDetails.GetOrganization returned false, expected true")
+	}
+
+	data = `{
+				"assignee": {
+					"type": "Team",
+					"id": 1
+				}
+			}`
+
+	bad := &Team{
+		ID: new(int64(1)),
+	}
+
+	err = json.Unmarshal([]byte(data), seatDetails)
+	if err != nil {
+		t.Errorf("CopilotSeatDetails.UnmarshalJSON returned an unexpected error: %v", err)
+	}
+
+	if got, ok := seatDetails.GetOrganization(); ok {
+		t.Errorf("CopilotSeatDetails.GetOrganization returned true, expected false. Returned %v, expected %v", got, bad)
+	}
+}
+
+func TestCopilotService_GetCopilotBilling(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/billing", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"seat_breakdown": {
+				"total": 12,
+				"added_this_cycle": 9,
+				"pending_invitation": 0,
+				"pending_cancellation": 0,
+				"active_this_cycle": 12,
+				"inactive_this_cycle": 11
+			},
+			"seat_management_setting": "assign_selected",
+			"public_code_suggestions": "block"
+			}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetCopilotBilling(ctx, "o")
+	if err != nil {
+		t.Errorf("Copilot.GetCopilotBilling returned error: %v", err)
+	}
+
+	want := &CopilotOrganizationDetails{
+		SeatBreakdown: &CopilotSeatBreakdown{
+			Total:               12,
+			AddedThisCycle:      9,
+			PendingInvitation:   0,
+			PendingCancellation: 0,
+			ActiveThisCycle:     12,
+			InactiveThisCycle:   11,
+		},
+		PublicCodeSuggestions: "block",
+		CopilotChat:           "",
+		SeatManagementSetting: "assign_selected",
+	}
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetCopilotBilling returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetCopilotBilling"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetCopilotBilling(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetCopilotBilling(ctx, "o")
+		if got != nil {
+			t.Errorf("Copilot.GetCopilotBilling returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_ListCopilotSeats(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/billing/seats", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{
+			"per_page": "100",
+			"page":     "1",
+		})
+		fmt.Fprint(w, `{
+				"total_seats": 4,
+				"seats": [
+					{
+						"created_at": `+refTimeStr(1136178000)+`,
+						"updated_at": `+refTimeStr(1136178001)+`,
+						"pending_cancellation_date": null,
+						"last_activity_at": `+refTimeStr(1136178002)+`,
+						"last_activity_editor": "vscode/1.77.3/copilot/1.86.82",
+						"assignee": {
+							"login": "octocat",
+							"id": 1,
+							"node_id": "MDQ6VXNlcjE=",
+							"avatar_url": "https://github.com/images/error/octocat_happy.gif",
+							"gravatar_id": "",
+							"url": "https://api.github.com/users/octocat",
+							"html_url": "https://github.com/octocat",
+							"followers_url": "https://api.github.com/users/octocat/followers",
+							"following_url": "https://api.github.com/users/octocat/following{/other_user}",
+							"gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+							"starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+							"subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+							"organizations_url": "https://api.github.com/users/octocat/orgs",
+							"repos_url": "https://api.github.com/users/octocat/repos",
+							"events_url": "https://api.github.com/users/octocat/events{/privacy}",
+							"received_events_url": "https://api.github.com/users/octocat/received_events",
+							"type": "User",
+							"site_admin": false
+						},
+						"assigning_team": {
+							"id": 1,
+							"node_id": "MDQ6VGVhbTE=",
+							"url": "https://api.github.com/teams/1",
+							"html_url": "https://github.com/orgs/github/teams/justice-league",
+							"name": "Justice League",
+							"slug": "justice-league",
+							"description": "A great team.",
+							"privacy": "closed",
+							"notification_setting": "notifications_enabled",
+							"permission": "admin",
+							"members_url": "https://api.github.com/teams/1/members{/member}",
+							"repositories_url": "https://api.github.com/teams/1/repos",
+							"parent": null
+						}
+					},
+					{
+						"created_at": `+refTimeStr(1136178000)+`,
+						"updated_at": `+refTimeStr(1136178001)+`,
+						"pending_cancellation_date": "2021-11-01",
+						"last_activity_at": `+refTimeStr(1136178002)+`,
+						"last_activity_editor": "vscode/1.77.3/copilot/1.86.82",
+						"assignee": {
+							"login": "octokitten",
+							"id": 1,
+							"node_id": "MDQ76VNlcjE=",
+							"avatar_url": "https://github.com/images/error/octokitten_happy.gif",
+							"gravatar_id": "",
+							"url": "https://api.github.com/users/octokitten",
+							"html_url": "https://github.com/octokitten",
+							"followers_url": "https://api.github.com/users/octokitten/followers",
+							"following_url": "https://api.github.com/users/octokitten/following{/other_user}",
+							"gists_url": "https://api.github.com/users/octokitten/gists{/gist_id}",
+							"starred_url": "https://api.github.com/users/octokitten/starred{/owner}{/repo}",
+							"subscriptions_url": "https://api.github.com/users/octokitten/subscriptions",
+							"organizations_url": "https://api.github.com/users/octokitten/orgs",
+							"repos_url": "https://api.github.com/users/octokitten/repos",
+							"events_url": "https://api.github.com/users/octokitten/events{/privacy}",
+							"received_events_url": "https://api.github.com/users/octokitten/received_events",
+							"type": "User",
+							"site_admin": false
+						}
+					},
+					{
+						"created_at": `+refTimeStr(1136178000)+`,
+						"updated_at": `+refTimeStr(1136178001)+`,
+						"pending_cancellation_date": "2021-11-01",
+						"last_activity_at": `+refTimeStr(1136178002)+`,
+						"last_activity_editor": "vscode/1.77.3/copilot/1.86.82",
+						"assignee": {
+							"name": "octokittens",
+							"id": 1,
+							"type": "Team"
+						}
+					},
+					{
+						"created_at": `+refTimeStr(1136178000)+`,
+						"updated_at": `+refTimeStr(1136178001)+`,
+						"pending_cancellation_date": "2021-11-01",
+						"last_activity_at": `+refTimeStr(1136178002)+`,
+						"last_activity_editor": "vscode/1.77.3/copilot/1.86.82",
+						"assignee": {
+							"name": "octocats",
+							"id": 1,
+							"type": "Organization"
+						}
+					}
+				]
+			}`)
+	})
+
+	ctx := t.Context()
+	opts := &ListOptions{Page: 1, PerPage: 100}
+	got, _, err := client.Copilot.ListCopilotSeats(ctx, "o", opts)
+	if err != nil {
+		t.Errorf("Copilot.ListCopilotSeats returned error: %v", err)
+	}
+
+	want := &ListCopilotSeatsResponse{
+		TotalSeats: 4,
+		Seats: []*CopilotSeatDetails{
+			{
+				Assignee: &User{
+					Login:             new("octocat"),
+					ID:                new(int64(1)),
+					NodeID:            new("MDQ6VXNlcjE="),
+					AvatarURL:         new("https://github.com/images/error/octocat_happy.gif"),
+					GravatarID:        new(""),
+					URL:               new("https://api.github.com/users/octocat"),
+					HTMLURL:           new("https://github.com/octocat"),
+					FollowersURL:      new("https://api.github.com/users/octocat/followers"),
+					FollowingURL:      new("https://api.github.com/users/octocat/following{/other_user}"),
+					GistsURL:          new("https://api.github.com/users/octocat/gists{/gist_id}"),
+					StarredURL:        new("https://api.github.com/users/octocat/starred{/owner}{/repo}"),
+					SubscriptionsURL:  new("https://api.github.com/users/octocat/subscriptions"),
+					OrganizationsURL:  new("https://api.github.com/users/octocat/orgs"),
+					ReposURL:          new("https://api.github.com/users/octocat/repos"),
+					EventsURL:         new("https://api.github.com/users/octocat/events{/privacy}"),
+					ReceivedEventsURL: new("https://api.github.com/users/octocat/received_events"),
+					Type:              new("User"),
+					SiteAdmin:         new(false),
+				},
+				AssigningTeam: &Team{
+					ID:                  new(int64(1)),
+					NodeID:              new("MDQ6VGVhbTE="),
+					URL:                 new("https://api.github.com/teams/1"),
+					HTMLURL:             new("https://github.com/orgs/github/teams/justice-league"),
+					Name:                new("Justice League"),
+					Slug:                new("justice-league"),
+					Description:         new("A great team."),
+					Privacy:             new("closed"),
+					Permission:          new("admin"),
+					NotificationSetting: new("notifications_enabled"),
+					MembersURL:          new("https://api.github.com/teams/1/members{/member}"),
+					RepositoriesURL:     new("https://api.github.com/teams/1/repos"),
+					Parent:              nil,
+				},
+
+				CreatedAt:               refTimestamp(1136178000),
+				UpdatedAt:               refTimestamp(1136178001),
+				PendingCancellationDate: nil,
+				LastActivityAt:          refTimestamp(1136178002),
+				LastActivityEditor:      new("vscode/1.77.3/copilot/1.86.82"),
+			},
+			{
+				Assignee: &User{
+					Login:             new("octokitten"),
+					ID:                new(int64(1)),
+					NodeID:            new("MDQ76VNlcjE="),
+					AvatarURL:         new("https://github.com/images/error/octokitten_happy.gif"),
+					GravatarID:        new(""),
+					URL:               new("https://api.github.com/users/octokitten"),
+					HTMLURL:           new("https://github.com/octokitten"),
+					FollowersURL:      new("https://api.github.com/users/octokitten/followers"),
+					FollowingURL:      new("https://api.github.com/users/octokitten/following{/other_user}"),
+					GistsURL:          new("https://api.github.com/users/octokitten/gists{/gist_id}"),
+					StarredURL:        new("https://api.github.com/users/octokitten/starred{/owner}{/repo}"),
+					SubscriptionsURL:  new("https://api.github.com/users/octokitten/subscriptions"),
+					OrganizationsURL:  new("https://api.github.com/users/octokitten/orgs"),
+					ReposURL:          new("https://api.github.com/users/octokitten/repos"),
+					EventsURL:         new("https://api.github.com/users/octokitten/events{/privacy}"),
+					ReceivedEventsURL: new("https://api.github.com/users/octokitten/received_events"),
+					Type:              new("User"),
+					SiteAdmin:         new(false),
+				},
+				AssigningTeam:           nil,
+				CreatedAt:               refTimestamp(1136178000),
+				UpdatedAt:               refTimestamp(1136178001),
+				PendingCancellationDate: new("2021-11-01"),
+				LastActivityAt:          refTimestamp(1136178002),
+				LastActivityEditor:      new("vscode/1.77.3/copilot/1.86.82"),
+			},
+			{
+				Assignee: &Team{
+					ID:   new(int64(1)),
+					Name: new("octokittens"),
+					Type: new("Team"),
+				},
+				AssigningTeam:           nil,
+				CreatedAt:               refTimestamp(1136178000),
+				UpdatedAt:               refTimestamp(1136178001),
+				PendingCancellationDate: new("2021-11-01"),
+				LastActivityAt:          refTimestamp(1136178002),
+				LastActivityEditor:      new("vscode/1.77.3/copilot/1.86.82"),
+			},
+			{
+				Assignee: &Organization{
+					ID:   new(int64(1)),
+					Name: new("octocats"),
+					Type: new("Organization"),
+				},
+				AssigningTeam:           nil,
+				CreatedAt:               refTimestamp(1136178000),
+				UpdatedAt:               refTimestamp(1136178001),
+				PendingCancellationDate: new("2021-11-01"),
+				LastActivityAt:          refTimestamp(1136178002),
+				LastActivityEditor:      new("vscode/1.77.3/copilot/1.86.82"),
+			},
+		},
+	}
+
+	assertNoDiff(t, want, got)
+
+	const methodName = "ListCopilotSeats"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.ListCopilotSeats(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.ListCopilotSeats(ctx, "o", opts)
+		if got != nil {
+			t.Errorf("Copilot.ListCopilotSeats returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_ListCopilotEnterpriseSeats(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/copilot/billing/seats", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{
+			"per_page": "100",
+			"page":     "1",
+		})
+		fmt.Fprint(w, `{
+			"total_seats": 2,
+			"seats": [
+				{
+					"created_at": `+refTimeStr(1136178000)+`,
+					"updated_at": `+refTimeStr(1136178001)+`,
+					"pending_cancellation_date": null,
+					"last_activity_at": `+refTimeStr(1136178002)+`,
+					"last_activity_editor": "vscode/1.77.3/copilot/1.86.82",
+					"plan_type": "business",
+					"assignee": {
+						"login": "octocat",
+						"id": 1,
+						"node_id": "MDQ6VXNlcjE=",
+						"avatar_url": "https://github.com/images/error/octocat_happy.gif",
+						"gravatar_id": "",
+						"url": "https://api.github.com/users/octocat",
+						"html_url": "https://github.com/octocat",
+						"followers_url": "https://api.github.com/users/octocat/followers",
+						"following_url": "https://api.github.com/users/octocat/following{/other_user}",
+						"gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+						"starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+						"subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+						"organizations_url": "https://api.github.com/users/octocat/orgs",
+						"repos_url": "https://api.github.com/users/octocat/repos",
+						"events_url": "https://api.github.com/users/octocat/events{/privacy}",
+						"received_events_url": "https://api.github.com/users/octocat/received_events",
+						"type": "User",
+						"site_admin": false
+					},
+					"assigning_team": {
+						"id": 1,
+						"node_id": "MDQ6VGVhbTE=",
+						"url": "https://api.github.com/teams/1",
+						"html_url": "https://github.com/orgs/github/teams/justice-league",
+						"name": "Justice League",
+						"slug": "justice-league",
+						"description": "A great team.",
+						"privacy": "closed",
+						"notification_setting": "notifications_enabled",
+						"permission": "admin",
+						"members_url": "https://api.github.com/teams/1/members{/member}",
+						"repositories_url": "https://api.github.com/teams/1/repos",
+						"parent": null
+					}
+				},
+				{
+					"created_at": `+refTimeStr(1136178000)+`,
+					"updated_at": `+refTimeStr(1136178001)+`,
+					"pending_cancellation_date": "2021-11-01",
+					"last_activity_at": `+refTimeStr(1136178002)+`,
+					"last_activity_editor": "vscode/1.77.3/copilot/1.86.82",
+					"assignee": {
+						"login": "octokitten",
+						"id": 1,
+						"node_id": "MDQ76VNlcjE=",
+						"avatar_url": "https://github.com/images/error/octokitten_happy.gif",
+						"gravatar_id": "",
+						"url": "https://api.github.com/users/octokitten",
+						"html_url": "https://github.com/octokitten",
+						"followers_url": "https://api.github.com/users/octokitten/followers",
+						"following_url": "https://api.github.com/users/octokitten/following{/other_user}",
+						"gists_url": "https://api.github.com/users/octokitten/gists{/gist_id}",
+						"starred_url": "https://api.github.com/users/octokitten/starred{/owner}{/repo}",
+						"subscriptions_url": "https://api.github.com/users/octokitten/subscriptions",
+						"organizations_url": "https://api.github.com/users/octokitten/orgs",
+						"repos_url": "https://api.github.com/users/octokitten/repos",
+						"events_url": "https://api.github.com/users/octokitten/events{/privacy}",
+						"received_events_url": "https://api.github.com/users/octokitten/received_events",
+						"type": "User",
+						"site_admin": false
+					}
+				}
+			]
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &ListOptions{Page: 1, PerPage: 100}
+	got, _, err := client.Copilot.ListCopilotEnterpriseSeats(ctx, "e", opts)
+	if err != nil {
+		t.Errorf("Copilot.ListCopilotEnterpriseSeats returned error: %v", err)
+	}
+
+	want := &ListCopilotSeatsResponse{
+		TotalSeats: 2,
+		Seats: []*CopilotSeatDetails{
+			{
+				Assignee: &User{
+					Login:             new("octocat"),
+					ID:                new(int64(1)),
+					NodeID:            new("MDQ6VXNlcjE="),
+					AvatarURL:         new("https://github.com/images/error/octocat_happy.gif"),
+					GravatarID:        new(""),
+					URL:               new("https://api.github.com/users/octocat"),
+					HTMLURL:           new("https://github.com/octocat"),
+					FollowersURL:      new("https://api.github.com/users/octocat/followers"),
+					FollowingURL:      new("https://api.github.com/users/octocat/following{/other_user}"),
+					GistsURL:          new("https://api.github.com/users/octocat/gists{/gist_id}"),
+					StarredURL:        new("https://api.github.com/users/octocat/starred{/owner}{/repo}"),
+					SubscriptionsURL:  new("https://api.github.com/users/octocat/subscriptions"),
+					OrganizationsURL:  new("https://api.github.com/users/octocat/orgs"),
+					ReposURL:          new("https://api.github.com/users/octocat/repos"),
+					EventsURL:         new("https://api.github.com/users/octocat/events{/privacy}"),
+					ReceivedEventsURL: new("https://api.github.com/users/octocat/received_events"),
+					Type:              new("User"),
+					SiteAdmin:         new(false),
+				},
+				AssigningTeam: &Team{
+					ID:                  new(int64(1)),
+					NodeID:              new("MDQ6VGVhbTE="),
+					URL:                 new("https://api.github.com/teams/1"),
+					HTMLURL:             new("https://github.com/orgs/github/teams/justice-league"),
+					Name:                new("Justice League"),
+					Slug:                new("justice-league"),
+					Description:         new("A great team."),
+					Privacy:             new("closed"),
+					NotificationSetting: new("notifications_enabled"),
+					Permission:          new("admin"),
+					MembersURL:          new("https://api.github.com/teams/1/members{/member}"),
+					RepositoriesURL:     new("https://api.github.com/teams/1/repos"),
+					Parent:              nil,
+				},
+				CreatedAt:               refTimestamp(1136178000),
+				UpdatedAt:               refTimestamp(1136178001),
+				PendingCancellationDate: nil,
+				LastActivityAt:          refTimestamp(1136178002),
+				LastActivityEditor:      new("vscode/1.77.3/copilot/1.86.82"),
+				PlanType:                new("business"),
+			},
+			{
+				Assignee: &User{
+					Login:             new("octokitten"),
+					ID:                new(int64(1)),
+					NodeID:            new("MDQ76VNlcjE="),
+					AvatarURL:         new("https://github.com/images/error/octokitten_happy.gif"),
+					GravatarID:        new(""),
+					URL:               new("https://api.github.com/users/octokitten"),
+					HTMLURL:           new("https://github.com/octokitten"),
+					FollowersURL:      new("https://api.github.com/users/octokitten/followers"),
+					FollowingURL:      new("https://api.github.com/users/octokitten/following{/other_user}"),
+					GistsURL:          new("https://api.github.com/users/octokitten/gists{/gist_id}"),
+					StarredURL:        new("https://api.github.com/users/octokitten/starred{/owner}{/repo}"),
+					SubscriptionsURL:  new("https://api.github.com/users/octokitten/subscriptions"),
+					OrganizationsURL:  new("https://api.github.com/users/octokitten/orgs"),
+					ReposURL:          new("https://api.github.com/users/octokitten/repos"),
+					EventsURL:         new("https://api.github.com/users/octokitten/events{/privacy}"),
+					ReceivedEventsURL: new("https://api.github.com/users/octokitten/received_events"),
+					Type:              new("User"),
+					SiteAdmin:         new(false),
+				},
+				AssigningTeam:           nil,
+				CreatedAt:               refTimestamp(1136178000),
+				UpdatedAt:               refTimestamp(1136178001),
+				PendingCancellationDate: new("2021-11-01"),
+				LastActivityAt:          refTimestamp(1136178002),
+				LastActivityEditor:      new("vscode/1.77.3/copilot/1.86.82"),
+				PlanType:                nil,
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		log.Printf("got: %+v", got.Seats[1])
+		log.Printf("want: %+v", want.Seats[1])
+		t.Errorf("Copilot.ListCopilotEnterpriseSeats returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "ListCopilotEnterpriseSeats"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.ListCopilotEnterpriseSeats(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.ListCopilotEnterpriseSeats(ctx, "e", opts)
+		if got != nil {
+			t.Errorf("Copilot.ListCopilotEnterpriseSeats returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_ListOrganizationCodingAgentRepositories(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/coding-agent/permissions/repositories", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{
+			"per_page": "100",
+			"page":     "1",
+		})
+		fmt.Fprint(w, `{
+			"total_count": 2,
+			"repositories": [
+				{"id": 1, "name": "Hello-World", "full_name": "octocat/Hello-World"},
+				{"id": 2, "name": "Hello-World-2", "full_name": "octocat/Hello-World-2"}
+			]
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &ListOptions{Page: 1, PerPage: 100}
+	got, _, err := client.Copilot.ListOrganizationCodingAgentRepositories(ctx, "o", opts)
+	if err != nil {
+		t.Errorf("Copilot.ListOrganizationCodingAgentRepositories returned error: %v", err)
+	}
+
+	want := &ListOrganizationCopilotCodingAgentRepositoriesResponse{
+		TotalCount: 2,
+		Repositories: []*Repository{
+			{ID: new(int64(1)), Name: new("Hello-World"), FullName: new("octocat/Hello-World")},
+			{ID: new(int64(2)), Name: new("Hello-World-2"), FullName: new("octocat/Hello-World-2")},
+		},
+	}
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.ListOrganizationCodingAgentRepositories returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "ListOrganizationCodingAgentRepositories"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.ListOrganizationCodingAgentRepositories(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.ListOrganizationCodingAgentRepositories(ctx, "o", opts)
+		if got != nil {
+			t.Errorf("Copilot.ListOrganizationCodingAgentRepositories returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationCodingAgentPermissions(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/coding-agent/permissions", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"enabled_repositories": "selected",
+			"selected_repositories_url": "https://api.github.com/orgs/o/copilot/coding-agent/permissions/repositories"
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetOrganizationCodingAgentPermissions(ctx, "o")
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationCodingAgentPermissions returned error: %v", err)
+	}
+
+	want := &CopilotCodingAgentPermissions{
+		EnabledRepositories:     "selected",
+		SelectedRepositoriesURL: new("https://api.github.com/orgs/o/copilot/coding-agent/permissions/repositories"),
+	}
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationCodingAgentPermissions returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationCodingAgentPermissions"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationCodingAgentPermissions(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationCodingAgentPermissions(ctx, "o")
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationCodingAgentPermissions returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_SetOrganizationCodingAgentPermissions(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := CopilotCodingAgentPermissionsRequest{EnabledRepositories: "all"}
+
+	mux.HandleFunc("/orgs/o/copilot/coding-agent/permissions", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		testJSONBody(t, r, input)
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ctx := t.Context()
+	_, err := client.Copilot.SetOrganizationCodingAgentPermissions(ctx, "o", input)
+	if err != nil {
+		t.Errorf("Copilot.SetOrganizationCodingAgentPermissions returned error: %v", err)
+	}
+
+	const methodName = "SetOrganizationCodingAgentPermissions"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Copilot.SetOrganizationCodingAgentPermissions(ctx, "\n", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Copilot.SetOrganizationCodingAgentPermissions(ctx, "o", input)
+	})
+}
+
+func TestCopilotService_SetOrganizationCodingAgentRepositories(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := []int64{123, 1234}
+
+	mux.HandleFunc("/orgs/o/copilot/coding-agent/permissions/repositories", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		testJSONBody(t, r, struct {
+			IDs []int64 `json:"selected_repository_ids"`
+		}{
+			IDs: input,
+		})
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ctx := t.Context()
+	_, err := client.Copilot.SetOrganizationCodingAgentRepositories(ctx, "o", input)
+	if err != nil {
+		t.Errorf("Copilot.SetOrganizationCodingAgentRepositories returned error: %v", err)
+	}
+
+	const methodName = "SetOrganizationCodingAgentRepositories"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Copilot.SetOrganizationCodingAgentRepositories(ctx, "\n", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Copilot.SetOrganizationCodingAgentRepositories(ctx, "o", input)
+	})
+}
+
+func TestCopilotService_EnableOrganizationCodingAgentRepository(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/coding-agent/permissions/repositories/123", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ctx := t.Context()
+	_, err := client.Copilot.EnableOrganizationCodingAgentRepository(ctx, "o", 123)
+	if err != nil {
+		t.Errorf("Copilot.EnableOrganizationCodingAgentRepository returned error: %v", err)
+	}
+
+	const methodName = "EnableOrganizationCodingAgentRepository"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Copilot.EnableOrganizationCodingAgentRepository(ctx, "\n", 123)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Copilot.EnableOrganizationCodingAgentRepository(ctx, "o", 123)
+	})
+}
+
+func TestCopilotService_DisableOrganizationCodingAgentRepository(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/coding-agent/permissions/repositories/123", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "DELETE")
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ctx := t.Context()
+	_, err := client.Copilot.DisableOrganizationCodingAgentRepository(ctx, "o", 123)
+	if err != nil {
+		t.Errorf("Copilot.DisableOrganizationCodingAgentRepository returned error: %v", err)
+	}
+
+	const methodName = "DisableOrganizationCodingAgentRepository"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Copilot.DisableOrganizationCodingAgentRepository(ctx, "\n", 123)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Copilot.DisableOrganizationCodingAgentRepository(ctx, "o", 123)
+	})
+}
+
+func TestCopilotService_GetOrganizationContentExclusionDetails(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/content_exclusion", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"octo-repo": ["/src/some-dir/kernel.rs"],
+			"octo-repo-2": ["/docs/secret.md", "**/*.env"]
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetOrganizationContentExclusionDetails(ctx, "o")
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationContentExclusionDetails returned error: %v", err)
+	}
+
+	want := CopilotContentExclusionDetails{
+		"octo-repo":   {"/src/some-dir/kernel.rs"},
+		"octo-repo-2": {"/docs/secret.md", "**/*.env"},
+	}
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationContentExclusionDetails returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationContentExclusionDetails"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationContentExclusionDetails(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationContentExclusionDetails(ctx, "o")
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationContentExclusionDetails returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotContentExclusionRule_Marshal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		rule CopilotContentExclusionRule
+		want string
+	}{
+		{
+			name: "path",
+			rule: CopilotContentExclusionRule{Path: new("/src/some-dir/kernel.rs")},
+			want: `"/src/some-dir/kernel.rs"`,
+		},
+		{
+			name: "ifAnyMatch",
+			rule: CopilotContentExclusionRule{IfAnyMatch: []string{"*.env"}},
+			want: `{"ifAnyMatch":["*.env"]}`,
+		},
+		{
+			name: "ifNoneMatch",
+			rule: CopilotContentExclusionRule{IfNoneMatch: []string{"*.go", "*.md"}},
+			want: `{"ifNoneMatch":["*.go","*.md"]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			testJSONMarshalOnly(t, tt.rule, tt.want)
+		})
+	}
+}
+
+func TestCopilotService_SetOrganizationContentExclusionDetails(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	body := CopilotSetContentExclusionDetailsRequest{
+		"octo-repo": {
+			{Path: new("/src/some-dir/kernel.rs")},
+			{IfAnyMatch: []string{"*.env"}},
+		},
+	}
+
+	mux.HandleFunc("/orgs/o/copilot/content_exclusion", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		testJSONBody(t, r, body)
+		fmt.Fprint(w, `{"message": "Content exclusion rules updated successfully."}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.SetOrganizationContentExclusionDetails(ctx, "o", body)
+	if err != nil {
+		t.Errorf("Copilot.SetOrganizationContentExclusionDetails returned error: %v", err)
+	}
+
+	want := &CopilotSetContentExclusionResponse{
+		Message: new("Content exclusion rules updated successfully."),
+	}
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.SetOrganizationContentExclusionDetails returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "SetOrganizationContentExclusionDetails"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.SetOrganizationContentExclusionDetails(ctx, "\n", body)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.SetOrganizationContentExclusionDetails(ctx, "o", body)
+		if got != nil {
+			t.Errorf("Copilot.SetOrganizationContentExclusionDetails returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetEnterpriseContentExclusionDetails(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/copilot/content_exclusion", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"git@github.com:*/copilot": ["/__tests__/**"],
+			"octo-org/octo-repo": ["/src/some-dir/kernel.rs"]
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetEnterpriseContentExclusionDetails(ctx, "e")
+	if err != nil {
+		t.Errorf("Copilot.GetEnterpriseContentExclusionDetails returned error: %v", err)
+	}
+
+	want := CopilotContentExclusionDetails{
+		"git@github.com:*/copilot": {"/__tests__/**"},
+		"octo-org/octo-repo":       {"/src/some-dir/kernel.rs"},
+	}
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetEnterpriseContentExclusionDetails returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetEnterpriseContentExclusionDetails"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetEnterpriseContentExclusionDetails(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetEnterpriseContentExclusionDetails(ctx, "e")
+		if got != nil {
+			t.Errorf("Copilot.GetEnterpriseContentExclusionDetails returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_SetEnterpriseContentExclusionDetails(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	body := CopilotSetContentExclusionDetailsRequest{
+		"git@github.com:*/copilot": {{Path: new("/__tests__/**")}},
+		"octo-org/octo-repo":       {{IfNoneMatch: []string{"*.go"}}},
+	}
+
+	mux.HandleFunc("/enterprises/e/copilot/content_exclusion", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		testJSONBody(t, r, body)
+		fmt.Fprint(w, `{"message": "Content exclusion rules updated successfully."}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.SetEnterpriseContentExclusionDetails(ctx, "e", body)
+	if err != nil {
+		t.Errorf("Copilot.SetEnterpriseContentExclusionDetails returned error: %v", err)
+	}
+
+	want := &CopilotSetContentExclusionResponse{
+		Message: new("Content exclusion rules updated successfully."),
+	}
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.SetEnterpriseContentExclusionDetails returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "SetEnterpriseContentExclusionDetails"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.SetEnterpriseContentExclusionDetails(ctx, "\n", body)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.SetEnterpriseContentExclusionDetails(ctx, "e", body)
+		if got != nil {
+			t.Errorf("Copilot.SetEnterpriseContentExclusionDetails returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_AddCopilotTeams(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := []string{"team1", "team2"}
+
+	mux.HandleFunc("/orgs/o/copilot/billing/selected_teams", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testJSONBody(t, r, struct {
+			SelectedTeams []string `json:"selected_teams"`
+		}{
+			SelectedTeams: input,
+		})
+		fmt.Fprint(w, `{"seats_created": 2}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.AddCopilotTeams(ctx, "o", input)
+	if err != nil {
+		t.Errorf("Copilot.AddCopilotTeams returned error: %v", err)
+	}
+
+	want := &SeatAssignments{SeatsCreated: 2}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.AddCopilotTeams returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "AddCopilotTeams"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.AddCopilotTeams(ctx, "\n", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.AddCopilotTeams(ctx, "o", input)
+		if got != nil {
+			t.Errorf("Copilot.AddCopilotTeams returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_RemoveCopilotTeams(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := []string{"user1", "user2"}
+
+	mux.HandleFunc("/orgs/o/copilot/billing/selected_teams", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "DELETE")
+		testJSONBody(t, r, struct {
+			SelectedTeams []string `json:"selected_teams"`
+		}{
+			SelectedTeams: input,
+		})
+		fmt.Fprint(w, `{"seats_cancelled": 2}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.RemoveCopilotTeams(ctx, "o", input)
+	if err != nil {
+		t.Errorf("Copilot.RemoveCopilotTeams returned error: %v", err)
+	}
+
+	want := &SeatCancellations{SeatsCancelled: 2}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.RemoveCopilotTeams returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "RemoveCopilotTeams"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.RemoveCopilotTeams(ctx, "\n", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.RemoveCopilotTeams(ctx, "o", []string{"team1", "team2"})
+		if got != nil {
+			t.Errorf("Copilot.RemoveCopilotTeams returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_AddCopilotUsers(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := []string{"user1", "user2"}
+
+	mux.HandleFunc("/orgs/o/copilot/billing/selected_users", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testJSONBody(t, r, struct {
+			SelectedTeams []string `json:"selected_usernames"`
+		}{
+			SelectedTeams: input,
+		})
+		fmt.Fprint(w, `{"seats_created": 2}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.AddCopilotUsers(ctx, "o", input)
+	if err != nil {
+		t.Errorf("Copilot.AddCopilotUsers returned error: %v", err)
+	}
+
+	want := &SeatAssignments{SeatsCreated: 2}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.AddCopilotUsers returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "AddCopilotUsers"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.AddCopilotUsers(ctx, "\n", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.AddCopilotUsers(ctx, "o", input)
+		if got != nil {
+			t.Errorf("Copilot.AddCopilotUsers returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_RemoveCopilotUsers(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := []string{"user1", "user2"}
+
+	mux.HandleFunc("/orgs/o/copilot/billing/selected_users", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "DELETE")
+		testJSONBody(t, r, struct {
+			SelectedTeams []string `json:"selected_usernames"`
+		}{
+			SelectedTeams: input,
+		})
+		fmt.Fprint(w, `{"seats_cancelled": 2}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.RemoveCopilotUsers(ctx, "o", input)
+	if err != nil {
+		t.Errorf("Copilot.RemoveCopilotUsers returned error: %v", err)
+	}
+
+	want := &SeatCancellations{SeatsCancelled: 2}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.RemoveCopilotUsers returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "RemoveCopilotUsers"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.RemoveCopilotUsers(ctx, "\n", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.RemoveCopilotUsers(ctx, "o", input)
+		if got != nil {
+			t.Errorf("Copilot.RemoveCopilotUsers returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_ListOrganizationCopilotSpaces(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot-spaces", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{
+			"per_page": "100",
+			"after":    "cursor",
+		})
+		fmt.Fprint(w, `{
+			"spaces": [
+			{
+				"id": 12,
+				"number": 6,
+				"name": "Test Planning Space",
+				"description": "A space for planning",
+				"general_instructions": "use this space for team planning",
+				"owner": {
+					"login": "octo-org",
+					"id": 1,
+					"type": "Organization"
+				},
+				"creator": {
+					"login": "octocat",
+					"id": 2,
+					"type": "User"
+				},
+				"created_at": `+refTimeStr(1136178000)+`,
+				"updated_at": `+refTimeStr(1136178001)+`,
+				"html_url": "https://github.com/copilot/spaces/octo-org/3",
+				"api_url": "https://api.github.com/orgs/octo-org/copilot-spaces/3",
+				"base_role": "read"
+			}
+			]
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &ListCursorOptions{PerPage: 100, After: "cursor"}
+	got, _, err := client.Copilot.ListOrganizationCopilotSpaces(ctx, "o", opts)
+	if err != nil {
+		t.Errorf("Copilot.ListOrganizationCopilotSpaces returned error: %v", err)
+	}
+	want := &CopilotSpacesList{
+		Spaces: []*CopilotSpace{
+			{
+				ID:                  int64(12),
+				Number:              6,
+				Name:                "Test Planning Space",
+				Description:         new("A space for planning"),
+				GeneralInstructions: new("use this space for team planning"),
+				Owner: &Organization{
+					Login: new("octo-org"),
+					ID:    new(int64(1)),
+					Type:  new("Organization"),
+				},
+				Creator: User{
+					Login: new("octocat"),
+					ID:    new(int64(2)),
+					Type:  new("User"),
+				},
+				CreatedAt: *refTimestamp(1136178000),
+				UpdatedAt: *refTimestamp(1136178001),
+				HTMLURL:   "https://github.com/copilot/spaces/octo-org/3",
+				APIURL:    "https://api.github.com/orgs/octo-org/copilot-spaces/3",
+				BaseRole:  "read",
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.ListOrganizationCopilotSpaces returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "ListOrganizationCopilotSpaces"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.ListOrganizationCopilotSpaces(ctx, "\n", opts)
+		return err
+	})
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.ListOrganizationCopilotSpaces(ctx, "o", opts)
+		if got != nil {
+			t.Errorf("Copilot.ListOrganizationCopilotSpaces returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationCopilotSpace(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot-spaces/6", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"id": 12,
+			"number": 6,
+			"name": "Test Planning Space",
+			"description": "A space for planning",
+			"general_instructions": "use this space for team planning",
+			"owner": {
+				"login": "octo-org",
+				"id": 1,
+				"type": "Organization"
+			},
+			"creator": {
+				"login": "octocat",
+				"id": 2,
+				"type": "User"
+			},
+			"created_at": `+refTimeStr(1136178000)+`,
+			"updated_at": `+refTimeStr(1136178001)+`,
+			"html_url": "https://github.com/copilot/spaces/octo-org/6",
+			"api_url": "https://api.github.com/orgs/octo-org/copilot-spaces/6",
+			"base_role": "read"
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetOrganizationCopilotSpace(ctx, "o", 6)
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationCopilotSpace returned error: %v", err)
+	}
+
+	want := &CopilotSpace{
+		ID:                  int64(12),
+		Number:              6,
+		Name:                "Test Planning Space",
+		Description:         new("A space for planning"),
+		GeneralInstructions: new("use this space for team planning"),
+		Owner: &Organization{
+			Login: new("octo-org"),
+			ID:    new(int64(1)),
+			Type:  new("Organization"),
+		},
+		Creator: User{
+			Login: new("octocat"),
+			ID:    new(int64(2)),
+			Type:  new("User"),
+		},
+		CreatedAt: *refTimestamp(1136178000),
+		UpdatedAt: *refTimestamp(1136178001),
+		HTMLURL:   "https://github.com/copilot/spaces/octo-org/6",
+		APIURL:    "https://api.github.com/orgs/octo-org/copilot-spaces/6",
+		BaseRole:  "read",
+	}
+
+	if !cmp.Equal(want, got) {
+		t.Errorf("CopilotService returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationCopilotSpace"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationCopilotSpace(ctx, "\n", 6)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationCopilotSpace(ctx, "o", 6)
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationCopilotSpace returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_CreateOrganizationCopilotSpace(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := CreateOrganizationCopilotSpaceRequest{
+		Name:                "Team Planning Space",
+		Description:         new("Organization space for team planning"),
+		GeneralInstructions: new("Help the team with planning tasks"),
+		BaseRole:            new("no_access"),
+		ResourcesAttributes: []*CreateCopilotSpaceResourceAttributes{
+			{
+				ResourceType: new("free_text"),
+				Metadata: &CopilotSpaceMetadata{
+					Name: new("Team Guidelines"),
+					Text: new("Our team follows agile methodology"),
+				},
+			},
+		},
+	}
+
+	want := &CopilotSpace{
+		ID:                  int64(12),
+		Number:              6,
+		Name:                "Team Planning Space",
+		Description:         new("Organization space for team planning"),
+		GeneralInstructions: new("Help the team with planning tasks"),
+		Owner: &Organization{
+			Login: new("octo-org"),
+			ID:    new(int64(1)),
+			Type:  new("Organization"),
+		},
+		Creator: User{
+			Login: new("octocat"),
+			ID:    new(int64(2)),
+			Type:  new("User"),
+		},
+		CreatedAt: *refTimestamp(1136178000),
+		UpdatedAt: *refTimestamp(1136178001),
+		HTMLURL:   "https://github.com/copilot/spaces/octo-org/6",
+		APIURL:    "https://api.github.com/orgs/octo-org/copilot-spaces/6",
+		BaseRole:  "no_access",
+		ResourcesAttributes: []*CopilotSpaceResource{
+			{
+				ID:           new(int64(101)),
+				ResourceType: new("free_text"),
+				Metadata: &CopilotSpaceMetadata{
+					Name: new("Team Guidelines"),
+					Text: new("Our team follows agile methodology"),
+				},
+			},
+			{
+				ID:                      new(int64(125)),
+				ResourceType:            new("media_content"),
+				CopilotChatAttachmentID: new(int64(123)),
+				Metadata: &CopilotSpaceMetadata{
+					CopilotChatAttachmentID: new(int64(123)),
+					MediaType:               new("image/png"),
+					URL:                     new("https://example.com/image.png"),
+					Height:                  new(640),
+					Width:                   new(480),
+				},
+				CreatedAt: &Timestamp{referenceTime},
+				UpdatedAt: &Timestamp{referenceTime},
+			},
+		},
+	}
+
+	mux.HandleFunc("/orgs/o/copilot-spaces", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testJSONBody(t, r, input)
+
+		fmt.Fprint(w, `{
+		"id": 12,
+		"number": 6,
+		"name": "Team Planning Space",
+		"description": "Organization space for team planning",
+		"general_instructions": "Help the team with planning tasks",
+		"owner": {
+			"login": "octo-org",
+			"id": 1,
+			"type": "Organization"
+		},
+		"creator": {
+			"login": "octocat",
+			"id": 2,
+			"type": "User"
+		},
+		"created_at": `+refTimeStr(1136178000)+`,
+		"updated_at": `+refTimeStr(1136178001)+`,
+		"html_url": "https://github.com/copilot/spaces/octo-org/6",
+		"api_url": "https://api.github.com/orgs/octo-org/copilot-spaces/6",
+		"base_role": "no_access",
+		"resources_attributes": [
+		{
+			"id": 101,
+			"resource_type": "free_text",
+			"metadata": {
+				"name": "Team Guidelines",
+				"text": "Our team follows agile methodology"
+			}
+		},
+		{
+			"id": 125,
+			"resource_type": "media_content",
+			"copilot_chat_attachment_id": 123,
+			"metadata": {
+				"copilot_chat_attachment_id": 123,
+				"media_type": "image/png",
+				"url": "https://example.com/image.png",
+				"height": 640,
+				"width": 480
+			},
+			"created_at": `+referenceTimeStr+`,
+			"updated_at": `+referenceTimeStr+`
+		}
+	]
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.CreateOrganizationCopilotSpace(ctx, "o", input)
+	if err != nil {
+		t.Errorf("Copilot.CreateOrganizationCopilotSpace returned error: %v", err)
+	}
+
+	if !cmp.Equal(want, got) {
+		t.Errorf("CopilotService returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "CreateOrganizationCopilotSpace"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.CreateOrganizationCopilotSpace(ctx, "\n", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.CreateOrganizationCopilotSpace(ctx, "o", input)
+		if got != nil {
+			t.Errorf("Copilot.CreateOrganizationCopilotSpace returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_UpdateOrganizationCopilotSpace(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := UpdateOrganizationCopilotSpaceRequest{
+		Name:                new("Team Planning Space"),
+		Description:         new("Updated organization space for team planning"),
+		GeneralInstructions: new("Help the team with updated planning tasks"),
+		BaseRole:            new("read"),
+		ResourcesAttributes: []*UpdateCopilotSpaceResourceAttributes{
+			{
+				ID:           new(int64(101)),
+				ResourceType: new("free_text"),
+				Metadata: &CopilotSpaceMetadata{
+					Name: new("Team Guidelines"),
+					Text: new("Our team follows agile methodology"),
+				},
+			},
+			{
+				ID:      new(int64(102)),
+				Destroy: new(true),
+			},
+		},
+	}
+
+	want := &CopilotSpace{
+		ID:                  int64(12),
+		Number:              6,
+		Name:                "Team Planning Space",
+		Description:         new("Updated organization space for team planning"),
+		GeneralInstructions: new("Help the team with updated planning tasks"),
+		Owner: &Organization{
+			Login: new("octo-org"),
+			ID:    new(int64(1)),
+			Type:  new("Organization"),
+		},
+		Creator: User{
+			Login: new("octocat"),
+			ID:    new(int64(2)),
+			Type:  new("User"),
+		},
+		CreatedAt: *refTimestamp(1136178000),
+		UpdatedAt: *refTimestamp(1136178001),
+		HTMLURL:   "https://github.com/copilot/spaces/octo-org/6",
+		APIURL:    "https://api.github.com/orgs/octo-org/copilot-spaces/6",
+		BaseRole:  "read",
+		ResourcesAttributes: []*CopilotSpaceResource{
+			{
+				ID:           new(int64(101)),
+				ResourceType: new("free_text"),
+				Metadata: &CopilotSpaceMetadata{
+					Name: new("Updated Team Guidelines"),
+					Text: new("Our team now follows updated agile methodology"),
+				},
+			},
+		},
+	}
+
+	mux.HandleFunc("/orgs/o/copilot-spaces/6", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		testJSONBody(t, r, input)
+
+		fmt.Fprint(w, `{
+		"id": 12,
+		"number": 6,
+		"name": "Team Planning Space",
+		"description": "Updated organization space for team planning",
+		"general_instructions": "Help the team with updated planning tasks",
+		"owner": {
+			"login": "octo-org",
+			"id": 1,
+			"type": "Organization"
+		},
+		"creator": {
+			"login": "octocat",
+			"id": 2,
+			"type": "User"
+		},
+		"created_at": `+refTimeStr(1136178000)+`,
+		"updated_at": `+refTimeStr(1136178001)+`,
+		"html_url": "https://github.com/copilot/spaces/octo-org/6",
+		"api_url": "https://api.github.com/orgs/octo-org/copilot-spaces/6",
+		"base_role": "read",
+		"resources_attributes": [
+		{
+			"id": 101,
+			"resource_type": "free_text",
+			"metadata": {
+				"name": "Updated Team Guidelines",
+				"text": "Our team now follows updated agile methodology"
+			}
+		}
+	]
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.UpdateOrganizationCopilotSpace(ctx, "o", 6, input)
+	if err != nil {
+		t.Errorf("Copilot.UpdateOrganizationCopilotSpace returned error: %v", err)
+	}
+
+	if !cmp.Equal(want, got) {
+		t.Errorf("CopilotService returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "UpdateOrganizationCopilotSpace"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.UpdateOrganizationCopilotSpace(ctx, "\n", 6, input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.UpdateOrganizationCopilotSpace(ctx, "o", 6, input)
+		if got != nil {
+			t.Errorf("Copilot.UpdateOrganizationCopilotSpace returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_DeleteOrganizationCopilotSpace(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot-spaces/6", func(_ http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "DELETE")
+	})
+
+	ctx := t.Context()
+	_, err := client.Copilot.DeleteOrganizationCopilotSpace(ctx, "o", 6)
+	if err != nil {
+		t.Errorf("Copilot.DeleteOrganizationCopilotSpace returned error: %v", err)
+	}
+
+	const methodName = "DeleteOrganizationCopilotSpace"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Copilot.DeleteOrganizationCopilotSpace(ctx, "\n", 6)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Copilot.DeleteOrganizationCopilotSpace(ctx, "o", 6)
+	})
+}
+
+func TestCopilotService_GetSeatDetails(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/members/u/copilot", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+				"created_at": `+refTimeStr(1136178000)+`,
+				"updated_at": `+refTimeStr(1136178001)+`,
+				"pending_cancellation_date": null,
+				"last_activity_at": `+refTimeStr(1136178002)+`,
+				"last_activity_editor": "vscode/1.77.3/copilot/1.86.82",
+				"assignee": {
+					"login": "octocat",
+					"id": 1,
+					"node_id": "MDQ6VXNlcjE=",
+					"avatar_url": "https://github.com/images/error/octocat_happy.gif",
+					"gravatar_id": "",
+					"url": "https://api.github.com/users/octocat",
+					"html_url": "https://github.com/octocat",
+					"followers_url": "https://api.github.com/users/octocat/followers",
+					"following_url": "https://api.github.com/users/octocat/following{/other_user}",
+					"gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+					"starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+					"subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+					"organizations_url": "https://api.github.com/users/octocat/orgs",
+					"repos_url": "https://api.github.com/users/octocat/repos",
+					"events_url": "https://api.github.com/users/octocat/events{/privacy}",
+					"received_events_url": "https://api.github.com/users/octocat/received_events",
+					"type": "User",
+					"site_admin": false
+				},
+				"assigning_team": {
+					"id": 1,
+					"node_id": "MDQ6VGVhbTE=",
+					"url": "https://api.github.com/teams/1",
+					"html_url": "https://github.com/orgs/github/teams/justice-league",
+					"name": "Justice League",
+					"slug": "justice-league",
+					"description": "A great team.",
+					"privacy": "closed",
+					"notification_setting": "notifications_enabled",
+					"permission": "admin",
+					"members_url": "https://api.github.com/teams/1/members{/member}",
+					"repositories_url": "https://api.github.com/teams/1/repos",
+					"parent": null
+				}
+			}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetSeatDetails(ctx, "o", "u")
+	if err != nil {
+		t.Errorf("Copilot.GetSeatDetails returned error: %v", err)
+	}
+
+	want := &CopilotSeatDetails{
+		Assignee: &User{
+			Login:             new("octocat"),
+			ID:                new(int64(1)),
+			NodeID:            new("MDQ6VXNlcjE="),
+			AvatarURL:         new("https://github.com/images/error/octocat_happy.gif"),
+			GravatarID:        new(""),
+			URL:               new("https://api.github.com/users/octocat"),
+			HTMLURL:           new("https://github.com/octocat"),
+			FollowersURL:      new("https://api.github.com/users/octocat/followers"),
+			FollowingURL:      new("https://api.github.com/users/octocat/following{/other_user}"),
+			GistsURL:          new("https://api.github.com/users/octocat/gists{/gist_id}"),
+			StarredURL:        new("https://api.github.com/users/octocat/starred{/owner}{/repo}"),
+			SubscriptionsURL:  new("https://api.github.com/users/octocat/subscriptions"),
+			OrganizationsURL:  new("https://api.github.com/users/octocat/orgs"),
+			ReposURL:          new("https://api.github.com/users/octocat/repos"),
+			EventsURL:         new("https://api.github.com/users/octocat/events{/privacy}"),
+			ReceivedEventsURL: new("https://api.github.com/users/octocat/received_events"),
+			Type:              new("User"),
+			SiteAdmin:         new(false),
+		},
+		AssigningTeam: &Team{
+			ID:                  new(int64(1)),
+			NodeID:              new("MDQ6VGVhbTE="),
+			URL:                 new("https://api.github.com/teams/1"),
+			HTMLURL:             new("https://github.com/orgs/github/teams/justice-league"),
+			Name:                new("Justice League"),
+			Slug:                new("justice-league"),
+			Description:         new("A great team."),
+			Privacy:             new("closed"),
+			NotificationSetting: new("notifications_enabled"),
+			Permission:          new("admin"),
+			MembersURL:          new("https://api.github.com/teams/1/members{/member}"),
+			RepositoriesURL:     new("https://api.github.com/teams/1/repos"),
+			Parent:              nil,
+		},
+		CreatedAt:               refTimestamp(1136178000),
+		UpdatedAt:               refTimestamp(1136178001),
+		PendingCancellationDate: nil,
+		LastActivityAt:          refTimestamp(1136178002),
+		LastActivityEditor:      new("vscode/1.77.3/copilot/1.86.82"),
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetSeatDetails returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetSeatDetails"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetSeatDetails(ctx, "\n", "u")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetSeatDetails(ctx, "o", "u")
+		if got != nil {
+			t.Errorf("Copilot.GetSeatDetails returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetEnterpriseMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/copilot/metrics", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `[
+			{
+				"date": "2024-06-24",
+				"total_active_users": 24,
+				"total_engaged_users": 20,
+				"copilot_ide_code_completions": {
+				"total_engaged_users": 20,
+				"languages": [
+					{
+					"name": "python",
+					"total_engaged_users": 10
+					},
+					{
+					"name": "ruby",
+					"total_engaged_users": 10
+					}
+				],
+				"editors": [
+					{
+					"name": "vscode",
+					"total_engaged_users": 13,
+					"models": [
+						{
+						"name": "default",
+						"is_custom_model": false,
+						"custom_model_training_date": null,
+						"total_engaged_users": 13,
+						"languages": [
+							{
+							"name": "python",
+							"total_engaged_users": 6,
+							"total_code_suggestions": 249,
+							"total_code_acceptances": 123,
+							"total_code_lines_suggested": 225,
+							"total_code_lines_accepted": 135
+							},
+							{
+							"name": "ruby",
+							"total_engaged_users": 7,
+							"total_code_suggestions": 496,
+							"total_code_acceptances": 253,
+							"total_code_lines_suggested": 520,
+							"total_code_lines_accepted": 270
+							}
+						]
+						}
+					]
+					},
+					{
+					"name": "neovim",
+					"total_engaged_users": 7,
+					"models": [
+						{
+						"name": "a-custom-model",
+						"is_custom_model": true,
+						"custom_model_training_date": "2024-02-01",
+						"languages": [
+							{
+							"name": "typescript",
+							"total_engaged_users": 3,
+							"total_code_suggestions": 112,
+							"total_code_acceptances": 56,
+							"total_code_lines_suggested": 143,
+							"total_code_lines_accepted": 61
+							},
+							{
+							"name": "go",
+							"total_engaged_users": 4,
+							"total_code_suggestions": 132,
+							"total_code_acceptances": 67,
+							"total_code_lines_suggested": 154,
+							"total_code_lines_accepted": 72
+							}
+						]
+						}
+					]
+					}
+				]
+				},
+				"copilot_ide_chat": {
+				"total_engaged_users": 13,
+				"editors": [
+					{
+					"name": "vscode",
+					"total_engaged_users": 13,
+					"models": [
+						{
+						"name": "default",
+						"is_custom_model": false,
+						"custom_model_training_date": null,
+						"total_engaged_users": 12,
+						"total_chats": 45,
+						"total_chat_insertion_events": 12,
+						"total_chat_copy_events": 16
+						},
+						{
+						"name": "a-custom-model",
+						"is_custom_model": true,
+						"custom_model_training_date": "2024-02-01",
+						"total_engaged_users": 1,
+						"total_chats": 10,
+						"total_chat_insertion_events": 11,
+						"total_chat_copy_events": 3
+						}
+					]
+					}
+				]
+				},
+				"copilot_dotcom_chat": {
+				"total_engaged_users": 14,
+				"models": [
+					{
+					"name": "default",
+					"is_custom_model": false,
+					"custom_model_training_date": null,
+					"total_engaged_users": 14,
+					"total_chats": 38
+					}
+				]
+				},
+				"copilot_dotcom_pull_requests": {
+				"total_engaged_users": 12,
+				"repositories": [
+					{
+					"name": "demo/repo1",
+					"total_engaged_users": 8,
+					"models": [
+						{
+						"name": "default",
+						"is_custom_model": false,
+						"custom_model_training_date": null,
+						"total_pr_summaries_created": 6,
+						"total_engaged_users": 8
+						}
+					]
+					},
+					{
+					"name": "demo/repo2",
+					"total_engaged_users": 4,
+					"models": [
+						{
+						"name": "a-custom-model",
+						"is_custom_model": true,
+						"custom_model_training_date": "2024-02-01",
+						"total_pr_summaries_created": 10,
+						"total_engaged_users": 4
+						}
+					]
+					}
+				]
+				}
+			}
+		]`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetEnterpriseMetrics(ctx, "e", &CopilotMetricsListOptions{})
+	if err != nil {
+		t.Errorf("Copilot.GetEnterpriseMetrics returned error: %v", err)
+	}
+
+	want := []*CopilotMetrics{
+		{
+			Date:              "2024-06-24",
+			TotalActiveUsers:  new(24),
+			TotalEngagedUsers: new(20),
+			CopilotIDECodeCompletions: &CopilotIDECodeCompletions{
+				TotalEngagedUsers: 20,
+				Languages: []*CopilotIDECodeCompletionsLanguage{
+					{
+						Name:              "python",
+						TotalEngagedUsers: 10,
+					},
+					{
+						Name:              "ruby",
+						TotalEngagedUsers: 10,
+					},
+				},
+				Editors: []*CopilotIDECodeCompletionsEditor{
+					{
+						Name:              "vscode",
+						TotalEngagedUsers: 13,
+						Models: []*CopilotIDECodeCompletionsModel{
+							{
+								Name:                    "default",
+								IsCustomModel:           false,
+								CustomModelTrainingDate: nil,
+								TotalEngagedUsers:       13,
+								Languages: []*CopilotIDECodeCompletionsModelLanguage{
+									{
+										Name:                    "python",
+										TotalEngagedUsers:       6,
+										TotalCodeSuggestions:    249,
+										TotalCodeAcceptances:    123,
+										TotalCodeLinesSuggested: 225,
+										TotalCodeLinesAccepted:  135,
+									},
+									{
+										Name:                    "ruby",
+										TotalEngagedUsers:       7,
+										TotalCodeSuggestions:    496,
+										TotalCodeAcceptances:    253,
+										TotalCodeLinesSuggested: 520,
+										TotalCodeLinesAccepted:  270,
+									},
+								},
+							},
+						},
+					},
+					{
+						Name:              "neovim",
+						TotalEngagedUsers: 7,
+						Models: []*CopilotIDECodeCompletionsModel{
+							{
+								Name:                    "a-custom-model",
+								IsCustomModel:           true,
+								CustomModelTrainingDate: new("2024-02-01"),
+								Languages: []*CopilotIDECodeCompletionsModelLanguage{
+									{
+										Name:                    "typescript",
+										TotalEngagedUsers:       3,
+										TotalCodeSuggestions:    112,
+										TotalCodeAcceptances:    56,
+										TotalCodeLinesSuggested: 143,
+										TotalCodeLinesAccepted:  61,
+									},
+									{
+										Name:                    "go",
+										TotalEngagedUsers:       4,
+										TotalCodeSuggestions:    132,
+										TotalCodeAcceptances:    67,
+										TotalCodeLinesSuggested: 154,
+										TotalCodeLinesAccepted:  72,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			CopilotIDEChat: &CopilotIDEChat{
+				TotalEngagedUsers: 13,
+				Editors: []*CopilotIDEChatEditor{
+					{
+						Name:              "vscode",
+						TotalEngagedUsers: 13,
+						Models: []*CopilotIDEChatModel{
+							{
+								Name:                     "default",
+								IsCustomModel:            false,
+								CustomModelTrainingDate:  nil,
+								TotalEngagedUsers:        12,
+								TotalChats:               45,
+								TotalChatInsertionEvents: 12,
+								TotalChatCopyEvents:      16,
+							},
+							{
+								Name:                     "a-custom-model",
+								IsCustomModel:            true,
+								CustomModelTrainingDate:  new("2024-02-01"),
+								TotalEngagedUsers:        1,
+								TotalChats:               10,
+								TotalChatInsertionEvents: 11,
+								TotalChatCopyEvents:      3,
+							},
+						},
+					},
+				},
+			},
+			CopilotDotcomChat: &CopilotDotcomChat{
+				TotalEngagedUsers: 14,
+				Models: []*CopilotDotcomChatModel{
+					{
+						Name:                    "default",
+						IsCustomModel:           false,
+						CustomModelTrainingDate: nil,
+						TotalEngagedUsers:       14,
+						TotalChats:              38,
+					},
+				},
+			},
+			CopilotDotcomPullRequests: &CopilotDotcomPullRequests{
+				TotalEngagedUsers: 12,
+				Repositories: []*CopilotDotcomPullRequestsRepository{
+					{
+						Name:              "demo/repo1",
+						TotalEngagedUsers: 8,
+						Models: []*CopilotDotcomPullRequestsModel{
+							{
+								Name:                    "default",
+								IsCustomModel:           false,
+								CustomModelTrainingDate: nil,
+								TotalPRSummariesCreated: 6,
+								TotalEngagedUsers:       8,
+							},
+						},
+					},
+					{
+						Name:              "demo/repo2",
+						TotalEngagedUsers: 4,
+						Models: []*CopilotDotcomPullRequestsModel{
+							{
+								Name:                    "a-custom-model",
+								IsCustomModel:           true,
+								CustomModelTrainingDate: new("2024-02-01"),
+								TotalPRSummariesCreated: 10,
+								TotalEngagedUsers:       4,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetEnterpriseMetrics returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetEnterpriseMetrics"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetEnterpriseMetrics(ctx, "\n", &CopilotMetricsListOptions{})
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetEnterpriseMetrics(ctx, "e", &CopilotMetricsListOptions{})
+		if got != nil {
+			t.Errorf("Copilot.GetEnterpriseMetrics returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetEnterpriseTeamMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/team/t/copilot/metrics", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `[
+			{
+				"date": "2024-06-24",
+				"total_active_users": 24,
+				"total_engaged_users": 20,
+				"copilot_ide_code_completions": {
+				"total_engaged_users": 20,
+				"languages": [
+					{
+					"name": "python",
+					"total_engaged_users": 10
+					},
+					{
+					"name": "ruby",
+					"total_engaged_users": 10
+					}
+				],
+				"editors": [
+					{
+					"name": "vscode",
+					"total_engaged_users": 13,
+					"models": [
+						{
+						"name": "default",
+						"is_custom_model": false,
+						"custom_model_training_date": null,
+						"total_engaged_users": 13,
+						"languages": [
+							{
+							"name": "python",
+							"total_engaged_users": 6,
+							"total_code_suggestions": 249,
+							"total_code_acceptances": 123,
+							"total_code_lines_suggested": 225,
+							"total_code_lines_accepted": 135
+							},
+							{
+							"name": "ruby",
+							"total_engaged_users": 7,
+							"total_code_suggestions": 496,
+							"total_code_acceptances": 253,
+							"total_code_lines_suggested": 520,
+							"total_code_lines_accepted": 270
+							}
+						]
+						}
+					]
+					},
+					{
+					"name": "neovim",
+					"total_engaged_users": 7,
+					"models": [
+						{
+						"name": "a-custom-model",
+						"is_custom_model": true,
+						"custom_model_training_date": "2024-02-01",
+						"languages": [
+							{
+							"name": "typescript",
+							"total_engaged_users": 3,
+							"total_code_suggestions": 112,
+							"total_code_acceptances": 56,
+							"total_code_lines_suggested": 143,
+							"total_code_lines_accepted": 61
+							},
+							{
+							"name": "go",
+							"total_engaged_users": 4,
+							"total_code_suggestions": 132,
+							"total_code_acceptances": 67,
+							"total_code_lines_suggested": 154,
+							"total_code_lines_accepted": 72
+							}
+						]
+						}
+					]
+					}
+				]
+				},
+				"copilot_ide_chat": {
+				"total_engaged_users": 13,
+				"editors": [
+					{
+					"name": "vscode",
+					"total_engaged_users": 13,
+					"models": [
+						{
+						"name": "default",
+						"is_custom_model": false,
+						"custom_model_training_date": null,
+						"total_engaged_users": 12,
+						"total_chats": 45,
+						"total_chat_insertion_events": 12,
+						"total_chat_copy_events": 16
+						},
+						{
+						"name": "a-custom-model",
+						"is_custom_model": true,
+						"custom_model_training_date": "2024-02-01",
+						"total_engaged_users": 1,
+						"total_chats": 10,
+						"total_chat_insertion_events": 11,
+						"total_chat_copy_events": 3
+						}
+					]
+					}
+				]
+				},
+				"copilot_dotcom_chat": {
+				"total_engaged_users": 14,
+				"models": [
+					{
+					"name": "default",
+					"is_custom_model": false,
+					"custom_model_training_date": null,
+					"total_engaged_users": 14,
+					"total_chats": 38
+					}
+				]
+				},
+				"copilot_dotcom_pull_requests": {
+				"total_engaged_users": 12,
+				"repositories": [
+					{
+					"name": "demo/repo1",
+					"total_engaged_users": 8,
+					"models": [
+						{
+						"name": "default",
+						"is_custom_model": false,
+						"custom_model_training_date": null,
+						"total_pr_summaries_created": 6,
+						"total_engaged_users": 8
+						}
+					]
+					},
+					{
+					"name": "demo/repo2",
+					"total_engaged_users": 4,
+					"models": [
+						{
+						"name": "a-custom-model",
+						"is_custom_model": true,
+						"custom_model_training_date": "2024-02-01",
+						"total_pr_summaries_created": 10,
+						"total_engaged_users": 4
+						}
+					]
+					}
+				]
+				}
+			}
+		]`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetEnterpriseTeamMetrics(ctx, "e", "t", &CopilotMetricsListOptions{})
+	if err != nil {
+		t.Errorf("Copilot.GetEnterpriseTeamMetrics returned error: %v", err)
+	}
+
+	want := []*CopilotMetrics{
+		{
+			Date:              "2024-06-24",
+			TotalActiveUsers:  new(24),
+			TotalEngagedUsers: new(20),
+			CopilotIDECodeCompletions: &CopilotIDECodeCompletions{
+				TotalEngagedUsers: 20,
+				Languages: []*CopilotIDECodeCompletionsLanguage{
+					{
+						Name:              "python",
+						TotalEngagedUsers: 10,
+					},
+					{
+						Name:              "ruby",
+						TotalEngagedUsers: 10,
+					},
+				},
+				Editors: []*CopilotIDECodeCompletionsEditor{
+					{
+						Name:              "vscode",
+						TotalEngagedUsers: 13,
+						Models: []*CopilotIDECodeCompletionsModel{
+							{
+								Name:                    "default",
+								IsCustomModel:           false,
+								CustomModelTrainingDate: nil,
+								TotalEngagedUsers:       13,
+								Languages: []*CopilotIDECodeCompletionsModelLanguage{
+									{
+										Name:                    "python",
+										TotalEngagedUsers:       6,
+										TotalCodeSuggestions:    249,
+										TotalCodeAcceptances:    123,
+										TotalCodeLinesSuggested: 225,
+										TotalCodeLinesAccepted:  135,
+									},
+									{
+										Name:                    "ruby",
+										TotalEngagedUsers:       7,
+										TotalCodeSuggestions:    496,
+										TotalCodeAcceptances:    253,
+										TotalCodeLinesSuggested: 520,
+										TotalCodeLinesAccepted:  270,
+									},
+								},
+							},
+						},
+					},
+					{
+						Name:              "neovim",
+						TotalEngagedUsers: 7,
+						Models: []*CopilotIDECodeCompletionsModel{
+							{
+								Name:                    "a-custom-model",
+								IsCustomModel:           true,
+								CustomModelTrainingDate: new("2024-02-01"),
+								Languages: []*CopilotIDECodeCompletionsModelLanguage{
+									{
+										Name:                    "typescript",
+										TotalEngagedUsers:       3,
+										TotalCodeSuggestions:    112,
+										TotalCodeAcceptances:    56,
+										TotalCodeLinesSuggested: 143,
+										TotalCodeLinesAccepted:  61,
+									},
+									{
+										Name:                    "go",
+										TotalEngagedUsers:       4,
+										TotalCodeSuggestions:    132,
+										TotalCodeAcceptances:    67,
+										TotalCodeLinesSuggested: 154,
+										TotalCodeLinesAccepted:  72,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			CopilotIDEChat: &CopilotIDEChat{
+				TotalEngagedUsers: 13,
+				Editors: []*CopilotIDEChatEditor{
+					{
+						Name:              "vscode",
+						TotalEngagedUsers: 13,
+						Models: []*CopilotIDEChatModel{
+							{
+								Name:                     "default",
+								IsCustomModel:            false,
+								CustomModelTrainingDate:  nil,
+								TotalEngagedUsers:        12,
+								TotalChats:               45,
+								TotalChatInsertionEvents: 12,
+								TotalChatCopyEvents:      16,
+							},
+							{
+								Name:                     "a-custom-model",
+								IsCustomModel:            true,
+								CustomModelTrainingDate:  new("2024-02-01"),
+								TotalEngagedUsers:        1,
+								TotalChats:               10,
+								TotalChatInsertionEvents: 11,
+								TotalChatCopyEvents:      3,
+							},
+						},
+					},
+				},
+			},
+			CopilotDotcomChat: &CopilotDotcomChat{
+				TotalEngagedUsers: 14,
+				Models: []*CopilotDotcomChatModel{
+					{
+						Name:                    "default",
+						IsCustomModel:           false,
+						CustomModelTrainingDate: nil,
+						TotalEngagedUsers:       14,
+						TotalChats:              38,
+					},
+				},
+			},
+			CopilotDotcomPullRequests: &CopilotDotcomPullRequests{
+				TotalEngagedUsers: 12,
+				Repositories: []*CopilotDotcomPullRequestsRepository{
+					{
+						Name:              "demo/repo1",
+						TotalEngagedUsers: 8,
+						Models: []*CopilotDotcomPullRequestsModel{
+							{
+								Name:                    "default",
+								IsCustomModel:           false,
+								CustomModelTrainingDate: nil,
+								TotalPRSummariesCreated: 6,
+								TotalEngagedUsers:       8,
+							},
+						},
+					},
+					{
+						Name:              "demo/repo2",
+						TotalEngagedUsers: 4,
+						Models: []*CopilotDotcomPullRequestsModel{
+							{
+								Name:                    "a-custom-model",
+								IsCustomModel:           true,
+								CustomModelTrainingDate: new("2024-02-01"),
+								TotalPRSummariesCreated: 10,
+								TotalEngagedUsers:       4,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetEnterpriseTeamMetrics returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetEnterpriseTeamMetrics"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetEnterpriseTeamMetrics(ctx, "\n", "t", &CopilotMetricsListOptions{})
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetEnterpriseTeamMetrics(ctx, "e", "t", &CopilotMetricsListOptions{})
+		if got != nil {
+			t.Errorf("Copilot.GetEnterpriseTeamMetrics returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/metrics", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `[
+			{
+				"date": "2024-06-24",
+				"total_active_users": 24,
+				"total_engaged_users": 20,
+				"copilot_ide_code_completions": {
+				"total_engaged_users": 20,
+				"languages": [
+					{
+					"name": "python",
+					"total_engaged_users": 10
+					},
+					{
+					"name": "ruby",
+					"total_engaged_users": 10
+					}
+				],
+				"editors": [
+					{
+					"name": "vscode",
+					"total_engaged_users": 13,
+					"models": [
+						{
+						"name": "default",
+						"is_custom_model": false,
+						"custom_model_training_date": null,
+						"total_engaged_users": 13,
+						"languages": [
+							{
+							"name": "python",
+							"total_engaged_users": 6,
+							"total_code_suggestions": 249,
+							"total_code_acceptances": 123,
+							"total_code_lines_suggested": 225,
+							"total_code_lines_accepted": 135
+							},
+							{
+							"name": "ruby",
+							"total_engaged_users": 7,
+							"total_code_suggestions": 496,
+							"total_code_acceptances": 253,
+							"total_code_lines_suggested": 520,
+							"total_code_lines_accepted": 270
+							}
+						]
+						}
+					]
+					},
+					{
+					"name": "neovim",
+					"total_engaged_users": 7,
+					"models": [
+						{
+						"name": "a-custom-model",
+						"is_custom_model": true,
+						"custom_model_training_date": "2024-02-01",
+						"languages": [
+							{
+							"name": "typescript",
+							"total_engaged_users": 3,
+							"total_code_suggestions": 112,
+							"total_code_acceptances": 56,
+							"total_code_lines_suggested": 143,
+							"total_code_lines_accepted": 61
+							},
+							{
+							"name": "go",
+							"total_engaged_users": 4,
+							"total_code_suggestions": 132,
+							"total_code_acceptances": 67,
+							"total_code_lines_suggested": 154,
+							"total_code_lines_accepted": 72
+							}
+						]
+						}
+					]
+					}
+				]
+				},
+				"copilot_ide_chat": {
+				"total_engaged_users": 13,
+				"editors": [
+					{
+					"name": "vscode",
+					"total_engaged_users": 13,
+					"models": [
+						{
+						"name": "default",
+						"is_custom_model": false,
+						"custom_model_training_date": null,
+						"total_engaged_users": 12,
+						"total_chats": 45,
+						"total_chat_insertion_events": 12,
+						"total_chat_copy_events": 16
+						},
+						{
+						"name": "a-custom-model",
+						"is_custom_model": true,
+						"custom_model_training_date": "2024-02-01",
+						"total_engaged_users": 1,
+						"total_chats": 10,
+						"total_chat_insertion_events": 11,
+						"total_chat_copy_events": 3
+						}
+					]
+					}
+				]
+				},
+				"copilot_dotcom_chat": {
+				"total_engaged_users": 14,
+				"models": [
+					{
+					"name": "default",
+					"is_custom_model": false,
+					"custom_model_training_date": null,
+					"total_engaged_users": 14,
+					"total_chats": 38
+					}
+				]
+				},
+				"copilot_dotcom_pull_requests": {
+				"total_engaged_users": 12,
+				"repositories": [
+					{
+					"name": "demo/repo1",
+					"total_engaged_users": 8,
+					"models": [
+						{
+						"name": "default",
+						"is_custom_model": false,
+						"custom_model_training_date": null,
+						"total_pr_summaries_created": 6,
+						"total_engaged_users": 8
+						}
+					]
+					},
+					{
+					"name": "demo/repo2",
+					"total_engaged_users": 4,
+					"models": [
+						{
+						"name": "a-custom-model",
+						"is_custom_model": true,
+						"custom_model_training_date": "2024-02-01",
+						"total_pr_summaries_created": 10,
+						"total_engaged_users": 4
+						}
+					]
+					}
+				]
+				}
+			}
+		]`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetOrganizationMetrics(ctx, "o", &CopilotMetricsListOptions{})
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationMetrics returned error: %v", err)
+	}
+
+	want := []*CopilotMetrics{
+		{
+			Date:              "2024-06-24",
+			TotalActiveUsers:  new(24),
+			TotalEngagedUsers: new(20),
+			CopilotIDECodeCompletions: &CopilotIDECodeCompletions{
+				TotalEngagedUsers: 20,
+				Languages: []*CopilotIDECodeCompletionsLanguage{
+					{
+						Name:              "python",
+						TotalEngagedUsers: 10,
+					},
+					{
+						Name:              "ruby",
+						TotalEngagedUsers: 10,
+					},
+				},
+				Editors: []*CopilotIDECodeCompletionsEditor{
+					{
+						Name:              "vscode",
+						TotalEngagedUsers: 13,
+						Models: []*CopilotIDECodeCompletionsModel{
+							{
+								Name:                    "default",
+								IsCustomModel:           false,
+								CustomModelTrainingDate: nil,
+								TotalEngagedUsers:       13,
+								Languages: []*CopilotIDECodeCompletionsModelLanguage{
+									{
+										Name:                    "python",
+										TotalEngagedUsers:       6,
+										TotalCodeSuggestions:    249,
+										TotalCodeAcceptances:    123,
+										TotalCodeLinesSuggested: 225,
+										TotalCodeLinesAccepted:  135,
+									},
+									{
+										Name:                    "ruby",
+										TotalEngagedUsers:       7,
+										TotalCodeSuggestions:    496,
+										TotalCodeAcceptances:    253,
+										TotalCodeLinesSuggested: 520,
+										TotalCodeLinesAccepted:  270,
+									},
+								},
+							},
+						},
+					},
+					{
+						Name:              "neovim",
+						TotalEngagedUsers: 7,
+						Models: []*CopilotIDECodeCompletionsModel{
+							{
+								Name:                    "a-custom-model",
+								IsCustomModel:           true,
+								CustomModelTrainingDate: new("2024-02-01"),
+								Languages: []*CopilotIDECodeCompletionsModelLanguage{
+									{
+										Name:                    "typescript",
+										TotalEngagedUsers:       3,
+										TotalCodeSuggestions:    112,
+										TotalCodeAcceptances:    56,
+										TotalCodeLinesSuggested: 143,
+										TotalCodeLinesAccepted:  61,
+									},
+									{
+										Name:                    "go",
+										TotalEngagedUsers:       4,
+										TotalCodeSuggestions:    132,
+										TotalCodeAcceptances:    67,
+										TotalCodeLinesSuggested: 154,
+										TotalCodeLinesAccepted:  72,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			CopilotIDEChat: &CopilotIDEChat{
+				TotalEngagedUsers: 13,
+				Editors: []*CopilotIDEChatEditor{
+					{
+						Name:              "vscode",
+						TotalEngagedUsers: 13,
+						Models: []*CopilotIDEChatModel{
+							{
+								Name:                     "default",
+								IsCustomModel:            false,
+								CustomModelTrainingDate:  nil,
+								TotalEngagedUsers:        12,
+								TotalChats:               45,
+								TotalChatInsertionEvents: 12,
+								TotalChatCopyEvents:      16,
+							},
+							{
+								Name:                     "a-custom-model",
+								IsCustomModel:            true,
+								CustomModelTrainingDate:  new("2024-02-01"),
+								TotalEngagedUsers:        1,
+								TotalChats:               10,
+								TotalChatInsertionEvents: 11,
+								TotalChatCopyEvents:      3,
+							},
+						},
+					},
+				},
+			},
+			CopilotDotcomChat: &CopilotDotcomChat{
+				TotalEngagedUsers: 14,
+				Models: []*CopilotDotcomChatModel{
+					{
+						Name:                    "default",
+						IsCustomModel:           false,
+						CustomModelTrainingDate: nil,
+						TotalEngagedUsers:       14,
+						TotalChats:              38,
+					},
+				},
+			},
+			CopilotDotcomPullRequests: &CopilotDotcomPullRequests{
+				TotalEngagedUsers: 12,
+				Repositories: []*CopilotDotcomPullRequestsRepository{
+					{
+						Name:              "demo/repo1",
+						TotalEngagedUsers: 8,
+						Models: []*CopilotDotcomPullRequestsModel{
+							{
+								Name:                    "default",
+								IsCustomModel:           false,
+								CustomModelTrainingDate: nil,
+								TotalPRSummariesCreated: 6,
+								TotalEngagedUsers:       8,
+							},
+						},
+					},
+					{
+						Name:              "demo/repo2",
+						TotalEngagedUsers: 4,
+						Models: []*CopilotDotcomPullRequestsModel{
+							{
+								Name:                    "a-custom-model",
+								IsCustomModel:           true,
+								CustomModelTrainingDate: new("2024-02-01"),
+								TotalPRSummariesCreated: 10,
+								TotalEngagedUsers:       4,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationMetrics returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationMetrics"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationMetrics(ctx, "\n", &CopilotMetricsListOptions{})
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationMetrics(ctx, "o", &CopilotMetricsListOptions{})
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationMetrics returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationTeamMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/team/t/copilot/metrics", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `[
+			{
+				"date": "2024-06-24",
+				"total_active_users": 24,
+				"total_engaged_users": 20,
+				"copilot_ide_code_completions": {
+					"total_engaged_users": 20,
+					"languages": [
+						{
+							"name": "python",
+							"total_engaged_users": 10
+						},
+						{
+							"name": "ruby",
+							"total_engaged_users": 10
+						}
+					],
+					"editors": [
+						{
+							"name": "vscode",
+							"total_engaged_users": 13,
+							"models": [
+								{
+									"name": "default",
+									"is_custom_model": false,
+									"custom_model_training_date": null,
+									"total_engaged_users": 13,
+									"languages": [
+										{
+											"name": "python",
+											"total_engaged_users": 6,
+											"total_code_suggestions": 249,
+											"total_code_acceptances": 123,
+											"total_code_lines_suggested": 225,
+											"total_code_lines_accepted": 135
+										},
+										{
+											"name": "ruby",
+											"total_engaged_users": 7,
+											"total_code_suggestions": 496,
+											"total_code_acceptances": 253,
+											"total_code_lines_suggested": 520,
+											"total_code_lines_accepted": 270
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "neovim",
+							"total_engaged_users": 7,
+							"models": [
+								{
+									"name": "a-custom-model",
+									"is_custom_model": true,
+									"custom_model_training_date": "2024-02-01",
+									"languages": [
+										{
+											"name": "typescript",
+											"total_engaged_users": 3,
+											"total_code_suggestions": 112,
+											"total_code_acceptances": 56,
+											"total_code_lines_suggested": 143,
+											"total_code_lines_accepted": 61
+										},
+										{
+											"name": "go",
+											"total_engaged_users": 4,
+											"total_code_suggestions": 132,
+											"total_code_acceptances": 67,
+											"total_code_lines_suggested": 154,
+											"total_code_lines_accepted": 72
+										}
+									]
+								}
+							]
+						}
+					]
+				},
+				"copilot_ide_chat": {
+					"total_engaged_users": 13,
+					"editors": [
+						{
+							"name": "vscode",
+							"total_engaged_users": 13,
+							"models": [
+								{
+									"name": "default",
+									"is_custom_model": false,
+									"custom_model_training_date": null,
+									"total_engaged_users": 12,
+									"total_chats": 45,
+									"total_chat_insertion_events": 12,
+									"total_chat_copy_events": 16
+								},
+								{
+									"name": "a-custom-model",
+									"is_custom_model": true,
+									"custom_model_training_date": "2024-02-01",
+									"total_engaged_users": 1,
+									"total_chats": 10,
+									"total_chat_insertion_events": 11,
+									"total_chat_copy_events": 3
+								}
+							]
+						}
+					]
+				},
+				"copilot_dotcom_chat": {
+					"total_engaged_users": 14,
+					"models": [
+						{
+							"name": "default",
+							"is_custom_model": false,
+							"custom_model_training_date": null,
+							"total_engaged_users": 14,
+							"total_chats": 38
+						}
+					]
+				},
+				"copilot_dotcom_pull_requests": {
+					"total_engaged_users": 12,
+					"repositories": [
+						{
+							"name": "demo/repo1",
+							"total_engaged_users": 8,
+							"models": [
+								{
+									"name": "default",
+									"is_custom_model": false,
+									"custom_model_training_date": null,
+									"total_pr_summaries_created": 6,
+									"total_engaged_users": 8
+								}
+							]
+						},
+						{
+							"name": "demo/repo2",
+							"total_engaged_users": 4,
+							"models": [
+								{
+									"name": "a-custom-model",
+									"is_custom_model": true,
+									"custom_model_training_date": "2024-02-01",
+									"total_pr_summaries_created": 10,
+									"total_engaged_users": 4
+								}
+							]
+						}
+					]
+				}
+			}
+		]`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetOrganizationTeamMetrics(ctx, "o", "t", &CopilotMetricsListOptions{})
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationTeamMetrics returned error: %v", err)
+	}
+
+	want := []*CopilotMetrics{
+		{
+			Date:              "2024-06-24",
+			TotalActiveUsers:  new(24),
+			TotalEngagedUsers: new(20),
+			CopilotIDECodeCompletions: &CopilotIDECodeCompletions{
+				TotalEngagedUsers: 20,
+				Languages: []*CopilotIDECodeCompletionsLanguage{
+					{
+						Name:              "python",
+						TotalEngagedUsers: 10,
+					},
+					{
+						Name:              "ruby",
+						TotalEngagedUsers: 10,
+					},
+				},
+				Editors: []*CopilotIDECodeCompletionsEditor{
+					{
+						Name:              "vscode",
+						TotalEngagedUsers: 13,
+						Models: []*CopilotIDECodeCompletionsModel{
+							{
+								Name:                    "default",
+								IsCustomModel:           false,
+								CustomModelTrainingDate: nil,
+								TotalEngagedUsers:       13,
+								Languages: []*CopilotIDECodeCompletionsModelLanguage{
+									{
+										Name:                    "python",
+										TotalEngagedUsers:       6,
+										TotalCodeSuggestions:    249,
+										TotalCodeAcceptances:    123,
+										TotalCodeLinesSuggested: 225,
+										TotalCodeLinesAccepted:  135,
+									},
+									{
+										Name:                    "ruby",
+										TotalEngagedUsers:       7,
+										TotalCodeSuggestions:    496,
+										TotalCodeAcceptances:    253,
+										TotalCodeLinesSuggested: 520,
+										TotalCodeLinesAccepted:  270,
+									},
+								},
+							},
+						},
+					},
+					{
+						Name:              "neovim",
+						TotalEngagedUsers: 7,
+						Models: []*CopilotIDECodeCompletionsModel{
+							{
+								Name:                    "a-custom-model",
+								IsCustomModel:           true,
+								CustomModelTrainingDate: new("2024-02-01"),
+								Languages: []*CopilotIDECodeCompletionsModelLanguage{
+									{
+										Name:                    "typescript",
+										TotalEngagedUsers:       3,
+										TotalCodeSuggestions:    112,
+										TotalCodeAcceptances:    56,
+										TotalCodeLinesSuggested: 143,
+										TotalCodeLinesAccepted:  61,
+									},
+									{
+										Name:                    "go",
+										TotalEngagedUsers:       4,
+										TotalCodeSuggestions:    132,
+										TotalCodeAcceptances:    67,
+										TotalCodeLinesSuggested: 154,
+										TotalCodeLinesAccepted:  72,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			CopilotIDEChat: &CopilotIDEChat{
+				TotalEngagedUsers: 13,
+				Editors: []*CopilotIDEChatEditor{
+					{
+						Name:              "vscode",
+						TotalEngagedUsers: 13,
+						Models: []*CopilotIDEChatModel{
+							{
+								Name:                     "default",
+								IsCustomModel:            false,
+								CustomModelTrainingDate:  nil,
+								TotalEngagedUsers:        12,
+								TotalChats:               45,
+								TotalChatInsertionEvents: 12,
+								TotalChatCopyEvents:      16,
+							},
+							{
+								Name:                     "a-custom-model",
+								IsCustomModel:            true,
+								CustomModelTrainingDate:  new("2024-02-01"),
+								TotalEngagedUsers:        1,
+								TotalChats:               10,
+								TotalChatInsertionEvents: 11,
+								TotalChatCopyEvents:      3,
+							},
+						},
+					},
+				},
+			},
+			CopilotDotcomChat: &CopilotDotcomChat{
+				TotalEngagedUsers: 14,
+				Models: []*CopilotDotcomChatModel{
+					{
+						Name:                    "default",
+						IsCustomModel:           false,
+						CustomModelTrainingDate: nil,
+						TotalEngagedUsers:       14,
+						TotalChats:              38,
+					},
+				},
+			},
+			CopilotDotcomPullRequests: &CopilotDotcomPullRequests{
+				TotalEngagedUsers: 12,
+				Repositories: []*CopilotDotcomPullRequestsRepository{
+					{
+						Name:              "demo/repo1",
+						TotalEngagedUsers: 8,
+						Models: []*CopilotDotcomPullRequestsModel{
+							{
+								Name:                    "default",
+								IsCustomModel:           false,
+								CustomModelTrainingDate: nil,
+								TotalPRSummariesCreated: 6,
+								TotalEngagedUsers:       8,
+							},
+						},
+					},
+					{
+						Name:              "demo/repo2",
+						TotalEngagedUsers: 4,
+						Models: []*CopilotDotcomPullRequestsModel{
+							{
+								Name:                    "a-custom-model",
+								IsCustomModel:           true,
+								CustomModelTrainingDate: new("2024-02-01"),
+								TotalPRSummariesCreated: 10,
+								TotalEngagedUsers:       4,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationTeamMetrics returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationTeamMetrics"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationTeamMetrics(ctx, "\n", "\n", &CopilotMetricsListOptions{})
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationTeamMetrics(ctx, "o", "t", &CopilotMetricsListOptions{})
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationTeamMetrics returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetEnterpriseDailyMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/copilot/metrics/reports/enterprise-1-day", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"day": "2025-07-01"})
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"],
+			"report_day": "2025-07-01"
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &CopilotMetricsReportOptions{Day: "2025-07-01"}
+	got, _, err := client.Copilot.GetEnterpriseDailyMetricsReport(ctx, "e", opts)
+	if err != nil {
+		t.Errorf("Copilot.GetEnterpriseDailyMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotDailyMetricsReport{
+		DownloadLinks: []string{"https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"},
+		ReportDay:     "2025-07-01",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetEnterpriseDailyMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetEnterpriseDailyMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetEnterpriseDailyMetricsReport(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetEnterpriseDailyMetricsReport(ctx, "e", opts)
+		if got != nil {
+			t.Errorf("Copilot.GetEnterpriseDailyMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetEnterpriseMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/copilot/metrics/reports/enterprise-28-day/latest", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"],
+			"report_start_day": "2025-07-01",
+			"report_end_day": "2025-07-28"
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetEnterpriseMetricsReport(ctx, "e")
+	if err != nil {
+		t.Errorf("Copilot.GetEnterpriseMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotMetricsReport{
+		DownloadLinks:  []string{"https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"},
+		ReportStartDay: "2025-07-01",
+		ReportEndDay:   "2025-07-28",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetEnterpriseMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetEnterpriseMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetEnterpriseMetricsReport(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetEnterpriseMetricsReport(ctx, "e")
+		if got != nil {
+			t.Errorf("Copilot.GetEnterpriseMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetEnterpriseUsersDailyMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/copilot/metrics/reports/users-1-day", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"day": "2025-07-01"})
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"],
+			"report_day": "2025-07-01"
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &CopilotMetricsReportOptions{Day: "2025-07-01"}
+	got, _, err := client.Copilot.GetEnterpriseUsersDailyMetricsReport(ctx, "e", opts)
+	if err != nil {
+		t.Errorf("Copilot.GetEnterpriseUsersDailyMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotDailyMetricsReport{
+		DownloadLinks: []string{"https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"},
+		ReportDay:     "2025-07-01",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetEnterpriseUsersDailyMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetEnterpriseUsersDailyMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetEnterpriseUsersDailyMetricsReport(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetEnterpriseUsersDailyMetricsReport(ctx, "e", opts)
+		if got != nil {
+			t.Errorf("Copilot.GetEnterpriseUsersDailyMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetEnterpriseUsersMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/copilot/metrics/reports/users-28-day/latest", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"],
+			"report_start_day": "2025-07-01",
+			"report_end_day": "2025-07-28"
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetEnterpriseUsersMetricsReport(ctx, "e")
+	if err != nil {
+		t.Errorf("Copilot.GetEnterpriseUsersMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotMetricsReport{
+		DownloadLinks:  []string{"https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"},
+		ReportStartDay: "2025-07-01",
+		ReportEndDay:   "2025-07-28",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetEnterpriseUsersMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetEnterpriseUsersMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetEnterpriseUsersMetricsReport(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetEnterpriseUsersMetricsReport(ctx, "e")
+		if got != nil {
+			t.Errorf("Copilot.GetEnterpriseUsersMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationDailyMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/metrics/reports/organization-1-day", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"day": "2025-07-01"})
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"],
+			"report_day": "2025-07-01"
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &CopilotMetricsReportOptions{Day: "2025-07-01"}
+	got, _, err := client.Copilot.GetOrganizationDailyMetricsReport(ctx, "o", opts)
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationDailyMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotDailyMetricsReport{
+		DownloadLinks: []string{"https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"},
+		ReportDay:     "2025-07-01",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationDailyMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationDailyMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationDailyMetricsReport(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationDailyMetricsReport(ctx, "o", opts)
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationDailyMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/metrics/reports/organization-28-day/latest", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"],
+			"report_start_day": "2025-07-01",
+			"report_end_day": "2025-07-28"
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetOrganizationMetricsReport(ctx, "o")
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotMetricsReport{
+		DownloadLinks:  []string{"https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"},
+		ReportStartDay: "2025-07-01",
+		ReportEndDay:   "2025-07-28",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationMetricsReport(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationMetricsReport(ctx, "o")
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationUsersDailyMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/metrics/reports/users-1-day", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"day": "2025-07-01"})
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"],
+			"report_day": "2025-07-01"
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &CopilotMetricsReportOptions{Day: "2025-07-01"}
+	got, _, err := client.Copilot.GetOrganizationUsersDailyMetricsReport(ctx, "o", opts)
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationUsersDailyMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotDailyMetricsReport{
+		DownloadLinks: []string{"https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"},
+		ReportDay:     "2025-07-01",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationUsersDailyMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationUsersDailyMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationUsersDailyMetricsReport(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationUsersDailyMetricsReport(ctx, "o", opts)
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationUsersDailyMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationUsersMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/metrics/reports/users-28-day/latest", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"],
+			"report_start_day": "2025-07-01",
+			"report_end_day": "2025-07-28"
+		}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Copilot.GetOrganizationUsersMetricsReport(ctx, "o")
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationUsersMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotMetricsReport{
+		DownloadLinks:  []string{"https://example.com/copilot-usage-report-1.json", "https://example.com/copilot-usage-report-2.json"},
+		ReportStartDay: "2025-07-01",
+		ReportEndDay:   "2025-07-28",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationUsersMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationUsersMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationUsersMetricsReport(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationUsersMetricsReport(ctx, "o")
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationUsersMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetEnterpriseRepositoriesDailyMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/copilot/metrics/reports/repos-1-day", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"day": "2026-07-14"})
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/repos-1.json", "https://example.com/repos-2.json"],
+			"report_day": "2026-07-14"
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &CopilotMetricsReportOptions{Day: "2026-07-14"}
+	got, _, err := client.Copilot.GetEnterpriseRepositoriesDailyMetricsReport(ctx, "e", opts)
+	if err != nil {
+		t.Errorf("Copilot.GetEnterpriseRepositoriesDailyMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotDailyMetricsReport{
+		DownloadLinks: []string{"https://example.com/repos-1.json", "https://example.com/repos-2.json"},
+		ReportDay:     "2026-07-14",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetEnterpriseRepositoriesDailyMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetEnterpriseRepositoriesDailyMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetEnterpriseRepositoriesDailyMetricsReport(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetEnterpriseRepositoriesDailyMetricsReport(ctx, "e", opts)
+		if got != nil {
+			t.Errorf("Copilot.GetEnterpriseRepositoriesDailyMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationRepositoriesDailyMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/metrics/reports/repos-1-day", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"day": "2026-07-14"})
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/repos-1.json"],
+			"report_day": "2026-07-14"
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &CopilotMetricsReportOptions{Day: "2026-07-14"}
+	got, _, err := client.Copilot.GetOrganizationRepositoriesDailyMetricsReport(ctx, "o", opts)
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationRepositoriesDailyMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotDailyMetricsReport{
+		DownloadLinks: []string{"https://example.com/repos-1.json"},
+		ReportDay:     "2026-07-14",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationRepositoriesDailyMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationRepositoriesDailyMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationRepositoriesDailyMetricsReport(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationRepositoriesDailyMetricsReport(ctx, "o", opts)
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationRepositoriesDailyMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetEnterpriseUserTeamsDailyMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/copilot/metrics/reports/user-teams-1-day", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"day": "2026-05-14"})
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/user-teams-1.json", "https://example.com/user-teams-2.json"],
+			"report_day": "2026-05-14"
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &CopilotMetricsReportOptions{Day: "2026-05-14"}
+	got, _, err := client.Copilot.GetEnterpriseUserTeamsDailyMetricsReport(ctx, "e", opts)
+	if err != nil {
+		t.Errorf("Copilot.GetEnterpriseUserTeamsDailyMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotDailyMetricsReport{
+		DownloadLinks: []string{"https://example.com/user-teams-1.json", "https://example.com/user-teams-2.json"},
+		ReportDay:     "2026-05-14",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetEnterpriseUserTeamsDailyMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetEnterpriseUserTeamsDailyMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetEnterpriseUserTeamsDailyMetricsReport(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetEnterpriseUserTeamsDailyMetricsReport(ctx, "e", opts)
+		if got != nil {
+			t.Errorf("Copilot.GetEnterpriseUserTeamsDailyMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_GetOrganizationUserTeamsDailyMetricsReport(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/orgs/o/copilot/metrics/reports/user-teams-1-day", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"day": "2026-05-14"})
+		fmt.Fprint(w, `{
+			"download_links": ["https://example.com/user-teams-1.json"],
+			"report_day": "2026-05-14"
+		}`)
+	})
+
+	ctx := t.Context()
+	opts := &CopilotMetricsReportOptions{Day: "2026-05-14"}
+	got, _, err := client.Copilot.GetOrganizationUserTeamsDailyMetricsReport(ctx, "o", opts)
+	if err != nil {
+		t.Errorf("Copilot.GetOrganizationUserTeamsDailyMetricsReport returned error: %v", err)
+	}
+
+	want := &CopilotDailyMetricsReport{
+		DownloadLinks: []string{"https://example.com/user-teams-1.json"},
+		ReportDay:     "2026-05-14",
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.GetOrganizationUserTeamsDailyMetricsReport returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetOrganizationUserTeamsDailyMetricsReport"
+
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Copilot.GetOrganizationUserTeamsDailyMetricsReport(ctx, "\n", opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Copilot.GetOrganizationUserTeamsDailyMetricsReport(ctx, "o", opts)
+		if got != nil {
+			t.Errorf("Copilot.GetOrganizationUserTeamsDailyMetricsReport returned %+v, want nil", got)
+		}
+		return resp, err
+	})
+}
+
+func TestCopilotService_DownloadCopilotMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/path/to/download", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `[{
+			"date": "2023-01-01",
+			"total_active_users": 100,
+			"total_engaged_users": 50,
+			"copilot_ide_code_completions": {
+				"total_engaged_users": 50,
+				"languages": [
+					{
+						"name": "go",
+						"total_engaged_users": 10
+					}
+				],
+				"editors": [
+					{
+						"name": "vscode",
+						"total_engaged_users": 10,
+						"models": [
+							{
+								"name": "model1",
+								"is_custom_model": false,
+								"custom_model_training_date": null,
+								"total_engaged_users": 10,
+								"languages": [
+									{
+										"name": "go",
+										"total_engaged_users": 10,
+										"total_code_suggestions": 100,
+										"total_code_acceptances": 50,
+										"total_code_lines_suggested": 1000,
+										"total_code_lines_accepted": 500
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		}]`)
+	})
+
+	ctx := t.Context()
+	url := client.baseURL.String() + "path/to/download"
+	got, resp, err := client.Copilot.DownloadCopilotMetrics(ctx, url)
+	if err != nil {
+		t.Errorf("Copilot.DownloadCopilotMetrics returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Copilot.DownloadCopilotMetrics returned status code: %v", resp.StatusCode)
+	}
+
+	want := []*CopilotMetrics{
+		{
+			Date:              "2023-01-01",
+			TotalActiveUsers:  new(100),
+			TotalEngagedUsers: new(50),
+			CopilotIDECodeCompletions: &CopilotIDECodeCompletions{
+				TotalEngagedUsers: 50,
+				Languages: []*CopilotIDECodeCompletionsLanguage{
+					{
+						Name:              "go",
+						TotalEngagedUsers: 10,
+					},
+				},
+				Editors: []*CopilotIDECodeCompletionsEditor{
+					{
+						Name:              "vscode",
+						TotalEngagedUsers: 10,
+						Models: []*CopilotIDECodeCompletionsModel{
+							{
+								Name:              "model1",
+								IsCustomModel:     false,
+								TotalEngagedUsers: 10,
+								Languages: []*CopilotIDECodeCompletionsModelLanguage{
+									{
+										Name:                    "go",
+										TotalEngagedUsers:       10,
+										TotalCodeSuggestions:    100,
+										TotalCodeAcceptances:    50,
+										TotalCodeLinesSuggested: 1000,
+										TotalCodeLinesAccepted:  500,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.DownloadCopilotMetrics returned %+v, want %+v", got, want)
+	}
+
+	// Test unexpected status code
+	mux.HandleFunc("/path/to/download/error", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	urlErr := client.baseURL.String() + "path/to/download/error"
+	_, _, err = client.Copilot.DownloadCopilotMetrics(ctx, urlErr)
+	if err == nil {
+		t.Error("Copilot.DownloadCopilotMetrics expected error but got none")
+	}
+
+	// Test invalid URL (fails http.NewRequestWithContext)
+	_, _, err = client.Copilot.DownloadCopilotMetrics(ctx, "\n")
+	if err == nil {
+		t.Error("Copilot.DownloadCopilotMetrics expected error for invalid URL, got none")
+	}
+
+	// Test invalid scheme (fails client.Do)
+	_, _, err = client.Copilot.DownloadCopilotMetrics(ctx, "invalid-scheme://test")
+	if err == nil {
+		t.Error("Copilot.DownloadCopilotMetrics expected error for invalid scheme, got none")
+	}
+
+	// Test json decoding error
+	mux.HandleFunc("/path/to/download/badjson", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `[{invalid JSON`)
+	})
+	urlBadJSON := client.baseURL.String() + "path/to/download/badjson"
+	_, _, err = client.Copilot.DownloadCopilotMetrics(ctx, urlBadJSON)
+	if err == nil {
+		t.Error("Copilot.DownloadCopilotMetrics expected error for bad JSON, got none")
+	}
+}
+
+// downloadFunc adapts a Download*Metrics method whose decoded payload the table
+// below does not inspect into the error-only shape it runs. Each method returns a
+// different type, so the shared signature is what lets one case list them all.
+func downloadFunc[V any](f func(context.Context, string) (V, *Response, error)) func(context.Context, string) error {
+	return func(ctx context.Context, url string) error {
+		_, _, err := f(ctx, url)
+		return err
+	}
+}
+
+// TestCopilotService_DownloadMetrics_ForeignHostGetsNoCredentials covers the
+// download helpers whose URL comes straight out of a report response, and which
+// therefore may name any host: DownloadCopilotMetrics, and the fetchMetricsReport
+// backed Download*Metrics methods. The client attaches its token only to its own
+// configured origins, so a download link naming some other host is fetched
+// unauthenticated. That is a property of the client's credential wrapper rather
+// than of any one of these methods, which is why none of them needs a host check
+// of its own.
+func TestCopilotService_DownloadMetrics_ForeignHostGetsNoCredentials(t *testing.T) {
+	t.Parallel()
+	client, _, _ := setup(t)
+
+	authedClient, err := client.Clone(WithAuthToken("secret-token"))
+	if err != nil {
+		t.Fatalf("Client.Clone returned error: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		// payload is what the foreign host serves. The methods do not all decode
+		// the same shape, so each case carries one its method can parse: a case
+		// then fails on the header and not on a decode error.
+		payload  string
+		download func(ctx context.Context, url string) error
+	}{
+		{"DownloadCopilotMetrics decodes a JSON array", `[]`, downloadFunc(authedClient.Copilot.DownloadCopilotMetrics)},
+		{"DownloadDailyMetrics decodes a JSON object", `{}`, downloadFunc(authedClient.Copilot.DownloadDailyMetrics)},
+		{"DownloadPeriodicMetrics decodes a JSON object", `{}`, downloadFunc(authedClient.Copilot.DownloadPeriodicMetrics)},
+		{"DownloadUserDailyMetrics decodes NDJSON", `{}`, downloadFunc(authedClient.Copilot.DownloadUserDailyMetrics)},
+		{"DownloadUserPeriodicMetrics decodes NDJSON", `{}`, downloadFunc(authedClient.Copilot.DownloadUserPeriodicMetrics)},
+		{"DownloadRepositoryDailyMetrics decodes NDJSON", `{}`, downloadFunc(authedClient.Copilot.DownloadRepositoryDailyMetrics)},
+		{"DownloadUserTeamsDailyMetrics decodes NDJSON", `{}`, downloadFunc(authedClient.Copilot.DownloadUserTeamsDailyMetrics)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			auth := make(chan string, 1)
+			foreign := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				select {
+				case auth <- r.Header.Get("Authorization"):
+				default:
+				}
+				fmt.Fprint(w, tt.payload)
+			}))
+			t.Cleanup(foreign.Close)
+
+			if err := tt.download(t.Context(), foreign.URL+"/path/to/report"); err != nil {
+				t.Fatalf("download returned error: %v", err)
+			}
+			assertRecordedAuthHeader(t, auth, "")
+		})
+	}
+}
+
+func TestCopilotService_DownloadDailyMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/path/to/daily", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"day": "2026-04-01",
+			"organization_id": "123",
+			"daily_active_cli_users": 2,
+			"daily_active_copilot_app_users": 1,
+			"daily_active_users": 10,
+			"daily_active_copilot_code_review_users": 3,
+			"daily_passive_copilot_code_review_users": 1,
+			"weekly_active_users": 20,
+			"weekly_active_copilot_code_review_users": 8,
+			"weekly_passive_copilot_code_review_users": 2,
+			"monthly_active_users": 30,
+			"monthly_active_copilot_code_review_users": 15,
+			"monthly_passive_copilot_code_review_users": 4,
+			"chat_panel_ask_mode": 4,
+			"totals_by_ide": [
+				{"ide": "vscode", "user_initiated_interaction_count": 5, "loc_added_sum": 100}
+			],
+			"totals_by_feature": [
+				{"feature": "completion", "user_initiated_interaction_count": 5},
+				{"feature": "agent_edit", "loc_added_sum": 7, "loc_deleted_sum": 2}
+			],
+			"totals_by_language_feature": [
+				{"language": "go", "feature": "completion", "code_generation_activity_count": 3}
+			],
+			"totals_by_language_model": [
+				{"language": "go", "model": "m1", "code_generation_activity_count": 3}
+			],
+			"totals_by_model_feature": [
+				{"model": "m1", "feature": "completion", "user_initiated_interaction_count": 5}
+			],
+			"totals_by_cli": {
+				"session_count": 3,
+				"request_count": 4,
+				"prompt_count": 2,
+				"token_usage": {
+					"avg_tokens_per_request": 4123.5,
+					"output_tokens_sum": 7000,
+					"prompt_tokens_sum": 9494
+				}
+			},
+			"totals_by_copilot_app": {
+				"session_count": 2,
+				"request_count": 6,
+				"prompt_count": 3,
+				"token_usage": {
+					"avg_tokens_per_request": 150.0,
+					"output_tokens_sum": 600,
+					"prompt_tokens_sum": 300
+				}
+			},
+			"totals_by_3rd_party_agent": [
+				{
+					"agent_name": "Claude",
+					"agent_id": "claude",
+					"user_initiated_interaction_count": 8,
+					"session_count": 3
+				}
+			],
+			"totals_by_ai_adoption_phase": [
+				{
+					"phase": "Phase 1",
+					"phase_number": 1,
+					"total_engaged_users": 4,
+					"avg_user_initiated_interactions": 1.5,
+					"avg_code_generation_activities": 2.0,
+					"avg_code_acceptance_activities": 1.0,
+					"avg_loc_added": 22.0,
+					"avg_loc_deleted": 0.0,
+					"avg_pull_requests_reviewed": 0.5,
+					"avg_pull_requests_created": 1.0,
+					"avg_pull_requests_merged": 1.0,
+					"total_pull_requests_merged": 4,
+					"avg_pull_requests_median_minutes_to_merge": 2.5,
+					"avg_pull_requests_minutes_to_review": 1.5,
+					"avg_pull_requests_review_cycles": 1.0
+				}
+			],
+			"loc_added_sum": 100,
+			"pull_requests": {
+				"total_reviewed": 1,
+				"total_created": 2,
+				"median_minutes_to_merge": 12.5,
+				"median_minutes_to_merge_copilot_authored": 4.5,
+				"median_minutes_to_merge_copilot_reviewed": 6.5
+			}
+		}`)
+	})
+
+	ctx := t.Context()
+	url := client.baseURL.String() + "path/to/daily"
+	got, resp, err := client.Copilot.DownloadDailyMetrics(ctx, url)
+	if err != nil {
+		t.Errorf("Copilot.DownloadDailyMetrics returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Copilot.DownloadDailyMetrics returned status code: %v", resp.StatusCode)
+	}
+
+	want := &CopilotDailyMetrics{
+		Day:                                  "2026-04-01",
+		OrganizationID:                       new("123"),
+		DailyActiveCLIUsers:                  new(2),
+		DailyActiveCopilotAppUsers:           new(1),
+		DailyActiveUsers:                     new(10),
+		DailyActiveCopilotCodeReviewUsers:    new(3),
+		DailyPassiveCopilotCodeReviewUsers:   new(1),
+		WeeklyActiveUsers:                    new(20),
+		WeeklyActiveCopilotCodeReviewUsers:   new(8),
+		WeeklyPassiveCopilotCodeReviewUsers:  new(2),
+		MonthlyActiveUsers:                   new(30),
+		MonthlyActiveCopilotCodeReviewUsers:  new(15),
+		MonthlyPassiveCopilotCodeReviewUsers: new(4),
+		CopilotMetricsChatPanel: CopilotMetricsChatPanel{
+			ChatPanelAskMode: new(4),
+		},
+		TotalsByIDE: []*CopilotMetricsIDE{
+			{IDE: "vscode", UserInitiatedInteractionCount: new(5), CopilotMetricsCodeActivity: CopilotMetricsCodeActivity{LOCAddedSum: new(100)}},
+		},
+		TotalsByFeature: []*CopilotMetricsFeature{
+			{Feature: "completion", UserInitiatedInteractionCount: new(5)},
+			{Feature: "agent_edit", CopilotMetricsCodeActivity: CopilotMetricsCodeActivity{LOCAddedSum: new(7), LOCDeletedSum: new(2)}},
+		},
+		TotalsByLanguageFeature: []*CopilotMetricsLanguageFeature{
+			{Language: "go", Feature: "completion", CopilotMetricsCodeActivity: CopilotMetricsCodeActivity{CodeGenerationActivityCount: new(3)}},
+		},
+		TotalsByLanguageModel: []*CopilotMetricsLanguageModel{
+			{Language: "go", Model: "m1", CopilotMetricsCodeActivity: CopilotMetricsCodeActivity{CodeGenerationActivityCount: new(3)}},
+		},
+		TotalsByModelFeature: []*CopilotMetricsModelFeature{
+			{Model: "m1", Feature: "completion", UserInitiatedInteractionCount: new(5)},
+		},
+		TotalsByCLI: &CopilotMetricsCLI{
+			SessionCount: new(3),
+			RequestCount: new(4),
+			PromptCount:  new(2),
+			TokenUsage: &CopilotMetricsCLITokenUsage{
+				AvgTokensPerRequest: new(4123.5),
+				OutputTokensSum:     new(7000),
+				PromptTokensSum:     new(9494),
+			},
+		},
+		TotalsByCopilotApp: &CopilotMetricsCopilotApp{
+			SessionCount: new(2),
+			RequestCount: new(6),
+			PromptCount:  new(3),
+			TokenUsage: &CopilotMetricsCopilotAppTokenUsage{
+				AvgTokensPerRequest: new(150.0),
+				OutputTokensSum:     new(600),
+				PromptTokensSum:     new(300),
+			},
+		},
+		TotalsBy3rdPartyAgent: []*CopilotMetricsThirdPartyAgent{
+			{
+				AgentName:                     "Claude",
+				AgentID:                       "claude",
+				UserInitiatedInteractionCount: new(8),
+				SessionCount:                  new(3),
+			},
+		},
+		TotalsByAIAdoptionPhase: []*CopilotMetricsAIAdoptionPhaseTotals{
+			{
+				Phase:                               "Phase 1",
+				PhaseNumber:                         1,
+				TotalEngagedUsers:                   4,
+				AvgUserInitiatedInteractions:        1.5,
+				AvgCodeGenerationActivities:         2.0,
+				AvgCodeAcceptanceActivities:         1.0,
+				AvgLOCAdded:                         22.0,
+				AvgLOCDeleted:                       0.0,
+				AvgPullRequestsReviewed:             0.5,
+				AvgPullRequestsCreated:              1.0,
+				AvgPullRequestsMerged:               1.0,
+				TotalPullRequestsMerged:             4,
+				AvgPullRequestsMedianMinutesToMerge: 2.5,
+				AvgPullRequestsMinutesToReview:      1.5,
+				AvgPullRequestsReviewCycles:         1.0,
+			},
+		},
+		LOCAddedSum: new(100),
+		PullRequests: &CopilotMetricsPullRequests{
+			TotalReviewed:                       new(1),
+			TotalCreated:                        new(2),
+			MedianMinutesToMerge:                new(12.5),
+			MedianMinutesToMergeCopilotAuthored: new(4.5),
+			MedianMinutesToMergeCopilotReviewed: new(6.5),
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.DownloadDailyMetrics returned %+v, want %+v", got, want)
+	}
+
+	mux.HandleFunc("/path/to/daily/error", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		w.WriteHeader(http.StatusNotFound)
+	})
+	if _, _, err := client.Copilot.DownloadDailyMetrics(ctx, client.baseURL.String()+"path/to/daily/error"); err == nil {
+		t.Error("Copilot.DownloadDailyMetrics expected error but got none")
+	}
+	if _, _, err := client.Copilot.DownloadDailyMetrics(ctx, "\n"); err == nil {
+		t.Error("Copilot.DownloadDailyMetrics expected error for invalid URL, got none")
+	}
+	if _, _, err := client.Copilot.DownloadDailyMetrics(ctx, "invalid-scheme://test"); err == nil {
+		t.Error("Copilot.DownloadDailyMetrics expected error for invalid scheme, got none")
+	}
+
+	mux.HandleFunc("/path/to/daily/badjson", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{invalid`)
+	})
+	if _, _, err := client.Copilot.DownloadDailyMetrics(ctx, client.baseURL.String()+"path/to/daily/badjson"); err == nil {
+		t.Error("Copilot.DownloadDailyMetrics expected error for bad JSON, got none")
+	}
+}
+
+// CheckResponse substitutes resp.Body with a re-readable copy on error
+// responses; fetchMetricsReport must still close the original body it replaces.
+func TestCopilotService_fetchMetricsReport_closesOriginalBodyOnErrorResponse(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/path/to/daily", func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"message":"Bad Request"}`, 400)
+	})
+
+	var closed bool
+	base := client.client.Transport
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	client.client.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		resp, err := base.RoundTrip(req)
+		if resp != nil {
+			resp.Body = &closeRecorder{ReadCloser: resp.Body, closed: &closed}
+		}
+		return resp, err
+	})
+
+	ctx := t.Context()
+	if _, _, err := client.Copilot.DownloadDailyMetrics(ctx, client.baseURL.String()+"path/to/daily"); err == nil {
+		t.Fatal("Copilot.DownloadDailyMetrics expected error but got none")
+	}
+	if !closed {
+		t.Error("original response body was not closed on an error response")
+	}
+}
+
+func TestCopilotService_DownloadPeriodicMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/path/to/periodic", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"report_start_day": "2026-03-05",
+			"report_end_day": "2026-04-01",
+			"organization_id": "123",
+			"created_at": `+refTimeStr(1136178000)+`,
+			"day_totals": [
+				{
+					"day": "2026-03-05",
+					"daily_active_cli_users": 2,
+					"daily_active_copilot_app_users": 1,
+					"daily_active_users": 5,
+					"daily_active_copilot_code_review_users": 2,
+					"daily_passive_copilot_code_review_users": 1,
+					"weekly_active_copilot_code_review_users": 6,
+					"monthly_active_copilot_code_review_users": 12,
+					"totals_by_cli": {
+						"session_count": 1,
+						"request_count": 2,
+						"prompt_count": 1,
+						"token_usage": {
+							"avg_tokens_per_request": 4000.0,
+							"output_tokens_sum": 5000,
+							"prompt_tokens_sum": 3000
+						}
+					},
+					"totals_by_copilot_app": {
+						"session_count": 1,
+						"request_count": 2,
+						"prompt_count": 1,
+						"token_usage": {
+							"avg_tokens_per_request": 800.0,
+							"output_tokens_sum": 400,
+							"prompt_tokens_sum": 400
+						}
+					},
+					"pull_requests": {
+						"median_minutes_to_merge": 8.5,
+						"median_minutes_to_merge_copilot_authored": 5.0,
+						"median_minutes_to_merge_copilot_reviewed": 7.0
+					}
+				},
+				{"day": "2026-03-06", "daily_active_users": 7}
+			]
+		}`)
+	})
+
+	ctx := t.Context()
+	url := client.baseURL.String() + "path/to/periodic"
+	got, resp, err := client.Copilot.DownloadPeriodicMetrics(ctx, url)
+	if err != nil {
+		t.Errorf("Copilot.DownloadPeriodicMetrics returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Copilot.DownloadPeriodicMetrics returned status code: %v", resp.StatusCode)
+	}
+
+	want := &CopilotPeriodicMetrics{
+		ReportStartDay: "2026-03-05",
+		ReportEndDay:   "2026-04-01",
+		OrganizationID: new("123"),
+		CreatedAt:      refTimestamp(1136178000),
+		DayTotals: []*CopilotDailyMetrics{
+			{
+				Day:                                 "2026-03-05",
+				DailyActiveCLIUsers:                 new(2),
+				DailyActiveCopilotAppUsers:          new(1),
+				DailyActiveUsers:                    new(5),
+				DailyActiveCopilotCodeReviewUsers:   new(2),
+				DailyPassiveCopilotCodeReviewUsers:  new(1),
+				WeeklyActiveCopilotCodeReviewUsers:  new(6),
+				MonthlyActiveCopilotCodeReviewUsers: new(12),
+				TotalsByCLI: &CopilotMetricsCLI{
+					SessionCount: new(1),
+					RequestCount: new(2),
+					PromptCount:  new(1),
+					TokenUsage: &CopilotMetricsCLITokenUsage{
+						AvgTokensPerRequest: new(4000.0),
+						OutputTokensSum:     new(5000),
+						PromptTokensSum:     new(3000),
+					},
+				},
+				TotalsByCopilotApp: &CopilotMetricsCopilotApp{
+					SessionCount: new(1),
+					RequestCount: new(2),
+					PromptCount:  new(1),
+					TokenUsage: &CopilotMetricsCopilotAppTokenUsage{
+						AvgTokensPerRequest: new(800.0),
+						OutputTokensSum:     new(400),
+						PromptTokensSum:     new(400),
+					},
+				},
+				PullRequests: &CopilotMetricsPullRequests{
+					MedianMinutesToMerge:                new(8.5),
+					MedianMinutesToMergeCopilotAuthored: new(5.0),
+					MedianMinutesToMergeCopilotReviewed: new(7.0),
+				},
+			},
+			{Day: "2026-03-06", DailyActiveUsers: new(7)},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.DownloadPeriodicMetrics returned %+v, want %+v", got, want)
+	}
+
+	mux.HandleFunc("/path/to/periodic/error", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		w.WriteHeader(http.StatusNotFound)
+	})
+	if _, _, err := client.Copilot.DownloadPeriodicMetrics(ctx, client.baseURL.String()+"path/to/periodic/error"); err == nil {
+		t.Error("Copilot.DownloadPeriodicMetrics expected error but got none")
+	}
+	if _, _, err := client.Copilot.DownloadPeriodicMetrics(ctx, "\n"); err == nil {
+		t.Error("Copilot.DownloadPeriodicMetrics expected error for invalid URL, got none")
+	}
+	if _, _, err := client.Copilot.DownloadPeriodicMetrics(ctx, "invalid-scheme://test"); err == nil {
+		t.Error("Copilot.DownloadPeriodicMetrics expected error for invalid scheme, got none")
+	}
+
+	mux.HandleFunc("/path/to/periodic/badjson", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{invalid`)
+	})
+	if _, _, err := client.Copilot.DownloadPeriodicMetrics(ctx, client.baseURL.String()+"path/to/periodic/badjson"); err == nil {
+		t.Error("Copilot.DownloadPeriodicMetrics expected error for bad JSON, got none")
+	}
+}
+
+func TestCopilotService_DownloadUserDailyMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/path/to/users-daily", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{"user_id":1,"user_login":"alice","day":"2026-04-01","ai_credits_used":12.5,"user_initiated_interaction_count":5,"chat_panel_edit_mode":2,"used_chat":true,"used_cli":true,"used_copilot_app":true,"used_copilot_cloud_agent":false,"used_copilot_coding_agent":false,"used_copilot_code_review_active":true,"ai_adoption_phase":{"phase":"Phase 2","phase_number":2,"version":"v1"},"totals_by_cli":{"session_count":2,"request_count":2,"prompt_count":1,"last_known_cli_version":{"sampled_at":`+referenceTimeStr+`,"cli_version":"1.0.8"}},"totals_by_copilot_app":{"session_count":1,"request_count":4,"prompt_count":2,"token_usage":{"avg_tokens_per_request":150.0,"output_tokens_sum":100,"prompt_tokens_sum":50}},"totals_by_ide":[{"ide":"vscode","user_initiated_interaction_count":5,"last_known_plugin_version":{"sampled_at":`+referenceTimeStr+`,"plugin":"copilot","plugin_version":"1.0.0"},"last_known_ide_version":{"sampled_at":`+referenceTimeStr+`,"ide_version":"1.90"}}],"totals_by_3rd_party_agent":[{"agent_name":"Claude","agent_id":"claude","user_initiated_interaction_count":2}]}
+{"user_id":2,"user_login":"bob","day":"2026-04-01","used_agent":true,"used_copilot_code_review_passive":true}
+`)
+	})
+
+	ctx := t.Context()
+	url := client.baseURL.String() + "path/to/users-daily"
+	got, resp, err := client.Copilot.DownloadUserDailyMetrics(ctx, url)
+	if err != nil {
+		t.Errorf("Copilot.DownloadUserDailyMetrics returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Copilot.DownloadUserDailyMetrics returned status code: %v", resp.StatusCode)
+	}
+
+	want := []*CopilotUserDailyMetrics{
+		{
+			UserID:                        1,
+			UserLogin:                     "alice",
+			Day:                           "2026-04-01",
+			AICreditsUsed:                 new(12.5),
+			UserInitiatedInteractionCount: new(5),
+			CopilotMetricsChatPanel: CopilotMetricsChatPanel{
+				ChatPanelEditMode: new(2),
+			},
+			UsedChat:                    new(true),
+			UsedCLI:                     new(true),
+			UsedCopilotApp:              new(true),
+			UsedCopilotCloudAgent:       new(false),
+			UsedCopilotCodingAgent:      new(false),
+			UsedCopilotCodeReviewActive: new(true),
+			AIAdoptionPhase: &CopilotMetricsAIAdoptionPhase{
+				Phase:       "Phase 2",
+				PhaseNumber: 2,
+				Version:     "v1",
+			},
+			TotalsByCLI: &CopilotMetricsCLI{
+				SessionCount: new(2),
+				RequestCount: new(2),
+				PromptCount:  new(1),
+				LastKnownCLIVersion: &CopilotMetricsCLIVersion{
+					SampledAt:  &referenceTimestamp,
+					CLIVersion: "1.0.8",
+				},
+			},
+			TotalsByCopilotApp: &CopilotMetricsCopilotApp{
+				SessionCount: new(1),
+				RequestCount: new(4),
+				PromptCount:  new(2),
+				TokenUsage: &CopilotMetricsCopilotAppTokenUsage{
+					AvgTokensPerRequest: new(150.0),
+					OutputTokensSum:     new(100),
+					PromptTokensSum:     new(50),
+				},
+			},
+			TotalsByIDE: []*CopilotUserMetricsIDE{
+				{
+					IDE:                           "vscode",
+					UserInitiatedInteractionCount: new(5),
+					LastKnownPluginVersion: &CopilotUserMetricsPluginVersion{
+						SampledAt:     &referenceTimestamp,
+						Plugin:        "copilot",
+						PluginVersion: "1.0.0",
+					},
+					LastKnownIDEVersion: &CopilotUserMetricsIDEVersion{
+						SampledAt:  &referenceTimestamp,
+						IDEVersion: "1.90",
+					},
+				},
+			},
+			TotalsBy3rdPartyAgent: []*CopilotMetricsThirdPartyAgent{
+				{
+					AgentName:                     "Claude",
+					AgentID:                       "claude",
+					UserInitiatedInteractionCount: new(2),
+				},
+			},
+		},
+		{
+			UserID:                       2,
+			UserLogin:                    "bob",
+			Day:                          "2026-04-01",
+			UsedAgent:                    new(true),
+			UsedCopilotCodeReviewPassive: new(true),
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.DownloadUserDailyMetrics returned %+v, want %+v", got, want)
+	}
+
+	// Empty body parses to a nil slice (no records).
+	mux.HandleFunc("/path/to/users-daily/empty", func(_ http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+	})
+	gotEmpty, _, err := client.Copilot.DownloadUserDailyMetrics(ctx, client.baseURL.String()+"path/to/users-daily/empty")
+	if err != nil {
+		t.Errorf("Copilot.DownloadUserDailyMetrics empty body returned error: %v", err)
+	}
+	if gotEmpty != nil {
+		t.Errorf("Copilot.DownloadUserDailyMetrics empty body returned %+v, want nil", gotEmpty)
+	}
+
+	mux.HandleFunc("/path/to/users-daily/error", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		w.WriteHeader(http.StatusNotFound)
+	})
+	if _, _, err := client.Copilot.DownloadUserDailyMetrics(ctx, client.baseURL.String()+"path/to/users-daily/error"); err == nil {
+		t.Error("Copilot.DownloadUserDailyMetrics expected error but got none")
+	}
+	if _, _, err := client.Copilot.DownloadUserDailyMetrics(ctx, "\n"); err == nil {
+		t.Error("Copilot.DownloadUserDailyMetrics expected error for invalid URL, got none")
+	}
+	if _, _, err := client.Copilot.DownloadUserDailyMetrics(ctx, "invalid-scheme://test"); err == nil {
+		t.Error("Copilot.DownloadUserDailyMetrics expected error for invalid scheme, got none")
+	}
+
+	// A malformed line causes the stream decode to fail.
+	mux.HandleFunc("/path/to/users-daily/badjson", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, "{\"user_id\":1,\"day\":\"2026-04-01\"}\n{bad\n")
+	})
+	if _, _, err := client.Copilot.DownloadUserDailyMetrics(ctx, client.baseURL.String()+"path/to/users-daily/badjson"); err == nil {
+		t.Error("Copilot.DownloadUserDailyMetrics expected error for bad JSON, got none")
+	}
+}
+
+func TestCopilotService_DownloadUserPeriodicMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/path/to/users-periodic", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{"report_start_day":"2026-03-05","report_end_day":"2026-04-01","day":"2026-03-05","user_id":1,"user_login":"alice","ai_credits_used":3.25,"user_initiated_interaction_count":3,"used_copilot_code_review_active":true,"ai_adoption_phase":{"phase":"Phase 1","phase_number":1,"version":"v1"}}
+{"report_start_day":"2026-03-05","report_end_day":"2026-04-01","day":"2026-03-06","user_id":1,"user_login":"alice","used_cli":true,"used_copilot_app":true,"used_copilot_cloud_agent":true,"used_copilot_coding_agent":true,"used_copilot_code_review_passive":true,"totals_by_cli":{"session_count":1,"request_count":3,"prompt_count":2,"token_usage":{"avg_tokens_per_request":1200.5,"output_tokens_sum":2400,"prompt_tokens_sum":1201}},"totals_by_copilot_app":{"session_count":2,"request_count":5,"prompt_count":3,"token_usage":{"avg_tokens_per_request":900.0,"output_tokens_sum":1500,"prompt_tokens_sum":1500}}}
+`)
+	})
+
+	ctx := t.Context()
+	url := client.baseURL.String() + "path/to/users-periodic"
+	got, resp, err := client.Copilot.DownloadUserPeriodicMetrics(ctx, url)
+	if err != nil {
+		t.Errorf("Copilot.DownloadUserPeriodicMetrics returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Copilot.DownloadUserPeriodicMetrics returned status code: %v", resp.StatusCode)
+	}
+
+	want := []*CopilotUserPeriodicMetrics{
+		{
+			ReportStartDay:                "2026-03-05",
+			ReportEndDay:                  "2026-04-01",
+			Day:                           "2026-03-05",
+			UserID:                        1,
+			UserLogin:                     "alice",
+			AICreditsUsed:                 new(3.25),
+			UserInitiatedInteractionCount: new(3),
+			UsedCopilotCodeReviewActive:   new(true),
+			AIAdoptionPhase: &CopilotMetricsAIAdoptionPhase{
+				Phase:       "Phase 1",
+				PhaseNumber: 1,
+				Version:     "v1",
+			},
+		},
+		{
+			ReportStartDay:               "2026-03-05",
+			ReportEndDay:                 "2026-04-01",
+			Day:                          "2026-03-06",
+			UserID:                       1,
+			UserLogin:                    "alice",
+			UsedCLI:                      new(true),
+			UsedCopilotApp:               new(true),
+			UsedCopilotCloudAgent:        new(true),
+			UsedCopilotCodeReviewPassive: new(true),
+			UsedCopilotCodingAgent:       new(true),
+			TotalsByCLI: &CopilotMetricsCLI{
+				SessionCount: new(1),
+				RequestCount: new(3),
+				PromptCount:  new(2),
+				TokenUsage: &CopilotMetricsCLITokenUsage{
+					AvgTokensPerRequest: new(1200.5),
+					OutputTokensSum:     new(2400),
+					PromptTokensSum:     new(1201),
+				},
+			},
+			TotalsByCopilotApp: &CopilotMetricsCopilotApp{
+				SessionCount: new(2),
+				RequestCount: new(5),
+				PromptCount:  new(3),
+				TokenUsage: &CopilotMetricsCopilotAppTokenUsage{
+					AvgTokensPerRequest: new(900.0),
+					OutputTokensSum:     new(1500),
+					PromptTokensSum:     new(1500),
+				},
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.DownloadUserPeriodicMetrics returned %+v, want %+v", got, want)
+	}
+
+	// Empty body parses to a nil slice (no records).
+	mux.HandleFunc("/path/to/users-periodic/empty", func(_ http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+	})
+	gotEmpty, _, err := client.Copilot.DownloadUserPeriodicMetrics(ctx, client.baseURL.String()+"path/to/users-periodic/empty")
+	if err != nil {
+		t.Errorf("Copilot.DownloadUserPeriodicMetrics empty body returned error: %v", err)
+	}
+	if gotEmpty != nil {
+		t.Errorf("Copilot.DownloadUserPeriodicMetrics empty body returned %+v, want nil", gotEmpty)
+	}
+
+	mux.HandleFunc("/path/to/users-periodic/error", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		w.WriteHeader(http.StatusNotFound)
+	})
+	if _, _, err := client.Copilot.DownloadUserPeriodicMetrics(ctx, client.baseURL.String()+"path/to/users-periodic/error"); err == nil {
+		t.Error("Copilot.DownloadUserPeriodicMetrics expected error but got none")
+	}
+	if _, _, err := client.Copilot.DownloadUserPeriodicMetrics(ctx, "\n"); err == nil {
+		t.Error("Copilot.DownloadUserPeriodicMetrics expected error for invalid URL, got none")
+	}
+	if _, _, err := client.Copilot.DownloadUserPeriodicMetrics(ctx, "invalid-scheme://test"); err == nil {
+		t.Error("Copilot.DownloadUserPeriodicMetrics expected error for invalid scheme, got none")
+	}
+
+	mux.HandleFunc("/path/to/users-periodic/badjson", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, "{not json\n")
+	})
+	if _, _, err := client.Copilot.DownloadUserPeriodicMetrics(ctx, client.baseURL.String()+"path/to/users-periodic/badjson"); err == nil {
+		t.Error("Copilot.DownloadUserPeriodicMetrics expected error for bad JSON, got none")
+	}
+}
+
+func TestCopilotService_DownloadRepositoryDailyMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/path/to/repos-daily", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{"day":"2026-07-14","enterprise_id":"1001","organization_id":"2002","repo_id":900000001,"repo_owner_name":"octodemo-metrics","repo_name":"example-service-alpha","repo_visibility":"INTERNAL","pull_requests":{"total_reviewed":1,"total_created":1,"total_created_by_copilot":1,"total_reviewed_by_copilot":1,"total_merged":1,"median_minutes_to_merge":372.62,"total_suggestions":0,"total_applied_suggestions":0,"total_merged_created_by_copilot":1,"median_minutes_to_merge_copilot_authored":372.62,"total_copilot_suggestions":0,"total_copilot_applied_suggestions":0,"total_merged_reviewed_by_copilot":1,"median_minutes_to_merge_copilot_reviewed":372.62,"copilot_suggestions_by_comment_type":[]}}
+{"day":"2026-07-14","enterprise_id":"1001","organization_id":"2002","repo_id":900000003,"repo_owner_name":"octodemo-metrics","repo_name":"example-service-gamma","repo_visibility":"INTERNAL","pull_requests":{"total_reviewed":1,"total_created":0,"total_created_by_copilot":0,"total_reviewed_by_copilot":1,"total_merged":1,"median_minutes_to_merge":1020.53,"total_suggestions":0,"total_applied_suggestions":1,"total_merged_created_by_copilot":0,"total_copilot_suggestions":0,"total_copilot_applied_suggestions":1,"total_merged_reviewed_by_copilot":1,"median_minutes_to_merge_copilot_reviewed":1020.53,"copilot_suggestions_by_comment_type":[{"comment_type":"spelling","total_copilot_suggestions":0,"total_copilot_applied_suggestions":1}]}}
+`)
+	})
+
+	ctx := t.Context()
+	url := client.baseURL.String() + "path/to/repos-daily"
+	got, resp, err := client.Copilot.DownloadRepositoryDailyMetrics(ctx, url)
+	if err != nil {
+		t.Errorf("Copilot.DownloadRepositoryDailyMetrics returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Copilot.DownloadRepositoryDailyMetrics returned status code: %v", resp.StatusCode)
+	}
+
+	want := []*CopilotRepositoryDailyMetrics{
+		{
+			Day:            "2026-07-14",
+			EnterpriseID:   new("1001"),
+			OrganizationID: new("2002"),
+			RepoID:         900000001,
+			RepoOwnerName:  "octodemo-metrics",
+			RepoName:       "example-service-alpha",
+			RepoVisibility: "INTERNAL",
+			PullRequests: &CopilotMetricsPullRequests{
+				TotalReviewed:                       new(1),
+				TotalCreated:                        new(1),
+				TotalCreatedByCopilot:               new(1),
+				TotalReviewedByCopilot:              new(1),
+				TotalMerged:                         new(1),
+				MedianMinutesToMerge:                new(372.62),
+				TotalSuggestions:                    new(0),
+				TotalAppliedSuggestions:             new(0),
+				TotalMergedCreatedByCopilot:         new(1),
+				MedianMinutesToMergeCopilotAuthored: new(372.62),
+				TotalCopilotSuggestions:             new(0),
+				TotalCopilotAppliedSuggestions:      new(0),
+				TotalMergedReviewedByCopilot:        new(1),
+				MedianMinutesToMergeCopilotReviewed: new(372.62),
+				CopilotSuggestionsByCommentType:     []*CopilotMetricsCopilotSuggestionByCommentType{},
+			},
+		},
+		{
+			Day:            "2026-07-14",
+			EnterpriseID:   new("1001"),
+			OrganizationID: new("2002"),
+			RepoID:         900000003,
+			RepoOwnerName:  "octodemo-metrics",
+			RepoName:       "example-service-gamma",
+			RepoVisibility: "INTERNAL",
+			PullRequests: &CopilotMetricsPullRequests{
+				TotalReviewed:                       new(1),
+				TotalCreated:                        new(0),
+				TotalCreatedByCopilot:               new(0),
+				TotalReviewedByCopilot:              new(1),
+				TotalMerged:                         new(1),
+				MedianMinutesToMerge:                new(1020.53),
+				TotalSuggestions:                    new(0),
+				TotalAppliedSuggestions:             new(1),
+				TotalMergedCreatedByCopilot:         new(0),
+				TotalCopilotSuggestions:             new(0),
+				TotalCopilotAppliedSuggestions:      new(1),
+				TotalMergedReviewedByCopilot:        new(1),
+				MedianMinutesToMergeCopilotReviewed: new(1020.53),
+				CopilotSuggestionsByCommentType: []*CopilotMetricsCopilotSuggestionByCommentType{
+					{
+						CommentType:                    "spelling",
+						TotalCopilotSuggestions:        new(0),
+						TotalCopilotAppliedSuggestions: new(1),
+					},
+				},
+			},
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.DownloadRepositoryDailyMetrics returned %+v, want %+v", got, want)
+	}
+
+	mux.HandleFunc("/path/to/repos-daily/empty", func(_ http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+	})
+	gotEmpty, _, err := client.Copilot.DownloadRepositoryDailyMetrics(ctx, client.baseURL.String()+"path/to/repos-daily/empty")
+	if err != nil {
+		t.Errorf("Copilot.DownloadRepositoryDailyMetrics empty body returned error: %v", err)
+	}
+	if gotEmpty != nil {
+		t.Errorf("Copilot.DownloadRepositoryDailyMetrics empty body returned %+v, want nil", gotEmpty)
+	}
+
+	mux.HandleFunc("/path/to/repos-daily/error", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		w.WriteHeader(http.StatusNotFound)
+	})
+	if _, _, err := client.Copilot.DownloadRepositoryDailyMetrics(ctx, client.baseURL.String()+"path/to/repos-daily/error"); err == nil {
+		t.Error("Copilot.DownloadRepositoryDailyMetrics expected error but got none")
+	}
+	if _, _, err := client.Copilot.DownloadRepositoryDailyMetrics(ctx, "\n"); err == nil {
+		t.Error("Copilot.DownloadRepositoryDailyMetrics expected error for invalid URL, got none")
+	}
+	if _, _, err := client.Copilot.DownloadRepositoryDailyMetrics(ctx, "invalid-scheme://test"); err == nil {
+		t.Error("Copilot.DownloadRepositoryDailyMetrics expected error for invalid scheme, got none")
+	}
+
+	mux.HandleFunc("/path/to/repos-daily/badjson", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, "{\"repo_id\":1,\"day\":\"2026-07-14\"}\n{bad\n")
+	})
+	if _, _, err := client.Copilot.DownloadRepositoryDailyMetrics(ctx, client.baseURL.String()+"path/to/repos-daily/badjson"); err == nil {
+		t.Error("Copilot.DownloadRepositoryDailyMetrics expected error for bad JSON, got none")
+	}
+}
+
+func TestCopilotService_DownloadUserTeamsDailyMetrics(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/path/to/user-teams-daily", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{"user_id":1001,"user_login":"octocat","day":"2026-05-14","organization_id":"999","team_id":42,"slug":"frontend"}
+{"user_id":1001,"user_login":"octocat","day":"2026-05-14","organization_id":"999","team_id":43,"slug":"backend"}
+{"user_id":1002,"user_login":"hubot","day":"2026-05-14","enterprise_id":"1","team_id":9001,"slug":"eng-platform"}
+`)
+	})
+
+	ctx := t.Context()
+	url := client.baseURL.String() + "path/to/user-teams-daily"
+	got, resp, err := client.Copilot.DownloadUserTeamsDailyMetrics(ctx, url)
+	if err != nil {
+		t.Errorf("Copilot.DownloadUserTeamsDailyMetrics returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Copilot.DownloadUserTeamsDailyMetrics returned status code: %v", resp.StatusCode)
+	}
+
+	want := []*CopilotUserTeamsDailyMetrics{
+		{
+			UserID:         1001,
+			UserLogin:      "octocat",
+			Day:            "2026-05-14",
+			OrganizationID: new("999"),
+			TeamID:         42,
+			Slug:           "frontend",
+		},
+		{
+			UserID:         1001,
+			UserLogin:      "octocat",
+			Day:            "2026-05-14",
+			OrganizationID: new("999"),
+			TeamID:         43,
+			Slug:           "backend",
+		},
+		{
+			UserID:       1002,
+			UserLogin:    "hubot",
+			Day:          "2026-05-14",
+			EnterpriseID: new("1"),
+			TeamID:       9001,
+			Slug:         "eng-platform",
+		},
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("Copilot.DownloadUserTeamsDailyMetrics returned %+v, want %+v", got, want)
+	}
+
+	mux.HandleFunc("/path/to/user-teams-daily/empty", func(_ http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+	})
+	gotEmpty, _, err := client.Copilot.DownloadUserTeamsDailyMetrics(ctx, client.baseURL.String()+"path/to/user-teams-daily/empty")
+	if err != nil {
+		t.Errorf("Copilot.DownloadUserTeamsDailyMetrics empty body returned error: %v", err)
+	}
+	if gotEmpty != nil {
+		t.Errorf("Copilot.DownloadUserTeamsDailyMetrics empty body returned %+v, want nil", gotEmpty)
+	}
+
+	mux.HandleFunc("/path/to/user-teams-daily/error", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		w.WriteHeader(http.StatusNotFound)
+	})
+	if _, _, err := client.Copilot.DownloadUserTeamsDailyMetrics(ctx, client.baseURL.String()+"path/to/user-teams-daily/error"); err == nil {
+		t.Error("Copilot.DownloadUserTeamsDailyMetrics expected error but got none")
+	}
+	if _, _, err := client.Copilot.DownloadUserTeamsDailyMetrics(ctx, "\n"); err == nil {
+		t.Error("Copilot.DownloadUserTeamsDailyMetrics expected error for invalid URL, got none")
+	}
+	if _, _, err := client.Copilot.DownloadUserTeamsDailyMetrics(ctx, "invalid-scheme://test"); err == nil {
+		t.Error("Copilot.DownloadUserTeamsDailyMetrics expected error for invalid scheme, got none")
+	}
+
+	mux.HandleFunc("/path/to/user-teams-daily/badjson", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, "{\"user_id\":1,\"day\":\"2026-05-14\"}\n{bad\n")
+	})
+	if _, _, err := client.Copilot.DownloadUserTeamsDailyMetrics(ctx, client.baseURL.String()+"path/to/user-teams-daily/badjson"); err == nil {
+		t.Error("Copilot.DownloadUserTeamsDailyMetrics expected error for bad JSON, got none")
+	}
+}

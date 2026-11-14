@@ -6,19 +6,16 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestOrganizationsService_ListMembers(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/members", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -36,13 +33,13 @@ func TestOrganizationsService_ListMembers(t *testing.T) {
 		Role:        "admin",
 		ListOptions: ListOptions{Page: 2},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	members, _, err := client.Organizations.ListMembers(ctx, "o", opt)
 	if err != nil {
 		t.Errorf("Organizations.ListMembers returned error: %v", err)
 	}
 
-	want := []*User{{ID: Int64(1)}}
+	want := []*User{{ID: new(int64(1))}}
 	if !cmp.Equal(members, want) {
 		t.Errorf("Organizations.ListMembers returned %+v, want %+v", members, want)
 	}
@@ -63,17 +60,17 @@ func TestOrganizationsService_ListMembers(t *testing.T) {
 }
 
 func TestOrganizationsService_ListMembers_invalidOrg(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Organizations.ListMembers(ctx, "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestOrganizationsService_ListMembers_public(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/public_members", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -81,28 +78,28 @@ func TestOrganizationsService_ListMembers_public(t *testing.T) {
 	})
 
 	opt := &ListMembersOptions{PublicOnly: true}
-	ctx := context.Background()
+	ctx := t.Context()
 	members, _, err := client.Organizations.ListMembers(ctx, "o", opt)
 	if err != nil {
 		t.Errorf("Organizations.ListMembers returned error: %v", err)
 	}
 
-	want := []*User{{ID: Int64(1)}}
+	want := []*User{{ID: new(int64(1))}}
 	if !cmp.Equal(members, want) {
 		t.Errorf("Organizations.ListMembers returned %+v, want %+v", members, want)
 	}
 }
 
 func TestOrganizationsService_IsMember(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/members/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	member, _, err := client.Organizations.IsMember(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.IsMember returned error: %v", err)
@@ -126,17 +123,17 @@ func TestOrganizationsService_IsMember(t *testing.T) {
 	})
 }
 
-// ensure that a 404 response is interpreted as "false" and not an error
+// Ensure that a 404 response is interpreted as "false" and not an error.
 func TestOrganizationsService_IsMember_notMember(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/members/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		w.WriteHeader(http.StatusNotFound)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	member, _, err := client.Organizations.IsMember(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.IsMember returned error: %+v", err)
@@ -146,21 +143,21 @@ func TestOrganizationsService_IsMember_notMember(t *testing.T) {
 	}
 }
 
-// ensure that a 400 response is interpreted as an actual error, and not simply
-// as "false" like the above case of a 404
+// Ensure that a 400 response is interpreted as an actual error, and not simply
+// as "false" like the above case of a 404.
 func TestOrganizationsService_IsMember_error(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/members/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		http.Error(w, "BadRequest", http.StatusBadRequest)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	member, _, err := client.Organizations.IsMember(ctx, "o", "u")
 	if err == nil {
-		t.Errorf("Expected HTTP 400 response")
+		t.Error("Expected HTTP 400 response")
 	}
 	if want := false; member != want {
 		t.Errorf("Organizations.IsMember returned %+v, want %+v", member, want)
@@ -168,24 +165,24 @@ func TestOrganizationsService_IsMember_error(t *testing.T) {
 }
 
 func TestOrganizationsService_IsMember_invalidOrg(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Organizations.IsMember(ctx, "%", "u")
 	testURLParseError(t, err)
 }
 
 func TestOrganizationsService_IsPublicMember(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/public_members/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	member, _, err := client.Organizations.IsPublicMember(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.IsPublicMember returned error: %v", err)
@@ -209,17 +206,17 @@ func TestOrganizationsService_IsPublicMember(t *testing.T) {
 	})
 }
 
-// ensure that a 404 response is interpreted as "false" and not an error
+// Ensure that a 404 response is interpreted as "false" and not an error.
 func TestOrganizationsService_IsPublicMember_notMember(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/public_members/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		w.WriteHeader(http.StatusNotFound)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	member, _, err := client.Organizations.IsPublicMember(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.IsPublicMember returned error: %v", err)
@@ -229,21 +226,21 @@ func TestOrganizationsService_IsPublicMember_notMember(t *testing.T) {
 	}
 }
 
-// ensure that a 400 response is interpreted as an actual error, and not simply
-// as "false" like the above case of a 404
+// Ensure that a 400 response is interpreted as an actual error, and not simply
+// as "false" like the above case of a 404.
 func TestOrganizationsService_IsPublicMember_error(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/public_members/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		http.Error(w, "BadRequest", http.StatusBadRequest)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	member, _, err := client.Organizations.IsPublicMember(ctx, "o", "u")
 	if err == nil {
-		t.Errorf("Expected HTTP 400 response")
+		t.Error("Expected HTTP 400 response")
 	}
 	if want := false; member != want {
 		t.Errorf("Organizations.IsPublicMember returned %+v, want %+v", member, want)
@@ -251,23 +248,23 @@ func TestOrganizationsService_IsPublicMember_error(t *testing.T) {
 }
 
 func TestOrganizationsService_IsPublicMember_invalidOrg(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Organizations.IsPublicMember(ctx, "%", "u")
 	testURLParseError(t, err)
 }
 
 func TestOrganizationsService_RemoveMember(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/orgs/o/members/u", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/orgs/o/members/u", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.RemoveMember(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.RemoveMember returned error: %v", err)
@@ -284,24 +281,50 @@ func TestOrganizationsService_RemoveMember(t *testing.T) {
 	})
 }
 
-func TestOrganizationsService_RemoveMember_invalidOrg(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+func TestOrganizationsService_CancelInvite(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	ctx := context.Background()
+	mux.HandleFunc("/orgs/o/invitations/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "DELETE")
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ctx := t.Context()
+	_, err := client.Organizations.CancelInvite(ctx, "o", 1)
+	if err != nil {
+		t.Errorf("Organizations.CancelInvite returned error: %v", err)
+	}
+
+	const methodName = "CancelInvite"
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Organizations.CancelInvite(ctx, "\n", 1)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Organizations.CancelInvite(ctx, "o", 1)
+	})
+}
+
+func TestOrganizationsService_RemoveMember_invalidOrg(t *testing.T) {
+	t.Parallel()
+	client, _, _ := setup(t)
+
+	ctx := t.Context()
 	_, err := client.Organizations.RemoveMember(ctx, "%", "u")
 	testURLParseError(t, err)
 }
 
 func TestOrganizationsService_PublicizeMembership(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/orgs/o/public_members/u", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/orgs/o/public_members/u", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.PublicizeMembership(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.PublicizeMembership returned error: %v", err)
@@ -319,14 +342,14 @@ func TestOrganizationsService_PublicizeMembership(t *testing.T) {
 }
 
 func TestOrganizationsService_ConcealMembership(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/orgs/o/public_members/u", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/orgs/o/public_members/u", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.ConcealMembership(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.ConcealMembership returned error: %v", err)
@@ -344,8 +367,8 @@ func TestOrganizationsService_ConcealMembership(t *testing.T) {
 }
 
 func TestOrganizationsService_ListOrgMemberships(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/memberships/orgs", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -360,13 +383,13 @@ func TestOrganizationsService_ListOrgMemberships(t *testing.T) {
 		State:       "active",
 		ListOptions: ListOptions{Page: 2},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	memberships, _, err := client.Organizations.ListOrgMemberships(ctx, opt)
 	if err != nil {
 		t.Errorf("Organizations.ListOrgMemberships returned error: %v", err)
 	}
 
-	want := []*Membership{{URL: String("u")}}
+	want := []*Membership{{URL: new("u")}}
 	if !cmp.Equal(memberships, want) {
 		t.Errorf("Organizations.ListOrgMemberships returned %+v, want %+v", memberships, want)
 	}
@@ -382,21 +405,21 @@ func TestOrganizationsService_ListOrgMemberships(t *testing.T) {
 }
 
 func TestOrganizationsService_GetOrgMembership_AuthenticatedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/memberships/orgs/o", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"url":"u"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	membership, _, err := client.Organizations.GetOrgMembership(ctx, "", "o")
 	if err != nil {
 		t.Errorf("Organizations.GetOrgMembership returned error: %v", err)
 	}
 
-	want := &Membership{URL: String("u")}
+	want := &Membership{URL: new("u")}
 	if !cmp.Equal(membership, want) {
 		t.Errorf("Organizations.GetOrgMembership returned %+v, want %+v", membership, want)
 	}
@@ -417,51 +440,45 @@ func TestOrganizationsService_GetOrgMembership_AuthenticatedUser(t *testing.T) {
 }
 
 func TestOrganizationsService_GetOrgMembership_SpecifiedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/memberships/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"url":"u"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	membership, _, err := client.Organizations.GetOrgMembership(ctx, "u", "o")
 	if err != nil {
 		t.Errorf("Organizations.GetOrgMembership returned error: %v", err)
 	}
 
-	want := &Membership{URL: String("u")}
+	want := &Membership{URL: new("u")}
 	if !cmp.Equal(membership, want) {
 		t.Errorf("Organizations.GetOrgMembership returned %+v, want %+v", membership, want)
 	}
 }
 
 func TestOrganizationsService_EditOrgMembership_AuthenticatedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &Membership{State: String("active")}
+	input := &Membership{State: new("active")}
 
 	mux.HandleFunc("/user/memberships/orgs/o", func(w http.ResponseWriter, r *http.Request) {
-		v := new(Membership)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"url":"u"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	membership, _, err := client.Organizations.EditOrgMembership(ctx, "", "o", input)
 	if err != nil {
 		t.Errorf("Organizations.EditOrgMembership returned error: %v", err)
 	}
 
-	want := &Membership{URL: String("u")}
+	want := &Membership{URL: new("u")}
 	if !cmp.Equal(membership, want) {
 		t.Errorf("Organizations.EditOrgMembership returned %+v, want %+v", membership, want)
 	}
@@ -482,45 +499,39 @@ func TestOrganizationsService_EditOrgMembership_AuthenticatedUser(t *testing.T) 
 }
 
 func TestOrganizationsService_EditOrgMembership_SpecifiedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &Membership{State: String("active")}
+	input := &Membership{State: new("active")}
 
 	mux.HandleFunc("/orgs/o/memberships/u", func(w http.ResponseWriter, r *http.Request) {
-		v := new(Membership)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PUT")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"url":"u"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	membership, _, err := client.Organizations.EditOrgMembership(ctx, "u", "o", input)
 	if err != nil {
 		t.Errorf("Organizations.EditOrgMembership returned error: %v", err)
 	}
 
-	want := &Membership{URL: String("u")}
+	want := &Membership{URL: new("u")}
 	if !cmp.Equal(membership, want) {
 		t.Errorf("Organizations.EditOrgMembership returned %+v, want %+v", membership, want)
 	}
 }
 
 func TestOrganizationsService_RemoveOrgMembership(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/memberships/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.RemoveOrgMembership(ctx, "u", "o")
 	if err != nil {
 		t.Errorf("Organizations.RemoveOrgMembership returned error: %v", err)
@@ -538,8 +549,8 @@ func TestOrganizationsService_RemoveOrgMembership(t *testing.T) {
 }
 
 func TestOrganizationsService_ListPendingOrgInvitations(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/invitations", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -550,7 +561,7 @@ func TestOrganizationsService_ListPendingOrgInvitations(t *testing.T) {
     					"login": "monalisa",
     					"email": "octocat@github.com",
     					"role": "direct_member",
-					"created_at": "2017-01-21T00:00:00Z",
+					"created_at": `+referenceTimeStr+`,
     					"inviter": {
       						"login": "other_user",
       						"id": 1,
@@ -577,42 +588,42 @@ func TestOrganizationsService_ListPendingOrgInvitations(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 1}
-	ctx := context.Background()
+	ctx := t.Context()
 	invitations, _, err := client.Organizations.ListPendingOrgInvitations(ctx, "o", opt)
 	if err != nil {
 		t.Errorf("Organizations.ListPendingOrgInvitations returned error: %v", err)
 	}
 
-	createdAt := time.Date(2017, time.January, 21, 0, 0, 0, 0, time.UTC)
 	want := []*Invitation{
 		{
-			ID:        Int64(1),
-			Login:     String("monalisa"),
-			Email:     String("octocat@github.com"),
-			Role:      String("direct_member"),
-			CreatedAt: &createdAt,
+			ID:        new(int64(1)),
+			Login:     new("monalisa"),
+			Email:     new("octocat@github.com"),
+			Role:      new("direct_member"),
+			CreatedAt: &referenceTimestamp,
 			Inviter: &User{
-				Login:             String("other_user"),
-				ID:                Int64(1),
-				AvatarURL:         String("https://github.com/images/error/other_user_happy.gif"),
-				GravatarID:        String(""),
-				URL:               String("https://api.github.com/users/other_user"),
-				HTMLURL:           String("https://github.com/other_user"),
-				FollowersURL:      String("https://api.github.com/users/other_user/followers"),
-				FollowingURL:      String("https://api.github.com/users/other_user/following/other_user"),
-				GistsURL:          String("https://api.github.com/users/other_user/gists/gist_id"),
-				StarredURL:        String("https://api.github.com/users/other_user/starred/owner/repo"),
-				SubscriptionsURL:  String("https://api.github.com/users/other_user/subscriptions"),
-				OrganizationsURL:  String("https://api.github.com/users/other_user/orgs"),
-				ReposURL:          String("https://api.github.com/users/other_user/repos"),
-				EventsURL:         String("https://api.github.com/users/other_user/events/privacy"),
-				ReceivedEventsURL: String("https://api.github.com/users/other_user/received_events/privacy"),
-				Type:              String("User"),
-				SiteAdmin:         Bool(false),
+				Login:             new("other_user"),
+				ID:                new(int64(1)),
+				AvatarURL:         new("https://github.com/images/error/other_user_happy.gif"),
+				GravatarID:        new(""),
+				URL:               new("https://api.github.com/users/other_user"),
+				HTMLURL:           new("https://github.com/other_user"),
+				FollowersURL:      new("https://api.github.com/users/other_user/followers"),
+				FollowingURL:      new("https://api.github.com/users/other_user/following/other_user"),
+				GistsURL:          new("https://api.github.com/users/other_user/gists/gist_id"),
+				StarredURL:        new("https://api.github.com/users/other_user/starred/owner/repo"),
+				SubscriptionsURL:  new("https://api.github.com/users/other_user/subscriptions"),
+				OrganizationsURL:  new("https://api.github.com/users/other_user/orgs"),
+				ReposURL:          new("https://api.github.com/users/other_user/repos"),
+				EventsURL:         new("https://api.github.com/users/other_user/events/privacy"),
+				ReceivedEventsURL: new("https://api.github.com/users/other_user/received_events/privacy"),
+				Type:              new("User"),
+				SiteAdmin:         new(false),
 			},
-			TeamCount:         Int(2),
-			InvitationTeamURL: String("https://api.github.com/organizations/2/invitations/1/teams"),
-		}}
+			TeamCount:         new(2),
+			InvitationTeamURL: new("https://api.github.com/organizations/2/invitations/1/teams"),
+		},
+	}
 
 	if !cmp.Equal(invitations, want) {
 		t.Errorf("Organizations.ListPendingOrgInvitations returned %+v, want %+v", invitations, want)
@@ -634,38 +645,33 @@ func TestOrganizationsService_ListPendingOrgInvitations(t *testing.T) {
 }
 
 func TestOrganizationsService_CreateOrgInvitation(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
-	input := &CreateOrgInvitationOptions{
-		Email: String("octocat@github.com"),
-		Role:  String("direct_member"),
-		TeamID: []int64{
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := CreateOrgInvitationRequest{
+		Email: new("octocat@github.com"),
+		Role:  new("direct_member"),
+		TeamIDs: []int64{
 			12,
 			26,
 		},
 	}
 
 	mux.HandleFunc("/orgs/o/invitations", func(w http.ResponseWriter, r *http.Request) {
-		v := new(CreateOrgInvitationOptions)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprintln(w, `{"email": "octocat@github.com"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	invitations, _, err := client.Organizations.CreateOrgInvitation(ctx, "o", input)
 	if err != nil {
 		t.Errorf("Organizations.CreateOrgInvitation returned error: %v", err)
 	}
 
-	want := &Invitation{Email: String("octocat@github.com")}
+	want := &Invitation{Email: new("octocat@github.com")}
 	if !cmp.Equal(invitations, want) {
-		t.Errorf("Organizations.ListPendingOrgInvitations returned %+v, want %+v", invitations, want)
+		t.Errorf("Organizations.CreateOrgInvitation returned %+v, want %+v", invitations, want)
 	}
 
 	const methodName = "CreateOrgInvitation"
@@ -684,8 +690,8 @@ func TestOrganizationsService_CreateOrgInvitation(t *testing.T) {
 }
 
 func TestOrganizationsService_ListOrgInvitationTeams(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/invitations/22/teams", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -706,7 +712,7 @@ func TestOrganizationsService_ListOrgInvitationTeams(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 1}
-	ctx := context.Background()
+	ctx := t.Context()
 	invitations, _, err := client.Organizations.ListOrgInvitationTeams(ctx, "o", "22", opt)
 	if err != nil {
 		t.Errorf("Organizations.ListOrgInvitationTeams returned error: %v", err)
@@ -714,15 +720,15 @@ func TestOrganizationsService_ListOrgInvitationTeams(t *testing.T) {
 
 	want := []*Team{
 		{
-			ID:              Int64(1),
-			URL:             String("https://api.github.com/teams/1"),
-			Name:            String("Justice League"),
-			Slug:            String("justice-league"),
-			Description:     String("A great team."),
-			Privacy:         String("closed"),
-			Permission:      String("admin"),
-			MembersURL:      String("https://api.github.com/teams/1/members{/member}"),
-			RepositoriesURL: String("https://api.github.com/teams/1/repos"),
+			ID:              new(int64(1)),
+			URL:             new("https://api.github.com/teams/1"),
+			Name:            new("Justice League"),
+			Slug:            new("justice-league"),
+			Description:     new("A great team."),
+			Privacy:         new("closed"),
+			Permission:      new("admin"),
+			MembersURL:      new("https://api.github.com/teams/1/members{/member}"),
+			RepositoriesURL: new("https://api.github.com/teams/1/repos"),
 		},
 	}
 
@@ -746,8 +752,8 @@ func TestOrganizationsService_ListOrgInvitationTeams(t *testing.T) {
 }
 
 func TestOrganizationsService_ListFailedOrgInvitations(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/failed_invitations", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -759,8 +765,8 @@ func TestOrganizationsService_ListFailedOrgInvitations(t *testing.T) {
 			   "node_id":"MDQ6VXNlcjE=",
 			   "email":"octocat@github.com",
 			   "role":"direct_member",
-			   "created_at":"2016-11-30T06:46:10Z",
-			   "failed_at":"2017-01-02T01:10:00Z",
+			   "created_at":`+refTimeStr(1136178000)+`,
+			   "failed_at":`+refTimeStr(1136178001)+`,
 			   "failed_reason":"the reason",
 			   "inviter":{
 				  "login":"other_user",
@@ -789,45 +795,44 @@ func TestOrganizationsService_ListFailedOrgInvitations(t *testing.T) {
 	})
 
 	opts := &ListOptions{Page: 2, PerPage: 1}
-	ctx := context.Background()
+	ctx := t.Context()
 	failedInvitations, _, err := client.Organizations.ListFailedOrgInvitations(ctx, "o", opts)
 	if err != nil {
 		t.Errorf("Organizations.ListFailedOrgInvitations returned error: %v", err)
 	}
 
-	createdAt := time.Date(2016, time.November, 30, 6, 46, 10, 0, time.UTC)
 	want := []*Invitation{
 		{
-			ID:           Int64(1),
-			Login:        String("monalisa"),
-			NodeID:       String("MDQ6VXNlcjE="),
-			Email:        String("octocat@github.com"),
-			Role:         String("direct_member"),
-			FailedAt:     &Timestamp{time.Date(2017, time.January, 2, 1, 10, 0, 0, time.UTC)},
-			FailedReason: String("the reason"),
-			CreatedAt:    &createdAt,
+			ID:           new(int64(1)),
+			Login:        new("monalisa"),
+			NodeID:       new("MDQ6VXNlcjE="),
+			Email:        new("octocat@github.com"),
+			Role:         new("direct_member"),
+			CreatedAt:    refTimestamp(1136178000),
+			FailedAt:     refTimestamp(1136178001),
+			FailedReason: new("the reason"),
 			Inviter: &User{
-				Login:             String("other_user"),
-				ID:                Int64(1),
-				NodeID:            String("MDQ6VXNlcjE="),
-				AvatarURL:         String("https://github.com/images/error/other_user_happy.gif"),
-				GravatarID:        String(""),
-				URL:               String("https://api.github.com/users/other_user"),
-				HTMLURL:           String("https://github.com/other_user"),
-				FollowersURL:      String("https://api.github.com/users/other_user/followers"),
-				FollowingURL:      String("https://api.github.com/users/other_user/following{/other_user}"),
-				GistsURL:          String("https://api.github.com/users/other_user/gists{/gist_id}"),
-				StarredURL:        String("https://api.github.com/users/other_user/starred{/owner}{/repo}"),
-				SubscriptionsURL:  String("https://api.github.com/users/other_user/subscriptions"),
-				OrganizationsURL:  String("https://api.github.com/users/other_user/orgs"),
-				ReposURL:          String("https://api.github.com/users/other_user/repos"),
-				EventsURL:         String("https://api.github.com/users/other_user/events{/privacy}"),
-				ReceivedEventsURL: String("https://api.github.com/users/other_user/received_events"),
-				Type:              String("User"),
-				SiteAdmin:         Bool(false),
+				Login:             new("other_user"),
+				ID:                new(int64(1)),
+				NodeID:            new("MDQ6VXNlcjE="),
+				AvatarURL:         new("https://github.com/images/error/other_user_happy.gif"),
+				GravatarID:        new(""),
+				URL:               new("https://api.github.com/users/other_user"),
+				HTMLURL:           new("https://github.com/other_user"),
+				FollowersURL:      new("https://api.github.com/users/other_user/followers"),
+				FollowingURL:      new("https://api.github.com/users/other_user/following{/other_user}"),
+				GistsURL:          new("https://api.github.com/users/other_user/gists{/gist_id}"),
+				StarredURL:        new("https://api.github.com/users/other_user/starred{/owner}{/repo}"),
+				SubscriptionsURL:  new("https://api.github.com/users/other_user/subscriptions"),
+				OrganizationsURL:  new("https://api.github.com/users/other_user/orgs"),
+				ReposURL:          new("https://api.github.com/users/other_user/repos"),
+				EventsURL:         new("https://api.github.com/users/other_user/events{/privacy}"),
+				ReceivedEventsURL: new("https://api.github.com/users/other_user/received_events"),
+				Type:              new("User"),
+				SiteAdmin:         new(false),
 			},
-			TeamCount:         Int(2),
-			InvitationTeamURL: String("https://api.github.com/organizations/2/invitations/1/teams"),
+			TeamCount:         new(2),
+			InvitationTeamURL: new("https://api.github.com/organizations/2/invitations/1/teams"),
 		},
 	}
 
@@ -848,108 +853,4 @@ func TestOrganizationsService_ListFailedOrgInvitations(t *testing.T) {
 		}
 		return resp, err
 	})
-}
-
-func TestMembership_Marshal(t *testing.T) {
-	testJSONMarshal(t, &Membership{}, "{}")
-
-	u := &Membership{
-		URL:             String("url"),
-		State:           String("state"),
-		Role:            String("email"),
-		OrganizationURL: String("orgurl"),
-		Organization: &Organization{
-			BillingEmail:                         String("be"),
-			Blog:                                 String("b"),
-			Company:                              String("c"),
-			Email:                                String("e"),
-			TwitterUsername:                      String("tu"),
-			Location:                             String("loc"),
-			Name:                                 String("n"),
-			Description:                          String("d"),
-			IsVerified:                           Bool(true),
-			HasOrganizationProjects:              Bool(true),
-			HasRepositoryProjects:                Bool(true),
-			DefaultRepoPermission:                String("drp"),
-			MembersCanCreateRepos:                Bool(true),
-			MembersCanCreateInternalRepos:        Bool(true),
-			MembersCanCreatePrivateRepos:         Bool(true),
-			MembersCanCreatePublicRepos:          Bool(false),
-			MembersAllowedRepositoryCreationType: String("marct"),
-			MembersCanCreatePages:                Bool(true),
-			MembersCanCreatePublicPages:          Bool(false),
-			MembersCanCreatePrivatePages:         Bool(true),
-		},
-		User: &User{
-			Login:     String("l"),
-			ID:        Int64(1),
-			NodeID:    String("n"),
-			URL:       String("u"),
-			ReposURL:  String("r"),
-			EventsURL: String("e"),
-			AvatarURL: String("a"),
-		},
-	}
-
-	want := `{
-		"url": "url",
-		"state": "state",
-		"role": "email",
-		"organization_url": "orgurl",
-		"organization": {
-			"name": "n",
-			"company": "c",
-			"blog": "b",
-			"location": "loc",
-			"email": "e",
-			"twitter_username": "tu",
-			"description": "d",
-			"billing_email": "be",
-			"is_verified": true,
-			"has_organization_projects": true,
-			"has_repository_projects": true,
-			"default_repository_permission": "drp",
-			"members_can_create_repositories": true,
-			"members_can_create_public_repositories": false,
-			"members_can_create_private_repositories": true,
-			"members_can_create_internal_repositories": true,
-			"members_allowed_repository_creation_type": "marct",
-			"members_can_create_pages": true,
-			"members_can_create_public_pages": false,
-			"members_can_create_private_pages": true
-		},
-		"user": {
-			"login": "l",
-			"id": 1,
-			"node_id": "n",
-			"avatar_url": "a",
-			"url": "u",
-			"events_url": "e",
-			"repos_url": "r"
-		}
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestCreateOrgInvitationOptions_Marshal(t *testing.T) {
-	testJSONMarshal(t, &CreateOrgInvitationOptions{}, "{}")
-
-	u := &CreateOrgInvitationOptions{
-		InviteeID: Int64(1),
-		Email:     String("email"),
-		Role:      String("role"),
-		TeamID:    []int64{1},
-	}
-
-	want := `{
-		"invitee_id": 1,
-		"email": "email",
-		"role": "role",
-		"team_ids": [
-			1
-		]
-	}`
-
-	testJSONMarshal(t, u, want)
 }

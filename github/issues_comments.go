@@ -18,18 +18,41 @@ type IssueComment struct {
 	Body      *string    `json:"body,omitempty"`
 	User      *User      `json:"user,omitempty"`
 	Reactions *Reactions `json:"reactions,omitempty"`
-	CreatedAt *time.Time `json:"created_at,omitempty"`
-	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	CreatedAt *Timestamp `json:"created_at,omitempty"`
+	UpdatedAt *Timestamp `json:"updated_at,omitempty"`
 	// AuthorAssociation is the comment author's relationship to the issue's repository.
 	// Possible values are "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MEMBER", "OWNER", or "NONE".
-	AuthorAssociation *string `json:"author_association,omitempty"`
-	URL               *string `json:"url,omitempty"`
-	HTMLURL           *string `json:"html_url,omitempty"`
-	IssueURL          *string `json:"issue_url,omitempty"`
+	//
+	// Deprecated: GitHub will remove this field from Events API payloads on October 7, 2025.
+	// Use the Issue Comments REST API endpoint to retrieve this information.
+	// See: https://docs.github.com/rest/issues/comments?apiVersion=2022-11-28#get-an-issue-comment
+	AuthorAssociation     *string                `json:"author_association,omitempty"`
+	PerformedViaGithubApp *App                   `json:"performed_via_github_app,omitempty"`
+	Pin                   *PinnedIssueComment    `json:"pin,omitempty"`
+	Minimized             *MinimizedIssueComment `json:"minimized,omitempty"`
+	URL                   *string                `json:"url,omitempty"`
+	HTMLURL               *string                `json:"html_url,omitempty"`
+	IssueURL              *string                `json:"issue_url,omitempty"`
+}
+
+// PinnedIssueComment represents the pin details of a pinned issue comment.
+type PinnedIssueComment struct {
+	PinnedAt *Timestamp `json:"pinned_at,omitempty"`
+	PinnedBy *User      `json:"pinned_by,omitempty"`
+}
+
+// MinimizedIssueComment represents the minimized details of a minimized issue comment.
+type MinimizedIssueComment struct {
+	Reason *string `json:"reason,omitempty"`
 }
 
 func (i IssueComment) String() string {
 	return Stringify(i)
+}
+
+// IssueCommentRequest represents a request to create or update an issue comment.
+type IssueCommentRequest struct {
+	Body string `json:"body"`
 }
 
 // IssueListCommentsOptions specifies the optional parameters to the
@@ -50,30 +73,33 @@ type IssueListCommentsOptions struct {
 // ListComments lists all comments on the specified issue. Specifying an issue
 // number of 0 will return all comments on all issues for the repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/issues/#list-issue-comments
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/issues/#list-issue-comments-for-a-repository
-func (s *IssuesService) ListComments(ctx context.Context, owner string, repo string, number int, opts *IssueListCommentsOptions) ([]*IssueComment, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/issues/comments?apiVersion=2022-11-28#list-issue-comments
+//
+// GitHub API docs: https://docs.github.com/rest/issues/comments?apiVersion=2022-11-28#list-issue-comments-for-a-repository
+//
+//meta:operation GET /repos/{owner}/{repo}/issues/comments
+//meta:operation GET /repos/{owner}/{repo}/issues/{issue_number}/comments
+func (s *IssuesService) ListComments(ctx context.Context, owner, repo string, number int, opts *IssueListCommentsOptions) ([]*IssueComment, *Response, error) {
 	var u string
 	if number == 0 {
 		u = fmt.Sprintf("repos/%v/%v/issues/comments", owner, repo)
 	} else {
-		u = fmt.Sprintf("repos/%v/%v/issues/%d/comments", owner, repo, number)
+		u = fmt.Sprintf("repos/%v/%v/issues/%v/comments", owner, repo, number)
 	}
 	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeReactionsPreview)
 
 	var comments []*IssueComment
-	resp, err := s.client.Do(ctx, req, &comments)
+	resp, err := s.client.Do(req, &comments)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -83,20 +109,21 @@ func (s *IssuesService) ListComments(ctx context.Context, owner string, repo str
 
 // GetComment fetches the specified issue comment.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/issues/#get-an-issue-comment
-func (s *IssuesService) GetComment(ctx context.Context, owner string, repo string, commentID int64) (*IssueComment, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/issues/comments/%d", owner, repo, commentID)
+// GitHub API docs: https://docs.github.com/rest/issues/comments?apiVersion=2022-11-28#get-an-issue-comment
+//
+//meta:operation GET /repos/{owner}/{repo}/issues/comments/{comment_id}
+func (s *IssuesService) GetComment(ctx context.Context, owner, repo string, commentID int64) (*IssueComment, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/issues/comments/%v", owner, repo, commentID)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeReactionsPreview)
 
-	comment := new(IssueComment)
-	resp, err := s.client.Do(ctx, req, comment)
+	var comment *IssueComment
+	resp, err := s.client.Do(req, &comment)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -106,15 +133,17 @@ func (s *IssuesService) GetComment(ctx context.Context, owner string, repo strin
 
 // CreateComment creates a new comment on the specified issue.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/issues/#create-an-issue-comment
-func (s *IssuesService) CreateComment(ctx context.Context, owner string, repo string, number int, comment *IssueComment) (*IssueComment, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/issues/%d/comments", owner, repo, number)
-	req, err := s.client.NewRequest("POST", u, comment)
+// GitHub API docs: https://docs.github.com/rest/issues/comments?apiVersion=2022-11-28#create-an-issue-comment
+//
+//meta:operation POST /repos/{owner}/{repo}/issues/{issue_number}/comments
+func (s *IssuesService) CreateComment(ctx context.Context, owner, repo string, number int, body IssueCommentRequest) (*IssueComment, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/issues/%v/comments", owner, repo, number)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
-	c := new(IssueComment)
-	resp, err := s.client.Do(ctx, req, c)
+	var c *IssueComment
+	resp, err := s.client.Do(req, &c)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -122,18 +151,19 @@ func (s *IssuesService) CreateComment(ctx context.Context, owner string, repo st
 	return c, resp, nil
 }
 
-// EditComment updates an issue comment.
-// A non-nil comment.Body must be provided. Other comment fields should be left nil.
+// UpdateComment updates an issue comment.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/issues/#update-an-issue-comment
-func (s *IssuesService) EditComment(ctx context.Context, owner string, repo string, commentID int64, comment *IssueComment) (*IssueComment, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/issues/comments/%d", owner, repo, commentID)
-	req, err := s.client.NewRequest("PATCH", u, comment)
+// GitHub API docs: https://docs.github.com/rest/issues/comments?apiVersion=2022-11-28#update-an-issue-comment
+//
+//meta:operation PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}
+func (s *IssuesService) UpdateComment(ctx context.Context, owner, repo string, commentID int64, body IssueCommentRequest) (*IssueComment, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/issues/comments/%v", owner, repo, commentID)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
-	c := new(IssueComment)
-	resp, err := s.client.Do(ctx, req, c)
+	var c *IssueComment
+	resp, err := s.client.Do(req, &c)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -143,12 +173,14 @@ func (s *IssuesService) EditComment(ctx context.Context, owner string, repo stri
 
 // DeleteComment deletes an issue comment.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/issues/#delete-an-issue-comment
-func (s *IssuesService) DeleteComment(ctx context.Context, owner string, repo string, commentID int64) (*Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/issues/comments/%d", owner, repo, commentID)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+// GitHub API docs: https://docs.github.com/rest/issues/comments?apiVersion=2022-11-28#delete-an-issue-comment
+//
+//meta:operation DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}
+func (s *IssuesService) DeleteComment(ctx context.Context, owner, repo string, commentID int64) (*Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/issues/comments/%v", owner, repo, commentID)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

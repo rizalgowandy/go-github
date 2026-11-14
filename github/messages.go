@@ -19,10 +19,12 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"io/ioutil"
+	"maps"
 	"mime"
 	"net/http"
 	"net/url"
+	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -40,63 +42,99 @@ const (
 	EventTypeHeader = "X-Github-Event"
 	// DeliveryIDHeader is the GitHub header key used to pass the unique ID for the webhook event.
 	DeliveryIDHeader = "X-Github-Delivery"
+
+	// maxPayloadSize is the maximum size of a GitHub webhook payload.
+	// GitHub documents a 25 MB limit for webhook payloads.
+	maxPayloadSize = 25 * 1024 * 1024
 )
 
 var (
 	// eventTypeMapping maps webhooks types to their corresponding go-github struct types.
-	eventTypeMapping = map[string]string{
-		"branch_protection_rule":         "BranchProtectionRuleEvent",
-		"check_run":                      "CheckRunEvent",
-		"check_suite":                    "CheckSuiteEvent",
-		"commit_comment":                 "CommitCommentEvent",
-		"content_reference":              "ContentReferenceEvent",
-		"create":                         "CreateEvent",
-		"delete":                         "DeleteEvent",
-		"deploy_key":                     "DeployKeyEvent",
-		"deployment":                     "DeploymentEvent",
-		"deployment_status":              "DeploymentStatusEvent",
-		"fork":                           "ForkEvent",
-		"github_app_authorization":       "GitHubAppAuthorizationEvent",
-		"gollum":                         "GollumEvent",
-		"installation":                   "InstallationEvent",
-		"installation_repositories":      "InstallationRepositoriesEvent",
-		"issue_comment":                  "IssueCommentEvent",
-		"issues":                         "IssuesEvent",
-		"label":                          "LabelEvent",
-		"marketplace_purchase":           "MarketplacePurchaseEvent",
-		"member":                         "MemberEvent",
-		"membership":                     "MembershipEvent",
-		"meta":                           "MetaEvent",
-		"milestone":                      "MilestoneEvent",
-		"organization":                   "OrganizationEvent",
-		"org_block":                      "OrgBlockEvent",
-		"package":                        "PackageEvent",
-		"page_build":                     "PageBuildEvent",
-		"ping":                           "PingEvent",
-		"project":                        "ProjectEvent",
-		"project_card":                   "ProjectCardEvent",
-		"project_column":                 "ProjectColumnEvent",
-		"public":                         "PublicEvent",
-		"pull_request":                   "PullRequestEvent",
-		"pull_request_review":            "PullRequestReviewEvent",
-		"pull_request_review_comment":    "PullRequestReviewCommentEvent",
-		"pull_request_target":            "PullRequestTargetEvent",
-		"push":                           "PushEvent",
-		"repository":                     "RepositoryEvent",
-		"repository_dispatch":            "RepositoryDispatchEvent",
-		"repository_vulnerability_alert": "RepositoryVulnerabilityAlertEvent",
-		"release":                        "ReleaseEvent",
-		"star":                           "StarEvent",
-		"status":                         "StatusEvent",
-		"team":                           "TeamEvent",
-		"team_add":                       "TeamAddEvent",
-		"user":                           "UserEvent",
-		"watch":                          "WatchEvent",
-		"workflow_dispatch":              "WorkflowDispatchEvent",
-		"workflow_job":                   "WorkflowJobEvent",
-		"workflow_run":                   "WorkflowRunEvent",
+	eventTypeMapping = map[string]any{
+		"branch_protection_configuration": &BranchProtectionConfigurationEvent{},
+		"branch_protection_rule":          &BranchProtectionRuleEvent{},
+		"check_run":                       &CheckRunEvent{},
+		"check_suite":                     &CheckSuiteEvent{},
+		"code_scanning_alert":             &CodeScanningAlertEvent{},
+		"commit_comment":                  &CommitCommentEvent{},
+		"content_reference":               &ContentReferenceEvent{},
+		"create":                          &CreateEvent{},
+		"custom_property":                 &CustomPropertyEvent{},
+		"custom_property_values":          &CustomPropertyValuesEvent{},
+		"delete":                          &DeleteEvent{},
+		"dependabot_alert":                &DependabotAlertEvent{},
+		"deploy_key":                      &DeployKeyEvent{},
+		"deployment":                      &DeploymentEvent{},
+		"deployment_review":               &DeploymentReviewEvent{},
+		"deployment_status":               &DeploymentStatusEvent{},
+		"deployment_protection_rule":      &DeploymentProtectionRuleEvent{},
+		"discussion":                      &DiscussionEvent{},
+		"discussion_comment":              &DiscussionCommentEvent{},
+		"fork":                            &ForkEvent{},
+		"github_app_authorization":        &GitHubAppAuthorizationEvent{},
+		"gollum":                          &GollumEvent{},
+		"installation":                    &InstallationEvent{},
+		"installation_repositories":       &InstallationRepositoriesEvent{},
+		"installation_target":             &InstallationTargetEvent{},
+		"issue_comment":                   &IssueCommentEvent{},
+		"issues":                          &IssuesEvent{},
+		"label":                           &LabelEvent{},
+		"marketplace_purchase":            &MarketplacePurchaseEvent{},
+		"member":                          &MemberEvent{},
+		"membership":                      &MembershipEvent{},
+		"merge_group":                     &MergeGroupEvent{},
+		"meta":                            &MetaEvent{},
+		"milestone":                       &MilestoneEvent{},
+		"organization":                    &OrganizationEvent{},
+		"org_block":                       &OrgBlockEvent{},
+		"package":                         &PackageEvent{},
+		"page_build":                      &PageBuildEvent{},
+		"personal_access_token_request":   &PersonalAccessTokenRequestEvent{},
+		"ping":                            &PingEvent{},
+		"projects_v2":                     &ProjectV2Event{},
+		"projects_v2_item":                &ProjectV2ItemEvent{},
+		"public":                          &PublicEvent{},
+		"pull_request":                    &PullRequestEvent{},
+		"pull_request_review":             &PullRequestReviewEvent{},
+		"pull_request_review_comment":     &PullRequestReviewCommentEvent{},
+		"pull_request_review_thread":      &PullRequestReviewThreadEvent{},
+		"pull_request_target":             &PullRequestTargetEvent{},
+		"push":                            &PushEvent{},
+		"registry_package":                &RegistryPackageEvent{},
+		"repository":                      &RepositoryEvent{},
+		"repository_dispatch":             &RepositoryDispatchEvent{},
+		"repository_import":               &RepositoryImportEvent{},
+		"repository_ruleset":              &RepositoryRulesetEvent{},
+		"repository_vulnerability_alert":  &RepositoryVulnerabilityAlertEvent{},
+		"release":                         &ReleaseEvent{},
+		"secret_scanning_alert":           &SecretScanningAlertEvent{},
+		"secret_scanning_alert_location":  &SecretScanningAlertLocationEvent{},
+		"security_advisory":               &SecurityAdvisoryEvent{},
+		"security_and_analysis":           &SecurityAndAnalysisEvent{},
+		"sponsorship":                     &SponsorshipEvent{},
+		"star":                            &StarEvent{},
+		"status":                          &StatusEvent{},
+		"team":                            &TeamEvent{},
+		"team_add":                        &TeamAddEvent{},
+		"user":                            &UserEvent{},
+		"watch":                           &WatchEvent{},
+		"workflow_dispatch":               &WorkflowDispatchEvent{},
+		"workflow_job":                    &WorkflowJobEvent{},
+		"workflow_run":                    &WorkflowRunEvent{},
 	}
+	// Forward mapping of event types to the string names of the structs.
+	messageToTypeName = make(map[string]string, len(eventTypeMapping))
+	// Inverse map of the above.
+	typeToMessageMapping = make(map[string]string, len(eventTypeMapping))
 )
+
+func init() {
+	for k, v := range eventTypeMapping {
+		typename := reflect.TypeOf(v).Elem().Name()
+		messageToTypeName[k] = typename
+		typeToMessageMapping[typename] = k
+	}
+}
 
 // genMAC generates the HMAC signature for a message provided the secret key
 // and hashFunc.
@@ -112,8 +150,19 @@ func checkMAC(message, messageMAC, key []byte, hashFunc func() hash.Hash) bool {
 	return hmac.Equal(messageMAC, expectedMAC)
 }
 
-// messageMAC returns the hex-decoded HMAC tag from the signature and its
-// corresponding hash function.
+// readPayloadBody reads the body from readable, enforcing maxPayloadSize.
+func readPayloadBody(readable io.Reader) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(readable, maxPayloadSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxPayloadSize {
+		return nil, errors.New("webhook payload exceeds maximum allowed size")
+	}
+	return body, nil
+}
+
+// messageMAC returns the MAC method and the corresponding hash function.
 func messageMAC(signature string) ([]byte, func() hash.Hash, error) {
 	if signature == "" {
 		return nil, nil, errors.New("missing signature")
@@ -142,30 +191,30 @@ func messageMAC(signature string) ([]byte, func() hash.Hash, error) {
 	return buf, hashFunc, nil
 }
 
-// ValidatePayload validates an incoming GitHub Webhook event request body
+// ValidatePayloadFromBody validates an incoming GitHub Webhook event request body
 // and returns the (JSON) payload.
 // The Content-Type header of the payload can be "application/json" or "application/x-www-form-urlencoded".
 // If the Content-Type is neither then an error is returned.
 // secretToken is the GitHub Webhook secret token.
-// If your webhook does not contain a secret token, you can pass nil or an empty slice.
-// This is intended for local development purposes only and all webhooks should ideally set up a secret token.
+// If your webhook does not contain a secret token, you can pass an empty secretToken.
+// Webhooks without a secret token are not secure and should be avoided.
 //
 // Example usage:
 //
-//     func (s *GitHubEventMonitor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-//       // read signature from request
-//       signature := ""
-//       payload, err := github.ValidatePayloadFromBody(r.Header.Get("Content-Type"), r.Body, signature, s.webhookSecretKey)
-//       if err != nil { ... }
-//       // Process payload...
-//     }
+//	func (s *GitHubEventMonitor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+//		// read signature from request
+//		signature := ""
+//		payload, err := github.ValidatePayloadFromBody(r.Header.Get("Content-Type"), r.Body, signature, s.webhookSecretKey)
+//		if err != nil { ... }
+//		// Process payload...
+//	}
 func ValidatePayloadFromBody(contentType string, readable io.Reader, signature string, secretToken []byte) (payload []byte, err error) {
 	var body []byte // Raw body that GitHub uses to calculate the signature.
 
 	switch contentType {
 	case "application/json":
 		var err error
-		if body, err = ioutil.ReadAll(readable); err != nil {
+		if body, err = readPayloadBody(readable); err != nil {
 			return nil, err
 		}
 
@@ -179,7 +228,7 @@ func ValidatePayloadFromBody(contentType string, readable io.Reader, signature s
 		const payloadFormParam = "payload"
 
 		var err error
-		if body, err = ioutil.ReadAll(readable); err != nil {
+		if body, err = readPayloadBody(readable); err != nil {
 			return nil, err
 		}
 
@@ -195,9 +244,8 @@ func ValidatePayloadFromBody(contentType string, readable io.Reader, signature s
 		return nil, fmt.Errorf("webhook request has unsupported Content-Type %q", contentType)
 	}
 
-	// Only validate the signature if a secret token exists. This is intended for
-	// local development only and all webhooks should ideally set up a secret token.
-	if len(secretToken) > 0 {
+	// Validate the signature if present or if one is expected (secretToken is non-empty).
+	if len(secretToken) > 0 || len(signature) > 0 {
 		if err := ValidateSignature(signature, body, secretToken); err != nil {
 			return nil, err
 		}
@@ -216,12 +264,11 @@ func ValidatePayloadFromBody(contentType string, readable io.Reader, signature s
 //
 // Example usage:
 //
-//     func (s *GitHubEventMonitor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-//       payload, err := github.ValidatePayload(r, s.webhookSecretKey)
-//       if err != nil { ... }
-//       // Process payload...
-//     }
-//
+//	func (s *GitHubEventMonitor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+//		payload, err := github.ValidatePayload(r, s.webhookSecretKey)
+//		if err != nil { ... }
+//		// Process payload...
+//	}
 func ValidatePayload(r *http.Request, secretToken []byte) (payload []byte, err error) {
 	signature := r.Header.Get(SHA256SignatureHeader)
 	if signature == "" {
@@ -255,41 +302,40 @@ func ValidateSignature(signature string, payload, secretToken []byte) error {
 
 // WebHookType returns the event type of webhook request r.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/hooks/#webhook-headers
+// GitHub API docs: https://docs.github.com/developers/webhooks-and-events/events/github-event-types
 func WebHookType(r *http.Request) string {
 	return r.Header.Get(EventTypeHeader)
 }
 
 // DeliveryID returns the unique delivery ID of webhook request r.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/hooks/#webhook-headers
+// GitHub API docs: https://docs.github.com/developers/webhooks-and-events/events/github-event-types
 func DeliveryID(r *http.Request) string {
 	return r.Header.Get(DeliveryIDHeader)
 }
 
 // ParseWebHook parses the event payload. For recognized event types, a
 // value of the corresponding struct type will be returned (as returned
-// by Event.ParsePayload()). An error will be returned for unrecognized event
+// by [Event.ParsePayload]). An error will be returned for unrecognized event
 // types.
 //
 // Example usage:
 //
-//     func (s *GitHubEventMonitor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-//       payload, err := github.ValidatePayload(r, s.webhookSecretKey)
-//       if err != nil { ... }
-//       event, err := github.ParseWebHook(github.WebHookType(r), payload)
-//       if err != nil { ... }
-//       switch event := event.(type) {
-//       case *github.CommitCommentEvent:
-//           processCommitCommentEvent(event)
-//       case *github.CreateEvent:
-//           processCreateEvent(event)
-//       ...
-//       }
-//     }
-//
-func ParseWebHook(messageType string, payload []byte) (interface{}, error) {
-	eventType, ok := eventTypeMapping[messageType]
+//	func (s *GitHubEventMonitor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+//		payload, err := github.ValidatePayload(r, s.webhookSecretKey)
+//		if err != nil { ... }
+//		event, err := github.ParseWebHook(github.WebHookType(r), payload)
+//		if err != nil { ... }
+//		switch event := event.(type) {
+//		case *github.CommitCommentEvent:
+//			processCommitCommentEvent(event)
+//		case *github.CreateEvent:
+//			processCreateEvent(event)
+//		...
+//		}
+//	}
+func ParseWebHook(messageType string, payload []byte) (any, error) {
+	eventType, ok := messageToTypeName[messageType]
 	if !ok {
 		return nil, fmt.Errorf("unknown X-Github-Event in message: %v", messageType)
 	}
@@ -299,4 +345,24 @@ func ParseWebHook(messageType string, payload []byte) (interface{}, error) {
 		RawPayload: (*json.RawMessage)(&payload),
 	}
 	return event.ParsePayload()
+}
+
+// MessageTypes returns a sorted list of all the known GitHub event type strings
+// supported by go-github.
+func MessageTypes() []string {
+	return slices.Sorted(maps.Keys(eventTypeMapping))
+}
+
+// EventForType returns an empty struct matching the specified GitHub event type.
+// If messageType does not match any known event types, it returns nil.
+func EventForType(messageType string) any {
+	prototype := eventTypeMapping[messageType]
+	if prototype == nil {
+		return nil
+	}
+	// return a _copy_ of the pointed-to-object.  Unfortunately, for this we
+	// need to use reflection.  If we store the actual objects in the map,
+	// we still need to use reflection to convert from `any` to the actual
+	// type, so this was deemed the lesser of two evils. (#2865)
+	return reflect.New(reflect.TypeOf(prototype).Elem()).Interface()
 }

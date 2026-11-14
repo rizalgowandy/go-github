@@ -1,0 +1,322 @@
+// Copyright 2025 The go-github AUTHORS. All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+package github
+
+import (
+	"fmt"
+	"net/http"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+)
+
+func TestEnterpriseService_ListConsumedLicenses(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/consumed-licenses", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"page": "2", "per_page": "10"})
+		fmt.Fprint(w, `{
+			"total_seats_consumed": 20,
+			"total_seats_purchased": 25,
+			"users": [{
+				"github_com_login": "user1",
+				"github_com_name": "User One",
+				"enterprise_server_user_ids": ["123", "456"],
+				"github_com_user": true,
+				"enterprise_server_user": false,
+				"visual_studio_subscription_user": false,
+				"license_type": "Enterprise",
+				"github_com_profile": "https://github.com/user1",
+				"github_com_member_roles": ["member"],
+				"github_com_enterprise_roles": ["member"],
+				"github_com_verified_domain_emails": ["user1@example.com"],
+				"github_com_saml_name_id": "saml123",
+				"github_com_orgs_with_pending_invites": [],
+				"github_com_two_factor_auth": true,
+				"enterprise_server_emails": ["user1@example.com"],
+				"visual_studio_license_status": "active",
+				"visual_studio_subscription_email": "user1@example.com",
+				"total_user_accounts": 1
+			}]
+		}`)
+	})
+
+	opt := &ListOptions{Page: 2, PerPage: 10}
+	ctx := t.Context()
+	licenses, _, err := client.Enterprise.ListConsumedLicenses(ctx, "e", opt)
+	if err != nil {
+		t.Errorf("Enterprise.ListConsumedLicenses returned error: %v", err)
+	}
+
+	want := &EnterpriseConsumedLicenses{
+		TotalSeatsConsumed:  20,
+		TotalSeatsPurchased: 25,
+		Users: []*EnterpriseLicensedUsers{
+			{
+				GithubComLogin:                  "user1",
+				GithubComName:                   new("User One"),
+				EnterpriseServerUserIDs:         []string{"123", "456"},
+				GithubComUser:                   true,
+				EnterpriseServerUser:            new(false),
+				VisualStudioSubscriptionUser:    false,
+				LicenseType:                     "Enterprise",
+				GithubComProfile:                new("https://github.com/user1"),
+				GithubComMemberRoles:            []string{"member"},
+				GithubComEnterpriseRoles:        []string{"member"},
+				GithubComVerifiedDomainEmails:   []string{"user1@example.com"},
+				GithubComSamlNameID:             new("saml123"),
+				GithubComOrgsWithPendingInvites: []string{},
+				GithubComTwoFactorAuth:          new(true),
+				EnterpriseServerEmails:          []string{"user1@example.com"},
+				VisualStudioLicenseStatus:       new("active"),
+				VisualStudioSubscriptionEmail:   new("user1@example.com"),
+				TotalUserAccounts:               1,
+			},
+		},
+	}
+
+	if !cmp.Equal(licenses, want) {
+		t.Errorf("Enterprise.ListConsumedLicenses returned %+v, want %+v", licenses, want)
+	}
+
+	const methodName = "ListConsumedLicenses"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Enterprise.ListConsumedLicenses(ctx, "\n", opt)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Enterprise.ListConsumedLicenses(ctx, "e", opt)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestEnterpriseService_GetLicenseSyncStatus(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/license-sync-status", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{
+			"title": "Enterprise License Sync Status",
+			"description": "Status of license synchronization",
+			"properties": {
+				"server_instances": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"server_id": "ghes-1",
+							"hostname": "github.enterprise.local",
+							"last_sync": {
+								"type": "object",
+								"properties": {
+									"date": `+referenceTimeStr+`,
+									"status": "success",
+									"error": ""
+								}
+							}
+						}
+					}
+				}
+			}
+		}`)
+	})
+
+	ctx := t.Context()
+	syncStatus, _, err := client.Enterprise.GetLicenseSyncStatus(ctx, "e")
+	if err != nil {
+		t.Errorf("Enterprise.GetLicenseSyncStatus returned error: %v", err)
+	}
+
+	want := &EnterpriseLicenseSyncStatus{
+		Title:       "Enterprise License Sync Status",
+		Description: "Status of license synchronization",
+		Properties: &ServerInstanceProperties{
+			ServerInstances: &ServerInstances{
+				Type: "array",
+				Items: &ServiceInstanceItems{
+					Type: "object",
+					Properties: &ServerItemProperties{
+						ServerID: "ghes-1",
+						Hostname: "github.enterprise.local",
+						LastSync: &LastLicenseSync{
+							Type: "object",
+							Properties: &LastLicenseSyncProperties{
+								Date:   &referenceTimestamp,
+								Status: "success",
+								Error:  "",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !cmp.Equal(syncStatus, want) {
+		t.Errorf("Enterprise.GetLicenseSyncStatus returned %+v, want %+v", syncStatus, want)
+	}
+
+	const methodName = "GetLicenseSyncStatus"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Enterprise.GetLicenseSyncStatus(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Enterprise.GetLicenseSyncStatus(ctx, "e")
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestEnterpriseService_ListVisualStudioSubscriptions(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/visual-studio-subscriptions", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"page": "1", "per_page": "10", "is_unmatched_only": "true"})
+		fmt.Fprint(w, `{
+			"total_count": 1,
+			"visual_studio_subscriptions": [{
+				"visual_studio_subscription_email": "user@example.com",
+				"subscription_id": "sub-123",
+				"username": "monalisa",
+				"manual_match": true
+			}]
+		}`)
+	})
+
+	opt := &ListVisualStudioSubscriptionsOptions{
+		ListOptions:     ListOptions{Page: 1, PerPage: 10},
+		IsUnmatchedOnly: true,
+	}
+	ctx := t.Context()
+	subscriptions, _, err := client.Enterprise.ListVisualStudioSubscriptions(ctx, "e", opt)
+	if err != nil {
+		t.Errorf("Enterprise.ListVisualStudioSubscriptions returned error: %v", err)
+	}
+
+	want := &VisualStudioSubscriptions{
+		TotalCount: new(1),
+		VisualStudioSubscriptions: []*VisualStudioSubscriptionAssignment{
+			{
+				VisualStudioSubscriptionEmail: new("user@example.com"),
+				SubscriptionID:                new("sub-123"),
+				Username:                      new("monalisa"),
+				ManualMatch:                   new(true),
+			},
+		},
+	}
+
+	if !cmp.Equal(subscriptions, want) {
+		t.Errorf("Enterprise.ListVisualStudioSubscriptions returned %+v, want %+v", subscriptions, want)
+	}
+
+	const methodName = "ListVisualStudioSubscriptions"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Enterprise.ListVisualStudioSubscriptions(ctx, "\n", opt)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Enterprise.ListVisualStudioSubscriptions(ctx, "e", opt)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestEnterpriseService_AddOrUpdateVisualStudioSubscriptionAssignment(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := VisualStudioSubscriptionAssignmentRequest{
+		UserIdentifier: new("monalisa"),
+	}
+
+	mux.HandleFunc("/enterprises/e/visual-studio-subscriptions/sub-123", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		testJSONBody(t, r, input)
+		fmt.Fprint(w, `{
+			"visual_studio_subscription_email": "user@example.com",
+			"subscription_id": "sub-123",
+			"username": "monalisa",
+			"manual_match": true
+		}`)
+	})
+
+	ctx := t.Context()
+	assignment, _, err := client.Enterprise.AddOrUpdateVisualStudioSubscriptionAssignment(ctx, "e", "sub-123", input)
+	if err != nil {
+		t.Errorf("Enterprise.AddOrUpdateVisualStudioSubscriptionAssignment returned error: %v", err)
+	}
+
+	want := &VisualStudioSubscriptionAssignment{
+		VisualStudioSubscriptionEmail: new("user@example.com"),
+		SubscriptionID:                new("sub-123"),
+		Username:                      new("monalisa"),
+		ManualMatch:                   new(true),
+	}
+
+	if !cmp.Equal(assignment, want) {
+		t.Errorf("Enterprise.AddOrUpdateVisualStudioSubscriptionAssignment returned %+v, want %+v", assignment, want)
+	}
+
+	const methodName = "AddOrUpdateVisualStudioSubscriptionAssignment"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Enterprise.AddOrUpdateVisualStudioSubscriptionAssignment(ctx, "\n", "sub-123", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Enterprise.AddOrUpdateVisualStudioSubscriptionAssignment(ctx, "e", "sub-123", input)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestEnterpriseService_DeleteVisualStudioSubscriptionAssignment(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/enterprises/e/visual-studio-subscriptions/sub-123", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "DELETE")
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ctx := t.Context()
+	resp, err := client.Enterprise.DeleteVisualStudioSubscriptionAssignment(ctx, "e", "sub-123")
+	if err != nil {
+		t.Errorf("Enterprise.DeleteVisualStudioSubscriptionAssignment returned error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("Enterprise.DeleteVisualStudioSubscriptionAssignment status code = %v, want %v", resp.StatusCode, http.StatusNoContent)
+	}
+
+	const methodName = "DeleteVisualStudioSubscriptionAssignment"
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Enterprise.DeleteVisualStudioSubscriptionAssignment(ctx, "\n", "sub-123")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Enterprise.DeleteVisualStudioSubscriptionAssignment(ctx, "e", "sub-123")
+	})
+}

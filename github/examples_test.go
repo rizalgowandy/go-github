@@ -12,53 +12,60 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/google/go-github/v39/github"
+	"github.com/google/go-github/v93/github"
 )
 
-func ExampleClient_Markdown() {
-	client := github.NewClient(nil)
+func ExampleMarkdownService_Render() {
+	client, err := github.NewClient()
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
 
 	input := "# heading #\n\nLink to issue #1"
 	opt := &github.MarkdownOptions{Mode: "gfm", Context: "google/go-github"}
 
 	ctx := context.Background()
-	output, _, err := client.Markdown(ctx, input, opt)
+	output, _, err := client.Markdown.Render(ctx, input, opt)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalf("Error rendering markdown: %v", err)
 	}
 
 	fmt.Println(output)
 }
 
 func ExampleRepositoriesService_GetReadme() {
-	client := github.NewClient(nil)
+	client, err := github.NewClient()
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
 
 	ctx := context.Background()
 	readme, _, err := client.Repositories.GetReadme(ctx, "google", "go-github", nil)
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatalf("Error getting README: %v", err)
 	}
 
 	content, err := readme.GetContent()
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatalf("Error getting README content: %v", err)
 	}
 
 	fmt.Printf("google/go-github README:\n%v\n", content)
 }
 
-func ExampleRepositoriesService_List() {
-	client := github.NewClient(nil)
+func ExampleRepositoriesService_ListByUser() {
+	client, err := github.NewClient()
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
 
 	user := "willnorris"
-	opt := &github.RepositoryListOptions{Type: "owner", Sort: "updated", Direction: "desc"}
+	opt := &github.RepositoryListByUserOptions{Type: "owner", Sort: "updated", Direction: "desc"}
 
 	ctx := context.Background()
-	repos, _, err := client.Repositories.List(ctx, user, opt)
+	repos, _, err := client.Repositories.ListByUser(ctx, user, opt)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalf("error listing repositories by user: %v", err)
 	}
 
 	fmt.Printf("Recently updated repositories by %q: %v", user, github.Stringify(repos))
@@ -69,11 +76,14 @@ func ExampleRepositoriesService_CreateFile() {
 	// Contents API. Only 1 file per commit can be managed through that API.
 
 	// Note that authentication is needed here as you are performing a modification
-	// so you will need to modify the example to provide an oauth client to
-	// github.NewClient() instead of nil. See the following documentation for more
-	// information on how to authenticate with the client:
-	// https://godoc.org/github.com/google/go-github/github#hdr-Authentication
-	client := github.NewClient(nil)
+	// so you will need to modify the example to provide authentication to
+	// github.NewClient(). See the following documentation for more information
+	// on how to authenticate with the client:
+	// https://pkg.go.dev/github.com/google/go-github/v93/github#hdr-Authentication
+	client, err := github.NewClient()
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
 
 	ctx := context.Background()
 	fileContent := []byte("This is the content of my file\nand the 2nd line of it")
@@ -81,31 +91,33 @@ func ExampleRepositoriesService_CreateFile() {
 	// Note: the file needs to be absent from the repository as you are not
 	// specifying a SHA reference here.
 	opts := &github.RepositoryContentFileOptions{
-		Message:   github.String("This is my commit message"),
+		Message:   new("This is my commit message"),
 		Content:   fileContent,
-		Branch:    github.String("master"),
-		Committer: &github.CommitAuthor{Name: github.String("FirstName LastName"), Email: github.String("user@example.com")},
+		Branch:    new("master"),
+		Committer: &github.CommitAuthor{Name: new("FirstName LastName"), Email: new("user@example.com")},
 	}
-	_, _, err := client.Repositories.CreateFile(ctx, "myOrganization", "myRepository", "myNewFile.md", opts)
-	if err != nil {
-		fmt.Println(err)
-		return
+	if _, _, err := client.Repositories.CreateFile(ctx, "myOrganization", "myRepository", "myNewFile.md", opts); err != nil {
+		log.Fatalf("Error creating file: %v", err)
 	}
 }
 
 func ExampleUsersService_ListAll() {
-	client := github.NewClient(nil)
+	client, err := github.NewClient()
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
+
+	ctx := context.Background()
 	opts := &github.UserListOptions{}
 	for {
-		ctx := context.Background()
 		users, _, err := client.Users.ListAll(ctx, opts)
 		if err != nil {
-			log.Fatalf("error listing users: %v", err)
+			log.Fatalf("Error listing users: %v", err)
 		}
 		if len(users) == 0 {
 			break
 		}
-		opts.Since = *users[len(users)-1].ID
+		opts.Since = users[len(users)-1].GetID()
 		// Process users...
 	}
 }
@@ -114,28 +126,30 @@ func ExamplePullRequestsService_Create() {
 	// In this example we're creating a PR and displaying the HTML url at the end.
 
 	// Note that authentication is needed here as you are performing a modification
-	// so you will need to modify the example to provide an oauth client to
-	// github.NewClient() instead of nil. See the following documentation for more
-	// information on how to authenticate with the client:
-	// https://godoc.org/github.com/google/go-github/github#hdr-Authentication
-	client := github.NewClient(nil)
+	// so you will need to modify the example to provide authentication to
+	// github.NewClient(). See the following documentation for more information
+	// on how to authenticate with the client:
+	// https://pkg.go.dev/github.com/google/go-github/v93/github#hdr-Authentication
+	client, err := github.NewClient()
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
 
-	newPR := &github.NewPullRequest{
-		Title:               github.String("My awesome pull request"),
-		Head:                github.String("branch_to_merge"),
-		Base:                github.String("master"),
-		Body:                github.String("This is the description of the PR created with the package `github.com/google/go-github/github`"),
-		MaintainerCanModify: github.Bool(true),
+	newPR := github.CreatePullRequest{
+		Title:               new("My awesome pull request"),
+		Head:                "branch_to_merge",
+		Base:                "master",
+		Body:                new("This is the description of the PR created with the package `github.com/google/go-github/github`"),
+		MaintainerCanModify: new(true),
 	}
 
 	ctx := context.Background()
 	pr, _, err := client.PullRequests.Create(ctx, "myOrganization", "myRepository", newPR)
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatalf("Error creating pull request: %v", err)
 	}
 
-	fmt.Printf("PR created: %s\n", pr.GetHTMLURL())
+	fmt.Printf("PR created: %v\n", pr.GetHTMLURL())
 }
 
 func ExampleTeamsService_ListTeams() {
@@ -143,11 +157,14 @@ func ExampleTeamsService_ListTeams() {
 
 	// Note that authentication is needed here as you are performing a lookup on
 	// an organization's administrative configuration, so you will need to modify
-	// the example to provide an oauth client to github.NewClient() instead of nil.
-	// See the following documentation for more information on how to authenticate
-	// with the client:
-	// https://godoc.org/github.com/google/go-github/github#hdr-Authentication
-	client := github.NewClient(nil)
+	// the example to provide authentication to github.NewClient(). See the
+	//  following documentation for more information on how to authenticate with
+	// the client:
+	// https://pkg.go.dev/github.com/google/go-github/v93/github#hdr-Authentication
+	client, err := github.NewClient()
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
 
 	teamName := "Developers team"
 	ctx := context.Background()
@@ -156,12 +173,11 @@ func ExampleTeamsService_ListTeams() {
 	for {
 		teams, resp, err := client.Teams.ListTeams(ctx, "myOrganization", opts)
 		if err != nil {
-			fmt.Println(err)
-			return
+			log.Fatalf("error listing teams: %v", err)
 		}
 		for _, t := range teams {
 			if t.GetName() == teamName {
-				fmt.Printf("Team %q has ID %d\n", teamName, t.GetID())
+				fmt.Printf("Team %q has ID %v\n", teamName, t.GetID())
 				return
 			}
 		}
@@ -172,4 +188,23 @@ func ExampleTeamsService_ListTeams() {
 	}
 
 	fmt.Printf("Team %q was not found\n", teamName)
+}
+
+func ExampleUsersService_ListUserSocialAccounts() {
+	client, err := github.NewClient()
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
+	ctx := context.Background()
+	opts := &github.ListOptions{}
+	for {
+		accounts, resp, err := client.Users.ListUserSocialAccounts(ctx, "shreyjain13", opts)
+		if err != nil {
+			log.Fatalf("Error listing user social accounts: %v", err)
+		}
+		if resp.NextPage == 0 || len(accounts) == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
 }

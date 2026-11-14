@@ -7,7 +7,7 @@ package github
 
 import "context"
 
-// UserEmail represents user's email address
+// UserEmail represents user's email address.
 type UserEmail struct {
 	Email      *string `json:"email,omitempty"`
 	Primary    *bool   `json:"primary,omitempty"`
@@ -17,7 +17,9 @@ type UserEmail struct {
 
 // ListEmails lists all email addresses for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/users/#list-email-addresses-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/users/emails?apiVersion=2022-11-28#list-email-addresses-for-the-authenticated-user
+//
+//meta:operation GET /user/emails
 func (s *UsersService) ListEmails(ctx context.Context, opts *ListOptions) ([]*UserEmail, *Response, error) {
 	u := "user/emails"
 	u, err := addOptions(u, opts)
@@ -25,13 +27,39 @@ func (s *UsersService) ListEmails(ctx context.Context, opts *ListOptions) ([]*Us
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var emails []*UserEmail
-	resp, err := s.client.Do(ctx, req, &emails)
+	resp, err := s.client.Do(req, &emails)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return emails, resp, nil
+}
+
+// ListPublicEmails lists public email addresses for the authenticated user.
+//
+// GitHub API docs: https://docs.github.com/rest/users/emails?apiVersion=2022-11-28#list-public-email-addresses-for-the-authenticated-user
+//
+//meta:operation GET /user/public_emails
+func (s *UsersService) ListPublicEmails(ctx context.Context, opts *ListOptions) ([]*UserEmail, *Response, error) {
+	u := "user/public_emails"
+	u, err := addOptions(u, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var emails []*UserEmail
+	resp, err := s.client.Do(req, &emails)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -41,16 +69,18 @@ func (s *UsersService) ListEmails(ctx context.Context, opts *ListOptions) ([]*Us
 
 // AddEmails adds email addresses of the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/users/#add-an-email-address-for-the-authenticated-user
-func (s *UsersService) AddEmails(ctx context.Context, emails []string) ([]*UserEmail, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/users/emails?apiVersion=2022-11-28#add-an-email-address-for-the-authenticated-user
+//
+//meta:operation POST /user/emails
+func (s *UsersService) AddEmails(ctx context.Context, body []string) ([]*UserEmail, *Response, error) {
 	u := "user/emails"
-	req, err := s.client.NewRequest("POST", u, emails)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var e []*UserEmail
-	resp, err := s.client.Do(ctx, req, &e)
+	resp, err := s.client.Do(req, &e)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -60,13 +90,42 @@ func (s *UsersService) AddEmails(ctx context.Context, emails []string) ([]*UserE
 
 // DeleteEmails deletes email addresses from authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/users/#delete-an-email-address-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/users/emails?apiVersion=2022-11-28#delete-an-email-address-for-the-authenticated-user
+//
+//meta:operation DELETE /user/emails
 func (s *UsersService) DeleteEmails(ctx context.Context, emails []string) (*Response, error) {
 	u := "user/emails"
-	req, err := s.client.NewRequest("DELETE", u, emails)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, emails)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
+}
+
+// SetEmailVisibility sets the visibility for the primary email address of the authenticated user.
+// `visibility` can be "private" or "public".
+//
+// GitHub API docs: https://docs.github.com/rest/users/emails?apiVersion=2022-11-28#set-primary-email-visibility-for-the-authenticated-user
+//
+//meta:operation PATCH /user/email/visibility
+func (s *UsersService) SetEmailVisibility(ctx context.Context, visibility string) ([]*UserEmail, *Response, error) {
+	u := "user/email/visibility"
+
+	updateVisibilityReq := &UserEmail{
+		Visibility: &visibility,
+	}
+
+	req, err := s.client.NewRequest(ctx, "PATCH", u, updateVisibilityReq)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var e []*UserEmail
+	resp, err := s.client.Do(req, &e)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return e, resp, nil
 }

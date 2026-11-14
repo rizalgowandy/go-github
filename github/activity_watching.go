@@ -27,21 +27,23 @@ type Subscription struct {
 
 // ListWatchers lists watchers of a particular repo.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#list-watchers
+// GitHub API docs: https://docs.github.com/rest/activity/watching?apiVersion=2022-11-28#list-watchers
+//
+//meta:operation GET /repos/{owner}/{repo}/subscribers
 func (s *ActivityService) ListWatchers(ctx context.Context, owner, repo string, opts *ListOptions) ([]*User, *Response, error) {
-	u := fmt.Sprintf("repos/%s/%s/subscribers", owner, repo)
+	u := fmt.Sprintf("repos/%v/%v/subscribers", owner, repo)
 	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var watchers []*User
-	resp, err := s.client.Do(ctx, req, &watchers)
+	resp, err := s.client.Do(req, &watchers)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -52,8 +54,12 @@ func (s *ActivityService) ListWatchers(ctx context.Context, owner, repo string, 
 // ListWatched lists the repositories the specified user is watching. Passing
 // the empty string will fetch watched repos for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#list-repositories-watched-by-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#list-repositories-watched-by-a-user
+// GitHub API docs: https://docs.github.com/rest/activity/watching?apiVersion=2022-11-28#list-repositories-watched-by-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/activity/watching?apiVersion=2022-11-28#list-repositories-watched-by-the-authenticated-user
+//
+//meta:operation GET /user/subscriptions
+//meta:operation GET /users/{username}/subscriptions
 func (s *ActivityService) ListWatched(ctx context.Context, user string, opts *ListOptions) ([]*Repository, *Response, error) {
 	var u string
 	if user != "" {
@@ -66,13 +72,13 @@ func (s *ActivityService) ListWatched(ctx context.Context, user string, opts *Li
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var watched []*Repository
-	resp, err := s.client.Do(ctx, req, &watched)
+	resp, err := s.client.Do(req, &watched)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -84,17 +90,19 @@ func (s *ActivityService) ListWatched(ctx context.Context, user string, opts *Li
 // repository for the authenticated user. If the authenticated user is not
 // watching the repository, a nil Subscription is returned.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#get-a-repository-subscription
+// GitHub API docs: https://docs.github.com/rest/activity/watching?apiVersion=2022-11-28#get-a-repository-subscription
+//
+//meta:operation GET /repos/{owner}/{repo}/subscription
 func (s *ActivityService) GetRepositorySubscription(ctx context.Context, owner, repo string) (*Subscription, *Response, error) {
-	u := fmt.Sprintf("repos/%s/%s/subscription", owner, repo)
+	u := fmt.Sprintf("repos/%v/%v/subscription", owner, repo)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sub := new(Subscription)
-	resp, err := s.client.Do(ctx, req, sub)
+	var sub *Subscription
+	resp, err := s.client.Do(req, &sub)
 	if err != nil {
 		// if it's just a 404, don't return that as an error
 		_, err = parseBoolResponse(err)
@@ -104,24 +112,32 @@ func (s *ActivityService) GetRepositorySubscription(ctx context.Context, owner, 
 	return sub, resp, nil
 }
 
+// SetRepositorySubscriptionRequest represents the request body for SetRepositorySubscription.
+type SetRepositorySubscriptionRequest struct {
+	Subscribed *bool `json:"subscribed,omitempty"`
+	Ignored    *bool `json:"ignored,omitempty"`
+}
+
 // SetRepositorySubscription sets the subscription for the specified repository
 // for the authenticated user.
 //
-// To watch a repository, set subscription.Subscribed to true.
-// To ignore notifications made within a repository, set subscription.Ignored to true.
+// To watch a repository, set body.Subscribed to true.
+// To ignore notifications made within a repository, set body.Ignored to true.
 // To stop watching a repository, use DeleteRepositorySubscription.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#set-a-repository-subscription
-func (s *ActivityService) SetRepositorySubscription(ctx context.Context, owner, repo string, subscription *Subscription) (*Subscription, *Response, error) {
-	u := fmt.Sprintf("repos/%s/%s/subscription", owner, repo)
+// GitHub API docs: https://docs.github.com/rest/activity/watching?apiVersion=2022-11-28#set-a-repository-subscription
+//
+//meta:operation PUT /repos/{owner}/{repo}/subscription
+func (s *ActivityService) SetRepositorySubscription(ctx context.Context, owner, repo string, body SetRepositorySubscriptionRequest) (*Subscription, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/subscription", owner, repo)
 
-	req, err := s.client.NewRequest("PUT", u, subscription)
+	req, err := s.client.NewRequest(ctx, "PUT", u, &body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sub := new(Subscription)
-	resp, err := s.client.Do(ctx, req, sub)
+	var sub *Subscription
+	resp, err := s.client.Do(req, &sub)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -135,13 +151,15 @@ func (s *ActivityService) SetRepositorySubscription(ctx context.Context, owner, 
 // This is used to stop watching a repository. To control whether or not to
 // receive notifications from a repository, use SetRepositorySubscription.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#delete-a-repository-subscription
+// GitHub API docs: https://docs.github.com/rest/activity/watching?apiVersion=2022-11-28#delete-a-repository-subscription
+//
+//meta:operation DELETE /repos/{owner}/{repo}/subscription
 func (s *ActivityService) DeleteRepositorySubscription(ctx context.Context, owner, repo string) (*Response, error) {
-	u := fmt.Sprintf("repos/%s/%s/subscription", owner, repo)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	u := fmt.Sprintf("repos/%v/%v/subscription", owner, repo)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

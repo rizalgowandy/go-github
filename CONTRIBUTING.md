@@ -1,10 +1,9 @@
-# How to contribute #
+# How to contribute
 
-We'd love to accept your patches and contributions to this project. There are
-a just a few small guidelines you need to follow.
+We'd love to accept your patches and contributions to this project.
+There are just a few small guidelines you need to follow.
 
-
-## Contributor License Agreement ##
+## Contributor License Agreement
 
 Contributions to any Google project must be accompanied by a Contributor
 License Agreement. This is not a copyright **assignment**, it simply gives
@@ -16,85 +15,781 @@ You generally only need to submit a CLA once, so if you've already submitted one
 (even if it was for a different project), you probably don't need to do it
 again.
 
-
-## Reporting issues ##
+## Reporting issues
 
 Bugs, feature requests, and development-related questions should be directed to
-our [GitHub issue tracker](https://github.com/google/go-github/issues).  If
+our [GitHub issue tracker](https://github.com/google/go-github/issues). If
 reporting a bug, please try and provide as much context as possible such as
 your operating system, Go version, and anything else that might be relevant to
-the bug.  For feature requests, please explain what you're trying to do, and
+the bug. For feature requests, please explain what you're trying to do, and
 how the requested feature would help you do that.
 
 Security related bugs can either be reported in the issue tracker, or if they
 are more sensitive, emailed to <opensource@google.com>.
 
-## Submitting a patch ##
+## Reviewing PRs
 
-  1. It's generally best to start by opening a new issue describing the bug or
-     feature you're intending to fix. Even if you think it's relatively minor,
-     it's helpful to know what people are working on. Mention in the initial
-     issue that you are planning to work on that bug or feature so that it can
-     be assigned to you.
+In addition to writing code, community projects also require community
+contributions in other ways; one of these is reviewing code contributions. If
+you are willing to review PRs please open a PR to add your GitHub username to
+the [REVIEWERS](./REVIEWERS) file. By adding your GitHub username to the list
+of reviewers you are giving contributors permission to request a review for a
+PR that has already been approved by a maintainer. If you are asked to review a
+PR and either do not have the time or do not think you are able to you should
+feel comfortable politely saying no.
 
-  1. Follow the normal process of [forking][] the project, and setup a new
-     branch to work in. It's important that each group of changes be done in
-     separate branches in order to ensure that a pull request only includes the
-     commits related to that bug or feature.
+If at any time you would like to remove your permission to be contacted for a
+review you can open a PR to remove your name from the [REVIEWERS](./REVIEWERS)
+file.
 
-  1. Go makes it very simple to ensure properly formatted code, so always run
-     `go fmt` on your code before committing it. You should also run
-     [golint][] over your code. As noted in the [golint readme][], it's not
-     strictly necessary that your code be completely "lint-free", but this will
-     help you find common style issues.
+## Submitting a patch
 
-  1. Any significant changes should almost always be accompanied by tests. The
-     project already has good test coverage, so look at some of the existing
-     tests if you're unsure how to go about it. [gocov][] and [gocov-html][]
-     are invaluable tools for seeing which parts of your code aren't being
-     exercised by your tests.
+1. It's generally best to start by opening a new issue describing the bug or
+   feature you're intending to fix. Even if you think it's relatively minor,
+   it's helpful to know what people are working on. Mention in the initial issue
+   that you are planning to work on that bug or feature so that it can be
+   assigned to you.
 
-  1. Please run:
-     * `go generate github.com/google/go-github/...`
-     * `go test github.com/google/go-github/...`
-     * `go vet github.com/google/go-github/...`
+2. Follow the normal process of [forking][] the project, and set up a new branch
+   to work in. It's important that each group of changes be done in separate
+   branches in order to ensure that a pull request only includes the commits
+   related to that bug or feature.
 
-  1. Do your best to have [well-formed commit messages][] for each change.
-     This provides consistency throughout the project, and ensures that commit
-     messages are able to be formatted properly by various git tools.
+3. Any significant changes should almost always be accompanied by tests. The
+   project already has good test coverage, so look at some of the existing tests
+   if you're unsure how to go about it. Coverage is [monitored by codecov.io][],
+   which flags pull requests that decrease test coverage. This doesn't
+   necessarily mean that PRs with decreased coverage won't be merged. Sometimes
+   a decrease in coverage makes sense, but if your PR is flagged, you should
+   either add tests to cover those lines or add a PR comment explaining the
+   untested lines.
 
-  1. Finally, push the commits to your fork and submit a [pull request][].
-     **NOTE:** Please do not use force-push on PRs in this repo, as it makes
-     it more difficult for reviewers to see what has changed since the last
-     code review.
+4. Run `script/fmt.sh`, `script/test.sh` and `script/lint.sh` to format your code and
+   check that it passes all tests and linters. `script/lint.sh` may also tell you
+   that the generated files or the linter exceptions in `.golangci.yml` need to be
+   updated. If so, run `script/generate.sh` to update them.
+
+5. Do your best to have [well-formed commit messages][] for each change. This
+   provides consistency throughout the project, and ensures that commit messages
+   are able to be formatted properly by various git tools. See next section for
+   more details.
+
+6. Finally, push the commits to your fork and submit a [pull request][].
+   **NOTE:** Please do not use force-push on PRs in this repo, as it makes it
+   more difficult for reviewers to see what has changed since the last code
+   review. We always perform "squash and merge" actions on PRs in this repo, so it doesn't
+   matter how many commits your PR has, as they will end up being a single commit after merging.
+   This is done to make a much cleaner `git log` history and helps to find regressions in the code
+   using existing tools such as `git bisect`.
+
+   - If your PR needs additional reviews you can request one of the
+     [REVIEWERS][] takes a look by mentioning them in a PR comment.
 
 [forking]: https://help.github.com/articles/fork-a-repo
-[golint]: https://github.com/golang/lint
-[golint readme]: https://github.com/golang/lint/blob/master/README.md
-[gocov]: https://github.com/axw/gocov
-[gocov-html]: https://github.com/matm/gocov-html
-[well-formed commit messages]: http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html
-[squash]: http://git-scm.com/book/en/Git-Tools-Rewriting-History#Squashing-Commits
+[well-formed commit messages]: https://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html
 [pull request]: https://help.github.com/articles/creating-a-pull-request
+[monitored by codecov.io]: https://codecov.io/gh/google/go-github
+[REVIEWERS]: ./REVIEWERS
 
+### Use proper commit messages and PR titles
 
-## Other notes on code organization ##
+Effective Git commit messages and subject lines hold immense significance in comprehending alterations and enhancing the code's maintainability.
 
-Currently, everything is defined in the main `github` package, with API methods
-broken into separate service objects. These services map directly to how
-the [GitHub API documentation][] is organized, so use that as your guide for
-where to put new methods.
+Always commit the changes to your fork and push them to the corresponding original repo by sending a Pull Request (PR). Follow the best practices for writing commit messages/PR titles.
 
-Code is organized in files also based pretty closely on the GitHub API
-documentation, following the format `{service}_{api}.go`. For example, methods
-defined at <https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#webhooks> live in
-[repos_hooks.go][].
+1. Limit the subject line to 50 characters
+2. Capitalize the subject line
+3. Do not end the subject line with a period
+4. Use the imperative mood in the subject line. A properly formed Git commit subject line should always be able to complete the following sentence:
+   If applied, this commit will `<your subject line here>`
 
-[GitHub API documentation]: https://docs.github.com/en/free-pro-team@latest/rest/reference/
-[repos_hooks.go]: https://github.com/google/go-github/blob/master/github/repos_hooks.go
+(This above advice can be found all over the internet, but was copied from [here](https://learn-ballerina.github.io/best_practices/use_proper_titles.html).)
 
+5. You may optionally prefix the PR title with the type of PR it is, in lower case,
+   followed by a colon. For example, `feat:`, `chore:`, `fix:`, `docs:`, etc.
+   For breaking API changes, add an exclamation point.
+   For example, `feat!:`, `chore!:`, `fix!:`, etc.
 
-## Maintainer's Guide ##
+### Windows users
+
+Use Git Bash as a terminal or WSL instead of PowerShell.
+
+To avoid [issues][] with a few linters and formatters within golangci-lint,
+make sure you check out files only with LF endings:
+
+```sh
+git config core.autocrlf false
+git config core.eol lf
+```
+
+To convert an existing cloned repo from CRLF to LF, use the following commands:
+
+```sh
+git config core.autocrlf false
+git rm --cached -r .
+git reset --hard HEAD
+```
+
+[issues]: https://github.com/golangci/golangci-lint/discussions/5840
+
+## Tips
+
+Although we have not (yet) banned AI-driven contributions to this repo (as many
+other open source projects have), we encourage you to read and honor the following
+tips (which are frequently ignored by AI-driven PRs):
+
+* Always review your own PRs using the same user interface that your actual
+  reviewers will be using with a critical eye, attempting to anticipate what your
+  reviewers will call out, _before_ asking anyone to review your PR.
+* Come up with a short and appropriate PR title.
+* Come up with a short, well-written, and appropriate PR description (we don't
+  need hundreds of lines of text here - keep it short and to-the-point so a
+  reviewer can _quickly_ determine what the PR is all about).
+* If a PR involves bug fixes, it should certainly include a unit test (or tests)
+  that demonstrates the bug - without the PR changes, the new unit test would
+  fail, but with the included PR changes, the new test(s) pass.
+* When possible, try to make smaller, focused PRs (which are easier to review
+  and easier for others to understand).
+* When a reviewer leaves a comment on one occurrence of an issue, apply the
+  same fix to all similar occurrences throughout the entire PR - don't wait
+  for the reviewer to point out each one individually.
+
+### Assisted contributions
+
+Tools that help draft or generate code are allowed, but contributors remain
+responsible for understanding and testing every line they submit. If an
+AI/LLM tool helped with code, tests, or prose, briefly disclose what it did in
+the PR description. Review the rendered diff and description yourself before
+requesting review, remove irrelevant generated changes, and keep review
+comments specific and actionable.
+
+## Code Guidelines
+
+This section documents common code patterns and conventions used throughout
+the go-github repository. Following these guidelines helps maintain consistency
+and makes the codebase easier to understand and maintain.
+
+### Code Comments
+
+Every exported method and type needs to have code comments that follow
+[Go Doc Comments][]. A typical method's comments will look like this:
+
+```go
+// Get fetches a repository.
+//
+// GitHub API docs: https://docs.github.com/rest/repos/repos?apiVersion=2022-11-28#get-a-repository
+//
+//meta:operation GET /repos/{owner}/{repo}
+func (s *RepositoriesService) Get(ctx context.Context, owner, repo string) (*Repository, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v", owner, repo)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	// ...
+}
+```
+And the returned type `Repository` will have comments like this:
+
+```go
+// Repository represents a GitHub repository.
+type Repository struct {
+	ID     *int64  `json:"id,omitempty"`
+	Owner  *User   `json:"owner,omitempty"`
+	// ...
+}
+```
+
+The first line is the name of the method followed by a short description. This
+could also be a longer description if needed, but there is no need to repeat any
+details that are documented in GitHub's documentation because users are expected
+to follow the documentation links to learn more.
+
+After the description comes a link to the GitHub API documentation. This is
+added or fixed automatically when you run `script/generate.sh`, so you won't
+need to set this yourself.
+
+Finally, the `//meta:operation` comment is a directive to the code generator
+that maps the method to the corresponding OpenAPI operation. Once again, there
+can be multiple directives for methods that call multiple
+endpoints. `script/generate.sh` will normalize these directives for you, so if
+you are adding a new method you can use the pattern from the `u := fmt.Sprintf`
+line instead of looking up what the url parameters are called in the OpenAPI
+description.
+
+[Go Doc Comments]: https://go.dev/doc/comment
+
+### File Organization
+
+Files are organized by service and API endpoint, following the pattern
+`{service}_{api}.go`. For example:
+- `repos_contents.go` - Repository contents API methods
+- `users_ssh_signing_keys.go` - User SSH signing keys API methods
+- `orgs_rules.go` - Organization rules API methods
+
+Test files follow the pattern `{service}_{api}_test.go`.
+
+These services map directly to how the [GitHub API documentation][] is
+organized, so use that as your guide for where to put new methods.
+
+For example, methods defined at <https://docs.github.com/en/rest/webhooks/repos> live in [repos_hooks.go](https://github.com/google/go-github/blob/master/github/repos_hooks.go).
+
+[GitHub API documentation]: https://docs.github.com/en/rest
+
+### Services
+
+The API is split into services, one per logical area of the GitHub API
+(e.g. `RepositoriesService`, `UsersService`). Each service is a named type
+over the shared `service` struct, which holds a back-reference to the `Client`:
+
+```go
+type service struct {
+	client *Client
+}
+
+type RepositoriesService service
+```
+
+All services share a single `service` value embedded in the `Client` as
+`common`, so adding a service does not allocate. To add a new service:
+
+1. Add a field for it on the `Client` struct, keeping the list alphabetical
+2. Wire it up in `newClient` (alongside the other `c.X = (*XService)(&c.common)` lines, also kept alphabetical).
+3. Declare the service type in the service's file (e.g. `repos.go`) and hang the
+   methods off it, using `s` as the receiver (see [Receiver Names](#receiver-names)).
+
+### Naming Conventions
+
+#### Receiver Names
+
+Service method receivers consistently use the single letter `s`:
+
+```go
+func (s *RepositoriesService) Get(ctx context.Context, owner, repo string) (*Repository, *Response, error) {
+	// ...
+}
+```
+
+#### Method Names
+
+Methods use descriptive names that clearly indicate their action.
+The method name should not repeat the scope already defined by the service:
+
+```go
+// On OrganizationsService, the scope is already "organization":
+func (s *OrganizationsService) ListMembers(ctx context.Context, org string, opts *OrganizationListMembersOptions) ([]*User, *Response, error)
+
+// On EnterpriseService, the scope is already "enterprise":
+func (s *EnterpriseService) GetLicenseInfo(ctx context.Context) (*LicenseInfo, *Response, error)
+```
+
+Common method name prefixes:
+- `Get` - Retrieve a single resource
+- `List` - Retrieve multiple resources (supports pagination)
+- `Create` - Create a new resource
+- `Update` - Update an existing resource
+- `Delete` - Delete a resource
+
+#### Common Variable Names
+
+- `ctx` - Context
+- `u` - URL string
+- `req` - HTTP request
+- `resp` - HTTP response
+- `result` - Result from API call
+- `err` - Error
+- `opts` - Options parameter
+- `body` - Body parameter
+- `owner` - Repository owner (username or organization)
+- `repo` - Repository name
+- `org` - Organization name
+- `user` - Username
+- `team` - Team name or slug
+- `project` - Project name or number
+
+### Type Conventions
+
+#### Value vs Pointer Parameters
+
+Prefer value types over pointer types for parameters where the distinction
+between "zero" and "unset" is not needed, or where the type is small and
+cheap to copy (e.g., `string`, `int`, `int64`, `bool`). Use pointer types
+when you need to distinguish between an unset value and a zero value.
+See [#3644][] and [#3887][] for background discussion.
+
+[#3644]: https://github.com/google/go-github/pull/3644
+[#3887]: https://github.com/google/go-github/pull/3887
+
+#### Creating Pointers
+
+Pointer fields are common because many request and response fields are
+optional. Use the `new` builtin to take the address of a literal
+instead of declaring an intermediate variable:
+
+```go
+repo := &Repository{
+	Name:    new("go-github"),
+	Private: new(true),
+	ID:      new(int64(1)),
+}
+```
+
+#### Request Option Types
+
+Request option types should be used for query parameters and named after the method they
+modify, with the suffix `Options`:
+
+```go
+type RepositoryListOptions struct {
+	Type      string `url:"type,omitempty"`
+	Sort      string `url:"sort,omitempty"`
+	Direction string `url:"direction,omitempty"`
+	ListOptions
+}
+```
+
+#### Request Body Types
+
+Request body types for POST/PUT/PATCH requests should use the `Request`
+suffix for create and update operations:
+
+```go
+type CreateHostedRunnerRequest struct {
+	Name           string `json:"name"`
+	RunnerGroupID  int64  `json:"runner_group_id"`
+	MaximumRunners *int64 `json:"maximum_runners,omitempty"`
+	// ...
+}
+```
+
+#### Response Types
+
+Response types are named after the resource they represent, typically without
+any suffix:
+
+```go
+type Repository struct {
+	ID          *int64  `json:"id,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	FullName    *string `json:"full_name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	// ...
+}
+```
+
+#### Common Structs
+
+- `ListOptions` - For offset-based pagination (page/per_page)
+- `ListCursorOptions` - For cursor-based pagination
+- `UploadOptions` - For file uploads
+- `Response` - Wraps the HTTP response
+
+### JSON Tags
+
+#### Request Bodies
+
+Required fields should be non-pointer types without `omitempty`.
+Optional fields should be pointer types with `omitempty`.
+Use `omitzero` for `time.Time` where you want to omit empty values (not
+just nil). A struct declared in this package must not be a value with an
+omit option, because `omitempty` never omits a struct value and our linters
+reject `omitzero` on one: make such a field a pointer instead. For slices
+and maps, `omitzero` has the opposite behavior: it keeps empty (non-nil)
+values and only omits nil values.
+
+```go
+type RepositoryRuleset struct {
+	// ID is optional.
+	ID *int64 `json:"id,omitempty"`
+
+	// Name is required.
+	Name string `json:"name"`
+
+	// Target is optional struct.
+	Target *RulesetTarget `json:"target,omitempty"`
+
+	// BypassActors is optional.
+	BypassActors []*BypassActor `json:"bypass_actors,omitzero"`
+
+	// CreatedAt is optional.
+	CreatedAt *Timestamp `json:"created_at,omitempty"`
+
+	// ...
+}
+```
+
+If you need to differentiate between an unset pointer to a basic type and a `nil` value you can add an un-marshaled struct field to control this behaviour and provide a custom `MarshalJSON` implementation for the struct (see `UpdateTeamRequest.RemoveParentTeam` in
+`github/teams.go`).
+
+Whether a request body property is required is documented by GitHub in their
+OpenAPI descriptions, not in this repository, so these rules are checked by
+`script/check-schema-fields.sh` against those descriptions. See the
+[tools/schemafields](#toolsschemafields) section for more information.
+
+#### Response Bodies
+
+Follow the same conventions as request bodies for `omitempty` and
+`omitzero` usage. Optional fields should use pointer types with
+`omitempty`, and required fields should prefer non-pointer types.
+See [Common Types](#common-types) for conventions on ID, Node ID, and Timestamp.
+
+### URL Tags for Query Parameters
+
+All fields should use `url` tags with `omitempty` to omit zero values
+from the query string:
+
+```go
+type RepositoryListOptions struct {
+	Type      string `url:"type,omitempty"`
+	Sort      string `url:"sort,omitempty"`
+	Direction string `url:"direction,omitempty"`
+	ListOptions
+}
+```
+
+### Pagination
+
+The go-github library supports two types of pagination:
+
+#### Offset-based Pagination
+
+Use `ListOptions` for APIs that use page/per_page parameters:
+
+```go
+type ListOptions struct {
+	Page    int `url:"page,omitempty"`
+	PerPage int `url:"per_page,omitempty"`
+}
+```
+
+#### Cursor-based Pagination
+
+Use `ListCursorOptions` for APIs that use cursor-based pagination:
+
+```go
+type ListCursorOptions struct {
+	Page    string `url:"page,omitempty"`
+	PerPage int    `url:"per_page,omitempty"`
+	First   int    `url:"first,omitempty"`
+	Last    int    `url:"last,omitempty"`
+	After   string `url:"after,omitempty"`
+	Before  string `url:"before,omitempty"`
+	Cursor  string `url:"cursor,omitempty"`
+}
+```
+
+Embed the appropriate pagination options in your option structs
+based on the API's pagination model: use `ListOptions` for
+offset-based APIs and `ListCursorOptions` for cursor-based APIs.
+The library automatically generates iterator methods (e.g., `ListIter`)
+for methods that start with `List` and return a slice.
+
+For APIs with non-standard pagination behavior (e.g., methods that
+return a wrapper struct containing multiple slices), configuration maps
+in `gen-iterators.go` can be adjusted — including `useCursorPagination`,
+`customNames`, `sliceToBeUsedForIteration`, and `customTestJSON`.
+
+### Common Types
+
+#### ID Fields
+
+GitHub API IDs are usually `int64`. Use non-pointer `int64`
+if the ID is required and `*int64` if the ID is optional.
+
+```go
+type CreateHostedRunnerRequest struct {
+	RunnerGroupID int64 `json:"runner_group_id"`
+	// ...
+}
+```
+
+#### Node ID Fields
+
+Node IDs are usually `string`:
+
+```go
+type IssueFieldValue struct {
+	NodeID string `json:"node_id"`
+	// ...
+}
+```
+
+#### Timestamp Fields
+
+Use the `Timestamp` type for all date/time fields:
+
+```go
+type Repository struct {
+	CreatedAt *Timestamp `json:"created_at,omitempty"`
+	// ...
+}
+```
+
+### Generated Code
+
+Some files are generated and must never be edited by hand.
+When you add or change a struct, run `script/generate.sh` to regenerate them.
+
+So after adding a field you typically only write the struct field itself;
+the accessor and stringify code follow from `script/generate.sh`.
+`script/lint.sh` will fail if these files are out of date.
+Documentation links and `//meta:operation` directives are updated
+by the same script (see [Code Comments](#code-comments)).
+
+### Testing
+
+Tests use a real `httptest` server rather than mocks. Call `setup` to get a
+`Client` pointed at a test server plus the `mux` to register handlers on, then
+assert on the request and the decoded response. A typical test looks like this:
+
+```go
+func TestRepositoriesService_GetByID(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repositories/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{"id":1,"name":"n"}`)
+	})
+
+	ctx := t.Context()
+	got, _, err := client.Repositories.GetByID(ctx, 1)
+	if err != nil {
+		t.Fatalf("Repositories.GetByID returned error: %v", err)
+	}
+
+	want := &Repository{ID: new(int64(1)), Name: new("n")}
+	if !cmp.Equal(got, want) {
+		t.Errorf("Repositories.GetByID returned %+v, want %+v", got, want)
+	}
+
+	const methodName = "GetByID"
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Repositories.GetByID(ctx, 1)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+```
+
+Conventions to follow:
+
+- Call `t.Parallel()` and use `t.Context()` for the request context.
+- Register handlers on `mux` with relative paths (a leading `/`); the test
+  server fails requests built from absolute URLs to catch that mistake.
+- Use the shared helpers instead of reimplementing assertions:
+  - `testMethod` - asserts the HTTP method.
+  - `testFormValues` - asserts query parameters.
+  - `testHeader` - asserts a request header.
+  - `testJSONBody` - asserts that the request body is the JSON encoding of a
+    value. Pass the value that the method was called with, or the one it builds
+    internally, rather than a hand-written copy of the body: the helper encodes
+    the value and compares it with the body as JSON, so it does not care whether
+    a field is a pointer, what a tag leaves out, or how a custom marshaler
+    reshapes the value, and it reports any field the body carries that the value
+    does not.
+  - `testJSONBodyRaw` - asserts the exact body, given as JSON text. Use it when
+    which fields are present is the point, such as a required field that must
+    not be omitted or a list that must be an empty array rather than null.
+    `testJSONBody` cannot see the difference, because an omitted field and a
+    zero-valued one encode the same way.
+  - `testPlainBody` - asserts a body that is not JSON.
+  - `testNewRequestAndDoFailure` - exercises the request-building and
+    request-doing error paths for a method.
+  - `testBadOptions` - asserts that invalid options return an error.
+- Use `testJSONMarshal` to verify a type round-trips to and from the expected JSON.
+- Compare values with `cmp.Equal` and construct optional fields with `Ptr`
+  (see [Creating Pointers](#creating-pointers)).
+
+## Metadata
+
+GitHub publishes [OpenAPI descriptions of their API][]. We use these
+descriptions to keep documentation links up to date, to keep track of which
+methods call which endpoints via the `//meta:operation` comments described
+above, and to check that request body fields are required exactly when the API
+requires them. GitHub's descriptions are far too large to keep in this
+repository or to pull down every time we generate code, so we keep only the
+metadata we need in `openapi_operations.yaml`.
+
+### openapi_operations.yaml
+
+Most contributors won't need to interact with `openapi_operations.yaml`, but it
+may be useful to know what it is. Its sections are:
+
+- `openapi_operations` - is the metadata that comes from GitHub's OpenAPI
+  descriptions. It is generated by `script/metadata.sh update-openapi` and
+  should not be edited by hand. In the rare case where it needs to be
+  overridden, use the `operation_overrides` section instead.
+
+  An operation consists of `name`, `documentation_url`,
+  and `openapi_files`. `openapi_files` is the list of files where the operation
+  is described. In order or preference, values can be "api.github.com.json" for
+  operations available on the free plan, "ghec.json" for operations available on
+  GitHub Enterprise Cloud or "ghes-<version>.json" for operations available on
+  GitHub Enterprise Server. When an operation is described in multiple ghes
+  files, only the most recent version is included. `documentation_url` is the
+  URL that should be linked from godoc. It is the documentation link found in
+  the first file listed in `openapi_files`.
+
+- `openapi_commit` - is the git commit that `script/metadata.sh update-openapi`
+  saw when it last updated `openapi_operations`. It is not necessarily the most
+  recent commit seen because `update-openapi` doesn't update the file when
+  there are no changes to `openapi_operations`.
+
+- `operations` - contains manually added metadata that is not in GitHub's
+  OpenAPI descriptions. There are only a few of these. Some have
+  documentation_urls that point to relevant GitHub documentation that is not in
+  the OpenAPI descriptions. Others have no documentation_url and result in a
+  note in the generated code that the documentation is missing.
+
+- `operation_overrides` - is where we override the documentation_url for
+  operations where the link in the OpenAPI descriptions is wrong.
+
+Only `openapi_operations` is replaced wholesale every time it is updated, so it
+cannot go stale. The two hand-written sections are never pruned, and an entry
+that stops doing anything stays until someone notices.
+`script/metadata.sh check` reports those entries: an override whose operation
+the file no longer lists, an override that no longer changes anything, a name
+that both `operations` and `openapi_operations` list, and a name a section lists
+twice. Delete what it reports, so that the file only shrinks.
+
+Please note that if your PR unit tests are failing due to an out-of-date
+`openapi_operations.yaml` file, simply ask the maintainer(s) of this repo
+to update it for you so that your PR doesn't need to include changes
+to this auto-generated file.
+
+### tools/metadata
+
+The `tools/metadata` package is a command-line tool for working with metadata.
+In a typical workflow, you won't use it directly, but you will use it indirectly
+through `script/generate.sh`.
+
+Its subcommands are:
+
+- `update-openapi` - updates `openapi_operations.yaml` with the latest
+  information from GitHub's OpenAPI descriptions. With `--validate` it will
+  validate that the descriptions are correct as of the commit
+  in `openapi_commit`. `update-openapi --validate` needs a `GITHUB_TOKEN`,
+  so it is run by the `linter` workflow rather than by `script/lint.sh`.
+
+- `update-go` - updates Go files with documentation URLs and formats comments.
+  It is used by `script/generate.sh`.
+
+- `format` - formats white space in `openapi_operations.yaml` and sorts its
+  arrays. It is not needed after `update-openapi`, which writes the file the
+  same way.
+
+- `unused` - lists operations from `openapi_operations.yaml` that are not mapped
+  from any methods.
+
+- `check` - reports the entries in `openapi_operations.yaml` that no longer do
+  anything, so that the hand-written sections can be kept minimal rather than
+  only sorted. It needs no `GITHUB_TOKEN`, so `script/lint.sh` and the `linter`
+  workflow run it.
+
+### tools/schemafields
+
+The `tools/schemafields` package checks Go request body struct field
+optionality against GitHub's OpenAPI request body schemas. It is run by
+`script/check-schema-fields.sh`, which `script/lint.sh` and the `linter`
+workflow call, so you rarely need to run it directly.
+
+The struct-to-schema mapping is derived automatically: the tool takes the
+`//meta:operation` annotation that a method already has, and checks the `body`
+parameter that `paramcheck` requires to be passed by value. An endpoint is
+therefore checked without any extra annotation, and coverage grows as pointer
+bodies are converted to by-value ones.
+
+A struct that some method returns describes an API response as well as,
+sometimes, a request body, so a field of one that no request body schema has is
+not reported: it is usually a field that the server sets and the client only
+reads. `-verbose` counts those fields, so that the exemption is visible in the
+summary without being a finding.
+
+A run ends with a summary of the state of the tree rather than of the run, so
+that a maintainer reads what there is to do rather than what happened:
+how many of the methods that take a struct request body were checked, what was
+not checked and why (bodies passed by pointer, and operations that none of the
+descriptions the tool loads documents), and what the findings are, counting the
+ones that `exceptions.txt` grandfathers alongside the new ones. It also reports
+what `-fix` can do about them, including the repairs that the exceptions file is
+holding back, and the errors that no mechanical repair settles. A body that is
+not a struct has no fields for a schema check to apply to, so it is left out of
+those counts and named by `-verbose` instead.
+
+Its flags are:
+
+- `-fix` repairs the findings that can be repaired mechanically: adding or
+  removing `omitempty` and `omitzero`, and converting fields between value and
+  pointer types. It is deliberately narrow, and repairs only what fails the
+  run: the `ERROR` findings that `exceptions.txt` does not grandfather. A
+  `WARN`ing is advisory, and an entry in the exceptions file is a decision to
+  leave a disagreement alone, so `-fix` rewrites neither. It prints the repairs
+  it plans before it writes them, and then re-checks the tree.
+  A field whose type changes between a value and a pointer leaves the callers
+  that still build one with the old type unable to compile, so `-fix` compiles
+  the checkout afterward and repairs those call sites too, unwrapping a
+  `new(...)` that the field no longer needs. It reports the call sites that no
+  mechanical repair can express, such as one that passes a variable, rather
+  than leaving them to be found by a build. A changed field type is generated
+  into other files as well, such as the accessors of its struct, so `-fix` runs
+  `script/generate.sh` for you when the checkout has one. It never rewrites a
+  generated file itself: the generator would discard the repair, and the
+  repository's generators leave their output read-only.
+  A repair that `-fix` planned and could not write, a call site it cannot
+  repair, and a checkout that does not compile are each reported as a
+  `not repaired:` line, and the run fails, so a run that reports a field
+  repaired has not left a broken tree behind it.
+  To repair a grandfathered field, delete its line from `exceptions.txt`
+  first, or pass `-exceptions /dev/null` to treat every finding as new.
+- `-write-exceptions` rewrites `tools/schemafields/exceptions.txt` from the
+  current findings.
+- `-descriptions` checks against local OpenAPI description files instead of
+  downloading the ones pinned in `openapi_operations.yaml`.
+- `-verbose` adds the full breakdown to the summary: the scan counts, the
+  operation uses that resolved, the fields that a rule leaves alone, the
+  per-rule tally, and every request body that was left unchecked, with the
+  reason.
+
+GitHub's descriptions are large, so a run without `-descriptions` downloads
+them from `github/rest-api-description` at the `openapi_commit` pinned in
+`openapi_operations.yaml` and caches them in the user cache directory; a
+repeated run is therefore offline. The cache holds the revision in use alone, so
+it does not grow by the size of the descriptions at every revision the
+repository is pinned to.
+
+Findings are reported as `ERROR`s, which fail the run, and `WARN`ings, which
+are advisory. `tools/schemafields/exceptions.txt` grandfathers the findings
+that the repository already has, so that a pull request is only told about the
+ones it introduces. An entry that no finding needs any more is reported as
+obsolete, and `-fix` removes it, so the file can only shrink. Because an entry
+also says that the field should be left alone, `-fix` will not repair a field
+that the file names.
+
+A struct can be the request body of more than one operation, and those
+operations can disagree: one schema can require a property that another does
+not have at all, or holds as `readOnly`, which is never sent. No one Go field
+suits both, because making the field mandatory would start sending a property
+that the other operation does not accept. `-fix` therefore rewrites a field
+only when every operation that sends the struct agrees about it, and reports
+the ones that do not for you to settle. An entry in `exceptions.txt` is how
+that decision is recorded.
+
+[OpenAPI descriptions of their API]: https://github.com/github/rest-api-description
+
+## Scripts
+
+The `script` directory has shell scripts that help with common development
+tasks:
+
+- `script/fmt.sh` formats all Go code in the repository.
+- `script/generate.sh` runs code generators and `go mod tidy` on all modules, and keeps the `structfield` linter exceptions in `.golangci.yml` up to date. With `--check` it verifies all three without writing anything.
+- `script/lint.sh` runs linters, checks request body fields against the OpenAPI schemas, checks that `openapi_operations.yaml` has no stale entries, and checks generated files and linter exceptions are current.
+- `script/metadata.sh` runs `tools/metadata`. See the [Metadata](#metadata) section for more information.
+- `script/check-schema-fields.sh` runs `tools/schemafields`. See the [tools/schemafields](#toolsschemafields) section for more information.
+- `script/run-check-structfield-settings.sh` reports the `structfield` linter exceptions in `.golangci.yml` that are no longer needed or are listed twice, and fails if there are any; with `-fix` it removes them instead.
+- `script/test.sh` runs tests on all modules.
+
+## Maintainer's Guide
 
 (These notes are mostly only for people merging in pull requests.)
 
@@ -127,3 +822,6 @@ this][modified-comment].
 [git-aliases]: https://github.com/willnorris/dotfiles/blob/d640d010c23b1116bdb3d4dc12088ed26120d87d/git/.gitconfig#L13-L15
 [rebase-comment]: https://github.com/google/go-github/pull/277#issuecomment-183035491
 [modified-comment]: https://github.com/google/go-github/pull/280#issuecomment-184859046
+
+**When creating a release, don't forget to update the `Version` constant in `github.go`.** This is used to
+send the version in the `User-Agent` header to identify clients to the GitHub API.

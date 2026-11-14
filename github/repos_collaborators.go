@@ -23,11 +23,18 @@ type ListCollaboratorsOptions struct {
 	// Default value is "all".
 	Affiliation string `url:"affiliation,omitempty"`
 
+	// Permission specifies how collaborators should be filtered by the permissions they have on the repository.
+	// Possible values are:
+	// "pull", "triage", "push", "maintain", "admin"
+	//
+	// If not specified, all collaborators will be returned.
+	Permission string `url:"permission,omitempty"`
+
 	ListOptions
 }
 
 // CollaboratorInvitation represents an invitation created when adding a collaborator.
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/collaborators/#response-when-a-new-invitation-is-created
+// GitHub API docs: https://docs.github.com/rest/collaborators/collaborators?apiVersion=2022-11-28#add-a-repository-collaborator
 type CollaboratorInvitation struct {
 	ID          *int64      `json:"id,omitempty"`
 	Repo        *Repository `json:"repository,omitempty"`
@@ -41,7 +48,9 @@ type CollaboratorInvitation struct {
 
 // ListCollaborators lists the GitHub users that have access to the repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#list-repository-collaborators
+// GitHub API docs: https://docs.github.com/rest/collaborators/collaborators?apiVersion=2022-11-28#list-repository-collaborators
+//
+//meta:operation GET /repos/{owner}/{repo}/collaborators
 func (s *RepositoriesService) ListCollaborators(ctx context.Context, owner, repo string, opts *ListCollaboratorsOptions) ([]*User, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/collaborators", owner, repo)
 	u, err := addOptions(u, opts)
@@ -49,13 +58,13 @@ func (s *RepositoriesService) ListCollaborators(ctx context.Context, owner, repo
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var users []*User
-	resp, err := s.client.Do(ctx, req, &users)
+	resp, err := s.client.Do(req, &users)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -68,15 +77,17 @@ func (s *RepositoriesService) ListCollaborators(ctx context.Context, owner, repo
 // Note: This will return false if the user is not a collaborator OR the user
 // is not a GitHub user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#check-if-a-user-is-a-repository-collaborator
+// GitHub API docs: https://docs.github.com/rest/collaborators/collaborators?apiVersion=2022-11-28#check-if-a-user-is-a-repository-collaborator
+//
+//meta:operation GET /repos/{owner}/{repo}/collaborators/{username}
 func (s *RepositoriesService) IsCollaborator(ctx context.Context, owner, repo, user string) (bool, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/collaborators/%v", owner, repo, user)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return false, nil, err
 	}
 
-	resp, err := s.client.Do(ctx, req, nil)
+	resp, err := s.client.Do(req, nil)
 	isCollab, err := parseBoolResponse(err)
 	return isCollab, resp, err
 }
@@ -88,67 +99,79 @@ type RepositoryPermissionLevel struct {
 	Permission *string `json:"permission,omitempty"`
 
 	User *User `json:"user,omitempty"`
+
+	RoleName *string `json:"role_name,omitempty"`
 }
 
 // GetPermissionLevel retrieves the specific permission level a collaborator has for a given repository.
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#get-repository-permissions-for-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/collaborators/collaborators?apiVersion=2022-11-28#get-repository-permissions-for-a-user
+//
+//meta:operation GET /repos/{owner}/{repo}/collaborators/{username}/permission
 func (s *RepositoriesService) GetPermissionLevel(ctx context.Context, owner, repo, user string) (*RepositoryPermissionLevel, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/collaborators/%v/permission", owner, repo, user)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rpl := new(RepositoryPermissionLevel)
-	resp, err := s.client.Do(ctx, req, rpl)
+	var rpl *RepositoryPermissionLevel
+	resp, err := s.client.Do(req, &rpl)
 	if err != nil {
 		return nil, resp, err
 	}
+
 	return rpl, resp, nil
 }
 
-// RepositoryAddCollaboratorOptions specifies the optional parameters to the
-// RepositoriesService.AddCollaborator method.
-type RepositoryAddCollaboratorOptions struct {
+// AddCollaboratorRequest represents a request to add a collaborator to a repository.
+type AddCollaboratorRequest struct {
 	// Permission specifies the permission to grant the user on this repository.
 	// Possible values are:
 	//     pull - team members can pull, but not push to or administer this repository
-	//     push - team members can pull and push, but not administer this repository
+	//     push - team members can push and pull, but not administer this repository
 	//     admin - team members can pull, push and administer this repository
 	//     maintain - team members can manage the repository without access to sensitive or destructive actions.
 	//     triage - team members can proactively manage issues and pull requests without write access.
 	//
 	// Default value is "push". This option is only valid for organization-owned repositories.
-	Permission string `json:"permission,omitempty"`
+	Permission *string `json:"permission,omitempty"`
 }
 
 // AddCollaborator sends an invitation to the specified GitHub user
 // to become a collaborator to the given repo.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#add-a-repository-collaborator
-func (s *RepositoriesService) AddCollaborator(ctx context.Context, owner, repo, user string, opts *RepositoryAddCollaboratorOptions) (*CollaboratorInvitation, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/collaborators/collaborators?apiVersion=2022-11-28#add-a-repository-collaborator
+//
+//meta:operation PUT /repos/{owner}/{repo}/collaborators/{username}
+func (s *RepositoriesService) AddCollaborator(ctx context.Context, owner, repo, user string, body AddCollaboratorRequest) (*CollaboratorInvitation, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/collaborators/%v", owner, repo, user)
-	req, err := s.client.NewRequest("PUT", u, opts)
+	req, err := s.client.NewRequest(ctx, "PUT", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
-	acr := new(CollaboratorInvitation)
-	resp, err := s.client.Do(ctx, req, acr)
+
+	var acr *CollaboratorInvitation
+	resp, err := s.client.Do(req, &acr)
 	if err != nil {
 		return nil, resp, err
 	}
+
 	return acr, resp, nil
 }
 
 // RemoveCollaborator removes the specified GitHub user as collaborator from the given repo.
 // Note: Does not return error if a valid user that is not a collaborator is removed.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#remove-a-repository-collaborator
+// GitHub API docs: https://docs.github.com/rest/collaborators/collaborators?apiVersion=2022-11-28#remove-a-repository-collaborator
+//
+//meta:operation DELETE /repos/{owner}/{repo}/collaborators/{username}
 func (s *RepositoriesService) RemoveCollaborator(ctx context.Context, owner, repo, user string) (*Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/collaborators/%v", owner, repo, user)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+
+	return s.client.Do(req, nil)
 }

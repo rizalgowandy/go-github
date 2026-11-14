@@ -12,7 +12,9 @@ import (
 
 // ListBlockedUsers lists all the users blocked by an organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-users-blocked-by-an-organization
+// GitHub API docs: https://docs.github.com/rest/orgs/blocking?apiVersion=2022-11-28#list-users-blocked-by-an-organization
+//
+//meta:operation GET /orgs/{org}/blocks
 func (s *OrganizationsService) ListBlockedUsers(ctx context.Context, org string, opts *ListOptions) ([]*User, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/blocks", org)
 	u, err := addOptions(u, opts)
@@ -20,16 +22,15 @@ func (s *OrganizationsService) ListBlockedUsers(ctx context.Context, org string,
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeBlockUsersPreview)
 
 	var blockedUsers []*User
-	resp, err := s.client.Do(ctx, req, &blockedUsers)
+	resp, err := s.client.Do(req, &blockedUsers)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -39,53 +40,56 @@ func (s *OrganizationsService) ListBlockedUsers(ctx context.Context, org string,
 
 // IsBlocked reports whether specified user is blocked from an organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#check-if-a-user-is-blocked-by-an-organization
-func (s *OrganizationsService) IsBlocked(ctx context.Context, org string, user string) (bool, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/orgs/blocking?apiVersion=2022-11-28#check-if-a-user-is-blocked-by-an-organization
+//
+//meta:operation GET /orgs/{org}/blocks/{username}
+func (s *OrganizationsService) IsBlocked(ctx context.Context, org, user string) (bool, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/blocks/%v", org, user)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return false, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeBlockUsersPreview)
 
-	resp, err := s.client.Do(ctx, req, nil)
+	resp, err := s.client.Do(req, nil)
 	isBlocked, err := parseBoolResponse(err)
 	return isBlocked, resp, err
 }
 
 // BlockUser blocks specified user from an organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#block-a-user-from-an-organization
-func (s *OrganizationsService) BlockUser(ctx context.Context, org string, user string) (*Response, error) {
+// GitHub API docs: https://docs.github.com/rest/orgs/blocking?apiVersion=2022-11-28#block-a-user-from-an-organization
+//
+//meta:operation PUT /orgs/{org}/blocks/{username}
+func (s *OrganizationsService) BlockUser(ctx context.Context, org, user string) (*Response, error) {
 	u := fmt.Sprintf("orgs/%v/blocks/%v", org, user)
 
-	req, err := s.client.NewRequest("PUT", u, nil)
+	req, err := s.client.NewRequest(ctx, "PUT", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeBlockUsersPreview)
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // UnblockUser unblocks specified user from an organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#unblock-a-user-from-an-organization
-func (s *OrganizationsService) UnblockUser(ctx context.Context, org string, user string) (*Response, error) {
+// GitHub API docs: https://docs.github.com/rest/orgs/blocking?apiVersion=2022-11-28#unblock-a-user-from-an-organization
+//
+//meta:operation DELETE /orgs/{org}/blocks/{username}
+func (s *OrganizationsService) UnblockUser(ctx context.Context, org, user string) (*Response, error) {
 	u := fmt.Sprintf("orgs/%v/blocks/%v", org, user)
 
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeBlockUsersPreview)
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

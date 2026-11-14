@@ -8,13 +8,12 @@ package github
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
 // OrganizationsService provides access to the organization related functions
 // in the GitHub API.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/
+// GitHub API docs: https://docs.github.com/rest/orgs?apiVersion=2022-11-28
 type OrganizationsService service
 
 // Organization represents a GitHub organization account.
@@ -35,10 +34,11 @@ type Organization struct {
 	PublicGists                 *int       `json:"public_gists,omitempty"`
 	Followers                   *int       `json:"followers,omitempty"`
 	Following                   *int       `json:"following,omitempty"`
-	CreatedAt                   *time.Time `json:"created_at,omitempty"`
-	UpdatedAt                   *time.Time `json:"updated_at,omitempty"`
-	TotalPrivateRepos           *int       `json:"total_private_repos,omitempty"`
-	OwnedPrivateRepos           *int       `json:"owned_private_repos,omitempty"`
+	CreatedAt                   *Timestamp `json:"created_at,omitempty"`
+	UpdatedAt                   *Timestamp `json:"updated_at,omitempty"`
+	ArchivedAt                  *Timestamp `json:"archived_at,omitempty"`
+	TotalPrivateRepos           *int64     `json:"total_private_repos,omitempty"`
+	OwnedPrivateRepos           *int64     `json:"owned_private_repos,omitempty"`
 	PrivateGists                *int       `json:"private_gists,omitempty"`
 	DiskUsage                   *int       `json:"disk_usage,omitempty"`
 	Collaborators               *int       `json:"collaborators,omitempty"`
@@ -65,6 +65,12 @@ type Organization struct {
 	MembersCanCreatePrivateRepos  *bool `json:"members_can_create_private_repositories,omitempty"`
 	MembersCanCreateInternalRepos *bool `json:"members_can_create_internal_repositories,omitempty"`
 
+	// MembersCanForkPrivateRepos toggles whether organization members can fork private organization repositories.
+	MembersCanForkPrivateRepos *bool `json:"members_can_fork_private_repositories,omitempty"`
+
+	// DeployKeysEnabledForRepositories toggles whether deploy keys may be added and used for repositories in the organization.
+	DeployKeysEnabledForRepositories *bool `json:"deploy_keys_enabled_for_repositories,omitempty"`
+
 	// MembersAllowedRepositoryCreationType denotes if organization members can create repositories
 	// and the type of repositories they can create. Possible values are: "all", "private", or "none".
 	//
@@ -79,6 +85,44 @@ type Organization struct {
 	MembersCanCreatePublicPages *bool `json:"members_can_create_public_pages,omitempty"`
 	// MembersCanCreatePrivatePages toggles whether organization members can create private GitHub Pages sites.
 	MembersCanCreatePrivatePages *bool `json:"members_can_create_private_pages,omitempty"`
+	// WebCommitSignoffRequire toggles
+	WebCommitSignoffRequired *bool `json:"web_commit_signoff_required,omitempty"`
+	// AdvancedSecurityAuditLogEnabled toggles whether the advanced security audit log is enabled.
+	AdvancedSecurityEnabledForNewRepos *bool `json:"advanced_security_enabled_for_new_repositories,omitempty"`
+	// DependabotAlertsEnabled toggles whether dependabot alerts are enabled.
+	DependabotAlertsEnabledForNewRepos *bool `json:"dependabot_alerts_enabled_for_new_repositories,omitempty"`
+	// DependabotSecurityUpdatesEnabled toggles whether dependabot security updates are enabled.
+	DependabotSecurityUpdatesEnabledForNewRepos *bool `json:"dependabot_security_updates_enabled_for_new_repositories,omitempty"`
+	// DependabotGraphEnabledForNewRepos toggles whether dependabot graph is enabled on new repositories.
+	DependencyGraphEnabledForNewRepos *bool `json:"dependency_graph_enabled_for_new_repositories,omitempty"`
+	// SecretScanningEnabled toggles whether secret scanning is enabled on new repositories.
+	SecretScanningEnabledForNewRepos *bool `json:"secret_scanning_enabled_for_new_repositories,omitempty"`
+	// SecretScanningPushProtectionEnabledForNewRepos toggles whether secret scanning push protection is enabled on new repositories.
+	SecretScanningPushProtectionEnabledForNewRepos *bool `json:"secret_scanning_push_protection_enabled_for_new_repositories,omitempty"`
+	// SecretScanningValidityChecksEnabled toggles whether secret scanning validity check is enabled.
+	SecretScanningValidityChecksEnabled *bool `json:"secret_scanning_validity_checks_enabled,omitempty"`
+	// SecretScanningPushProtectionCustomLinkEnabled toggles whether a custom link is shown to contributors blocked by secret scanning push protection.
+	SecretScanningPushProtectionCustomLinkEnabled *bool `json:"secret_scanning_push_protection_custom_link_enabled,omitempty"`
+	// SecretScanningPushProtectionCustomLink is the URL displayed to contributors blocked by secret scanning push protection.
+	SecretScanningPushProtectionCustomLink *string `json:"secret_scanning_push_protection_custom_link,omitempty"`
+	// MembersCanDeleteRepositories toggles whether members with admin permissions can delete a repository.
+	MembersCanDeleteRepositories *bool `json:"members_can_delete_repositories,omitempty"`
+	// MembersCanChangeRepoVisibility toggles whether members with admin permissions can change the visibility for a repository.
+	MembersCanChangeRepoVisibility *bool `json:"members_can_change_repo_visibility,omitempty"`
+	// MembersCanInviteOutsideCollaborators toggles whether members with admin permissions can invite outside collaborators.
+	MembersCanInviteOutsideCollaborators *bool `json:"members_can_invite_outside_collaborators,omitempty"`
+	// MembersCanDeleteIssues toggles whether members with admin permissions can delete issues.
+	MembersCanDeleteIssues *bool `json:"members_can_delete_issues,omitempty"`
+	// DisplayCommenterFullNameSettingEnabled toggles whether members can see the comment author's profile name in private repositories.
+	DisplayCommenterFullNameSettingEnabled *bool `json:"display_commenter_full_name_setting_enabled,omitempty"`
+	// ReadersCanCreateDiscussions toggles whether users with read access can create and comment on discussions.
+	ReadersCanCreateDiscussions *bool `json:"readers_can_create_discussions,omitempty"`
+	// MembersCanCreateTeams toggles whether members of an organization can create new teams.
+	MembersCanCreateTeams *bool `json:"members_can_create_teams,omitempty"`
+	// MembersCanViewDependencyInsights toggles whether members may view dependency insights.
+	MembersCanViewDependencyInsights *bool `json:"members_can_view_dependency_insights,omitempty"`
+	// DefaultRepositoryBranch is the default branch for new repositories in the organization.
+	DefaultRepositoryBranch *string `json:"default_repository_branch,omitempty"`
 
 	// API URLs
 	URL              *string `json:"url,omitempty"`
@@ -105,7 +149,7 @@ type Plan struct {
 	Name          *string `json:"name,omitempty"`
 	Space         *int    `json:"space,omitempty"`
 	Collaborators *int    `json:"collaborators,omitempty"`
-	PrivateRepos  *int    `json:"private_repos,omitempty"`
+	PrivateRepos  *int64  `json:"private_repos,omitempty"`
 	FilledSeats   *int    `json:"filled_seats,omitempty"`
 	Seats         *int    `json:"seats,omitempty"`
 }
@@ -117,13 +161,11 @@ func (p Plan) String() string {
 // OrganizationsListOptions specifies the optional parameters to the
 // OrganizationsService.ListAll method.
 type OrganizationsListOptions struct {
-	// Since filters Organizations by ID.
+	// An organization ID. Only return organizations with an ID greater than this ID.
 	Since int64 `url:"since,omitempty"`
 
-	// Note: Pagination is powered exclusively by the Since parameter,
-	// ListOptions.Page has no effect.
-	// ListOptions.PerPage controls an undocumented GitHub API parameter.
-	ListOptions
+	// The number of results per page (max 100).
+	PerPage int `url:"per_page,omitempty"`
 }
 
 // ListAll lists all organizations, in the order that they were created on GitHub.
@@ -132,20 +174,22 @@ type OrganizationsListOptions struct {
 // listing the next set of organizations, use the ID of the last-returned organization
 // as the opts.Since parameter for the next call.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-organizations
+// GitHub API docs: https://docs.github.com/rest/orgs/orgs?apiVersion=2022-11-28#list-organizations
+//
+//meta:operation GET /organizations
 func (s *OrganizationsService) ListAll(ctx context.Context, opts *OrganizationsListOptions) ([]*Organization, *Response, error) {
 	u, err := addOptions("organizations", opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	orgs := []*Organization{}
-	resp, err := s.client.Do(ctx, req, &orgs)
+	resp, err := s.client.Do(req, &orgs)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -155,8 +199,12 @@ func (s *OrganizationsService) ListAll(ctx context.Context, opts *OrganizationsL
 // List the organizations for a user. Passing the empty string will list
 // organizations for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-organizations-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-organizations-for-a-user
+// GitHub API docs: https://docs.github.com/rest/orgs/orgs?apiVersion=2022-11-28#list-organizations-for-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/orgs/orgs?apiVersion=2022-11-28#list-organizations-for-the-authenticated-user
+//
+//meta:operation GET /user/orgs
+//meta:operation GET /users/{username}/orgs
 func (s *OrganizationsService) List(ctx context.Context, user string, opts *ListOptions) ([]*Organization, *Response, error) {
 	var u string
 	if user != "" {
@@ -169,13 +217,13 @@ func (s *OrganizationsService) List(ctx context.Context, user string, opts *List
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var orgs []*Organization
-	resp, err := s.client.Do(ctx, req, &orgs)
+	resp, err := s.client.Do(req, &orgs)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -185,60 +233,20 @@ func (s *OrganizationsService) List(ctx context.Context, user string, opts *List
 
 // Get fetches an organization by name.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#get-an-organization
+// GitHub API docs: https://docs.github.com/rest/orgs/orgs?apiVersion=2022-11-28#get-an-organization
+//
+//meta:operation GET /orgs/{org}
 func (s *OrganizationsService) Get(ctx context.Context, org string) (*Organization, *Response, error) {
 	u := fmt.Sprintf("orgs/%v", org)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeMemberAllowedRepoCreationTypePreview)
 
-	organization := new(Organization)
-	resp, err := s.client.Do(ctx, req, organization)
-	if err != nil {
-		return nil, resp, err
-	}
-
-	return organization, resp, nil
-}
-
-// GetByID fetches an organization.
-//
-// Note: GetByID uses the undocumented GitHub API endpoint /organizations/:id.
-func (s *OrganizationsService) GetByID(ctx context.Context, id int64) (*Organization, *Response, error) {
-	u := fmt.Sprintf("organizations/%d", id)
-	req, err := s.client.NewRequest("GET", u, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	organization := new(Organization)
-	resp, err := s.client.Do(ctx, req, organization)
-	if err != nil {
-		return nil, resp, err
-	}
-
-	return organization, resp, nil
-}
-
-// Edit an organization.
-//
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#update-an-organization
-func (s *OrganizationsService) Edit(ctx context.Context, name string, org *Organization) (*Organization, *Response, error) {
-	u := fmt.Sprintf("orgs/%v", name)
-	req, err := s.client.NewRequest("PATCH", u, org)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// TODO: remove custom Accept header when this API fully launches.
-	req.Header.Set("Accept", mediaTypeMemberAllowedRepoCreationTypePreview)
-
-	o := new(Organization)
-	resp, err := s.client.Do(ctx, req, o)
+	var o *Organization
+	resp, err := s.client.Do(req, &o)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -246,9 +254,70 @@ func (s *OrganizationsService) Edit(ctx context.Context, name string, org *Organ
 	return o, resp, nil
 }
 
+// GetByID fetches an organization.
+//
+// Note: GetByID uses the undocumented GitHub API endpoint "GET /organizations/{organization_id}".
+//
+//meta:operation GET /organizations/{organization_id}
+func (s *OrganizationsService) GetByID(ctx context.Context, id int64) (*Organization, *Response, error) {
+	u := fmt.Sprintf("organizations/%v", id)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var org *Organization
+	resp, err := s.client.Do(req, &org)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return org, resp, nil
+}
+
+// Edit an organization.
+//
+// GitHub API docs: https://docs.github.com/rest/orgs/orgs?apiVersion=2022-11-28#update-an-organization
+//
+//meta:operation PATCH /orgs/{org}
+func (s *OrganizationsService) Edit(ctx context.Context, name string, body *Organization) (*Organization, *Response, error) {
+	u := fmt.Sprintf("orgs/%v", name)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req.Header.Set("Accept", mediaTypeMemberAllowedRepoCreationTypePreview)
+
+	var o *Organization
+	resp, err := s.client.Do(req, &o)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return o, resp, nil
+}
+
+// Delete an organization by name.
+//
+// GitHub API docs: https://docs.github.com/rest/orgs/orgs?apiVersion=2022-11-28#delete-an-organization
+//
+//meta:operation DELETE /orgs/{org}
+func (s *OrganizationsService) Delete(ctx context.Context, org string) (*Response, error) {
+	u := fmt.Sprintf("orgs/%v", org)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
+}
+
 // ListInstallations lists installations for an organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-app-installations-for-an-organization
+// GitHub API docs: https://docs.github.com/rest/orgs/orgs?apiVersion=2022-11-28#list-app-installations-for-an-organization
+//
+//meta:operation GET /orgs/{org}/installations
 func (s *OrganizationsService) ListInstallations(ctx context.Context, org string, opts *ListOptions) (*OrganizationInstallations, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/installations", org)
 
@@ -257,13 +326,13 @@ func (s *OrganizationsService) ListInstallations(ctx context.Context, org string
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	result := new(OrganizationInstallations)
-	resp, err := s.client.Do(ctx, req, result)
+	var result *OrganizationInstallations
+	resp, err := s.client.Do(req, &result)
 	if err != nil {
 		return nil, resp, err
 	}

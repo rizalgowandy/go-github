@@ -6,38 +6,38 @@
 package github
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestActionsService_ListWorkflowRunsByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/actions/workflows/29679449/runs", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testFormValues(t, r, values{"per_page": "2", "page": "2"})
-		fmt.Fprint(w, `{"total_count":4,"workflow_runs":[{"id":399444496,"run_number":296,"created_at":"2019-01-02T15:04:05Z","updated_at":"2020-01-02T15:04:05Z"},{"id":399444497,"run_number":296,"created_at":"2019-01-02T15:04:05Z","updated_at":"2020-01-02T15:04:05Z"}]}`)
+		fmt.Fprint(w, `{"total_count":4,"workflow_runs":[{"id":399444496,"run_number":296,"created_at":`+refTimeStr(1136178000)+`,"updated_at":`+refTimeStr(1136178001)+`},{"id":399444497,"run_number":296,"created_at":`+refTimeStr(1136178002)+`,"updated_at":`+refTimeStr(1136178003)+`}]}`)
 	})
 
 	opts := &ListWorkflowRunsOptions{ListOptions: ListOptions{Page: 2, PerPage: 2}}
-	ctx := context.Background()
+	ctx := t.Context()
 	runs, _, err := client.Actions.ListWorkflowRunsByID(ctx, "o", "r", 29679449, opts)
 	if err != nil {
-		t.Errorf("Actions.ListWorkFlowRunsByID returned error: %v", err)
+		t.Errorf("Actions.ListWorkflowRunsByID returned error: %v", err)
 	}
 
 	want := &WorkflowRuns{
-		TotalCount: Int(4),
+		TotalCount: new(4),
 		WorkflowRuns: []*WorkflowRun{
-			{ID: Int64(399444496), RunNumber: Int(296), CreatedAt: &Timestamp{time.Date(2019, time.January, 02, 15, 04, 05, 0, time.UTC)}, UpdatedAt: &Timestamp{time.Date(2020, time.January, 02, 15, 04, 05, 0, time.UTC)}},
-			{ID: Int64(399444497), RunNumber: Int(296), CreatedAt: &Timestamp{time.Date(2019, time.January, 02, 15, 04, 05, 0, time.UTC)}, UpdatedAt: &Timestamp{time.Date(2020, time.January, 02, 15, 04, 05, 0, time.UTC)}},
+			{ID: new(int64(399444496)), RunNumber: new(296), CreatedAt: refTimestamp(1136178000), UpdatedAt: refTimestamp(1136178001)},
+			{ID: new(int64(399444497)), RunNumber: new(296), CreatedAt: refTimestamp(1136178002), UpdatedAt: refTimestamp(1136178003)},
 		},
 	}
 	if !cmp.Equal(runs, want) {
@@ -60,27 +60,27 @@ func TestActionsService_ListWorkflowRunsByID(t *testing.T) {
 }
 
 func TestActionsService_ListWorkflowRunsFileName(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/actions/workflows/29679449/runs", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testFormValues(t, r, values{"per_page": "2", "page": "2"})
-		fmt.Fprint(w, `{"total_count":4,"workflow_runs":[{"id":399444496,"run_number":296,"created_at":"2019-01-02T15:04:05Z","updated_at":"2020-01-02T15:04:05Z"},{"id":399444497,"run_number":296,"created_at":"2019-01-02T15:04:05Z","updated_at":"2020-01-02T15:04:05Z"}]}`)
+		fmt.Fprint(w, `{"total_count":4,"workflow_runs":[{"id":399444496,"run_number":296,"created_at":`+refTimeStr(1136178000)+`,"updated_at":`+refTimeStr(1136178001)+`},{"id":399444497,"run_number":296,"created_at":`+refTimeStr(1136178002)+`,"updated_at":`+refTimeStr(1136178003)+`}]}`)
 	})
 
 	opts := &ListWorkflowRunsOptions{ListOptions: ListOptions{Page: 2, PerPage: 2}}
-	ctx := context.Background()
+	ctx := t.Context()
 	runs, _, err := client.Actions.ListWorkflowRunsByFileName(ctx, "o", "r", "29679449", opts)
 	if err != nil {
-		t.Errorf("Actions.ListWorkFlowRunsByFileName returned error: %v", err)
+		t.Errorf("Actions.ListWorkflowRunsByFileName returned error: %v", err)
 	}
 
 	want := &WorkflowRuns{
-		TotalCount: Int(4),
+		TotalCount: new(4),
 		WorkflowRuns: []*WorkflowRun{
-			{ID: Int64(399444496), RunNumber: Int(296), CreatedAt: &Timestamp{time.Date(2019, time.January, 02, 15, 04, 05, 0, time.UTC)}, UpdatedAt: &Timestamp{time.Date(2020, time.January, 02, 15, 04, 05, 0, time.UTC)}},
-			{ID: Int64(399444497), RunNumber: Int(296), CreatedAt: &Timestamp{time.Date(2019, time.January, 02, 15, 04, 05, 0, time.UTC)}, UpdatedAt: &Timestamp{time.Date(2020, time.January, 02, 15, 04, 05, 0, time.UTC)}},
+			{ID: new(int64(399444496)), RunNumber: new(296), CreatedAt: refTimestamp(1136178000), UpdatedAt: refTimestamp(1136178001)},
+			{ID: new(int64(399444497)), RunNumber: new(296), CreatedAt: refTimestamp(1136178002), UpdatedAt: refTimestamp(1136178003)},
 		},
 	}
 	if !cmp.Equal(runs, want) {
@@ -103,25 +103,25 @@ func TestActionsService_ListWorkflowRunsFileName(t *testing.T) {
 }
 
 func TestActionsService_GetWorkflowRunByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/actions/runs/29679449", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprint(w, `{"id":399444496,"run_number":296,"created_at":"2019-01-02T15:04:05Z","updated_at":"2020-01-02T15:04:05Z"}}`)
+		fmt.Fprint(w, `{"id":399444496,"run_number":296,"created_at":`+refTimeStr(1136178000)+`,"updated_at":`+refTimeStr(1136178001)+`}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	runs, _, err := client.Actions.GetWorkflowRunByID(ctx, "o", "r", 29679449)
 	if err != nil {
 		t.Errorf("Actions.GetWorkflowRunByID returned error: %v", err)
 	}
 
 	want := &WorkflowRun{
-		ID:        Int64(399444496),
-		RunNumber: Int(296),
-		CreatedAt: &Timestamp{time.Date(2019, time.January, 02, 15, 04, 05, 0, time.UTC)},
-		UpdatedAt: &Timestamp{time.Date(2020, time.January, 02, 15, 04, 05, 0, time.UTC)},
+		ID:        new(int64(399444496)),
+		RunNumber: new(296),
+		CreatedAt: refTimestamp(1136178000),
+		UpdatedAt: refTimestamp(1136178001),
 	}
 
 	if !cmp.Equal(runs, want) {
@@ -143,22 +143,261 @@ func TestActionsService_GetWorkflowRunByID(t *testing.T) {
 	})
 }
 
-func TestActionsService_RerunWorkflowRunByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestActionsService_GetWorkflowRunAttempt(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/actions/runs/29679449/attempts/3", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"exclude_pull_requests": "true"})
+		fmt.Fprint(w, `{"id":399444496,"run_number":296,"run_attempt":3,"created_at":`+refTimeStr(1136178000)+`,"updated_at":`+refTimeStr(1136178001)+`}`)
+	})
+
+	opts := &WorkflowRunAttemptOptions{ExcludePullRequests: new(true)}
+	ctx := t.Context()
+	runs, _, err := client.Actions.GetWorkflowRunAttempt(ctx, "o", "r", 29679449, 3, opts)
+	if err != nil {
+		t.Errorf("Actions.GetWorkflowRunAttempt returned error: %v", err)
+	}
+
+	want := &WorkflowRun{
+		ID:         new(int64(399444496)),
+		RunNumber:  new(296),
+		RunAttempt: new(3),
+		CreatedAt:  refTimestamp(1136178000),
+		UpdatedAt:  refTimestamp(1136178001),
+	}
+
+	if !cmp.Equal(runs, want) {
+		t.Errorf("Actions.GetWorkflowRunAttempt returned %+v, want %+v", runs, want)
+	}
+
+	const methodName = "GetWorkflowRunAttempt"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Actions.GetWorkflowRunAttempt(ctx, "\n", "\n", 29679449, 3, opts)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Actions.GetWorkflowRunAttempt(ctx, "o", "r", 29679449, 3, opts)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestActionsService_GetWorkflowRunAttemptLogs(t *testing.T) {
+	t.Parallel()
+	tcs := []struct {
+		name              string
+		respectRateLimits bool
+	}{
+		{
+			name:              "withoutRateLimits",
+			respectRateLimits: false,
+		},
+		{
+			name:              "withRateLimits",
+			respectRateLimits: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client, mux, _ := setup(t)
+			client.rateLimitRedirectionalEndpoints = tc.respectRateLimits
+
+			mux.HandleFunc("/repos/o/r/actions/runs/399444496/attempts/2/logs", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				http.Redirect(w, r, "https://github.com/a", http.StatusFound)
+			})
+
+			ctx := t.Context()
+			url, resp, err := client.Actions.GetWorkflowRunAttemptLogs(ctx, "o", "r", 399444496, 2, 1)
+			if err != nil {
+				t.Errorf("Actions.GetWorkflowRunAttemptLogs returned error: %v", err)
+			}
+			if resp.StatusCode != http.StatusFound {
+				t.Errorf("Actions.GetWorkflowRunAttemptLogs returned status: %v, want %v", resp.StatusCode, http.StatusFound)
+			}
+			want := "https://github.com/a"
+			if url.String() != want {
+				t.Errorf("Actions.GetWorkflowRunAttemptLogs returned %+v, want %+v", url, want)
+			}
+
+			const methodName = "GetWorkflowRunAttemptLogs"
+			testBadOptions(t, methodName, func() (err error) {
+				_, _, err = client.Actions.GetWorkflowRunAttemptLogs(ctx, "\n", "\n", 399444496, 2, 1)
+				return err
+			})
+		})
+	}
+}
+
+func TestActionsService_GetWorkflowRunAttemptLogs_StatusMovedPermanently_dontFollowRedirects(t *testing.T) {
+	t.Parallel()
+	tcs := []struct {
+		name              string
+		respectRateLimits bool
+	}{
+		{
+			name:              "withoutRateLimits",
+			respectRateLimits: false,
+		},
+		{
+			name:              "withRateLimits",
+			respectRateLimits: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client, mux, _ := setup(t)
+			client.rateLimitRedirectionalEndpoints = tc.respectRateLimits
+
+			mux.HandleFunc("/repos/o/r/actions/runs/399444496/attempts/2/logs", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				http.Redirect(w, r, "https://github.com/a", http.StatusMovedPermanently)
+			})
+
+			ctx := t.Context()
+			_, resp, _ := client.Actions.GetWorkflowRunAttemptLogs(ctx, "o", "r", 399444496, 2, 0)
+			if resp.StatusCode != http.StatusMovedPermanently {
+				t.Errorf("Actions.GetWorkflowRunAttemptLogs returned status: %v, want %v", resp.StatusCode, http.StatusMovedPermanently)
+			}
+		})
+	}
+}
+
+func TestActionsService_GetWorkflowRunAttemptLogs_StatusMovedPermanently_followRedirects(t *testing.T) {
+	t.Parallel()
+	tcs := []struct {
+		name              string
+		respectRateLimits bool
+	}{
+		{
+			name:              "withoutRateLimits",
+			respectRateLimits: false,
+		},
+		{
+			name:              "withRateLimits",
+			respectRateLimits: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client, mux, serverURL := setup(t)
+			client.rateLimitRedirectionalEndpoints = tc.respectRateLimits
+
+			// Mock a redirect link, which leads to an archive link
+			mux.HandleFunc("/repos/o/r/actions/runs/399444496/attempts/2/logs", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				redirectURL, _ := url.Parse(serverURL + baseURLPath + "/redirect")
+				http.Redirect(w, r, redirectURL.String(), http.StatusMovedPermanently)
+			})
+
+			mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				http.Redirect(w, r, "https://github.com/a", http.StatusFound)
+			})
+
+			ctx := t.Context()
+			url, resp, err := client.Actions.GetWorkflowRunAttemptLogs(ctx, "o", "r", 399444496, 2, 1)
+			if err != nil {
+				t.Errorf("Actions.GetWorkflowRunAttemptLogs returned error: %v", err)
+			}
+
+			if resp.StatusCode != http.StatusFound {
+				t.Errorf("Actions.GetWorkflowRunAttemptLogs returned status: %v, want %v", resp.StatusCode, http.StatusFound)
+			}
+
+			want := "https://github.com/a"
+			if url.String() != want {
+				t.Errorf("Actions.GetWorkflowRunAttemptLogs returned %+v, want %+v", url, want)
+			}
+
+			const methodName = "GetWorkflowRunAttemptLogs"
+			testBadOptions(t, methodName, func() (err error) {
+				_, _, err = client.Actions.GetWorkflowRunAttemptLogs(ctx, "\n", "\n", 399444496, 2, 1)
+				return err
+			})
+		})
+	}
+}
+
+func TestActionsService_GetWorkflowRunAttemptLogs_unexpectedCode(t *testing.T) {
+	t.Parallel()
+	tcs := []struct {
+		name              string
+		respectRateLimits bool
+	}{
+		{
+			name:              "withoutRateLimits",
+			respectRateLimits: false,
+		},
+		{
+			name:              "withRateLimits",
+			respectRateLimits: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client, mux, serverURL := setup(t)
+			client.rateLimitRedirectionalEndpoints = tc.respectRateLimits
+
+			// Mock a redirect link, which leads to an archive link
+			mux.HandleFunc("/repos/o/r/actions/runs/399444496/attempts/2/logs", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				redirectURL, _ := url.Parse(serverURL + baseURLPath + "/redirect")
+				http.Redirect(w, r, redirectURL.String(), http.StatusMovedPermanently)
+			})
+
+			mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				w.WriteHeader(http.StatusNoContent)
+			})
+
+			ctx := t.Context()
+			url, resp, err := client.Actions.GetWorkflowRunAttemptLogs(ctx, "o", "r", 399444496, 2, 1)
+			if err == nil {
+				t.Fatal("Actions.GetWorkflowRunAttemptLogs should return error on unexpected code")
+			}
+			if !strings.Contains(err.Error(), "unexpected status code") {
+				t.Error("Actions.GetWorkflowRunAttemptLogs should return unexpected status code")
+			}
+			if got, want := resp.Response.StatusCode, http.StatusNoContent; got != want {
+				t.Errorf("Actions.GetWorkflowRunAttemptLogs return status %v, want %v", got, want)
+			}
+			if url != nil {
+				t.Errorf("Actions.GetWorkflowRunAttemptLogs return %+v, want nil", url)
+			}
+		})
+	}
+}
+
+func TestActionsService_RerunWorkflowByID(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/actions/runs/3434/rerun", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "POST")
 		w.WriteHeader(http.StatusCreated)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	resp, err := client.Actions.RerunWorkflowByID(ctx, "o", "r", 3434)
 	if err != nil {
 		t.Errorf("Actions.RerunWorkflowByID returned error: %v", err)
 	}
 	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Actions.RerunWorkflowRunByID returned status: %d, want %d", resp.StatusCode, http.StatusCreated)
+		t.Errorf("Actions.RerunWorkflowByID returned status: %v, want %v", resp.StatusCode, http.StatusCreated)
 	}
 
 	const methodName = "RerunWorkflowByID"
@@ -172,22 +411,80 @@ func TestActionsService_RerunWorkflowRunByID(t *testing.T) {
 	})
 }
 
+func TestActionsService_RerunFailedJobsByID(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/actions/runs/3434/rerun-failed-jobs", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	ctx := t.Context()
+	resp, err := client.Actions.RerunFailedJobsByID(ctx, "o", "r", 3434)
+	if err != nil {
+		t.Errorf("Actions.RerunFailedJobsByID returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Actions.RerunFailedJobsByID returned status: %v, want %v", resp.StatusCode, http.StatusCreated)
+	}
+
+	const methodName = "RerunFailedJobsByID"
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Actions.RerunFailedJobsByID(ctx, "\n", "\n", 3434)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Actions.RerunFailedJobsByID(ctx, "o", "r", 3434)
+	})
+}
+
+func TestActionsService_RerunJobByID(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/actions/jobs/3434/rerun", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	ctx := t.Context()
+	resp, err := client.Actions.RerunJobByID(ctx, "o", "r", 3434)
+	if err != nil {
+		t.Errorf("Actions.RerunJobByID returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Actions.RerunJobByID returned status: %v, want %v", resp.StatusCode, http.StatusCreated)
+	}
+
+	const methodName = "RerunJobByID"
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Actions.RerunJobByID(ctx, "\n", "\n", 3434)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Actions.RerunJobByID(ctx, "o", "r", 3434)
+	})
+}
+
 func TestActionsService_CancelWorkflowRunByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/actions/runs/3434/cancel", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "POST")
 		w.WriteHeader(http.StatusAccepted)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	resp, err := client.Actions.CancelWorkflowRunByID(ctx, "o", "r", 3434)
-	if _, ok := err.(*AcceptedError); !ok {
+	if !errors.As(err, new(*AcceptedError)) {
 		t.Errorf("Actions.CancelWorkflowRunByID returned error: %v (want AcceptedError)", err)
 	}
 	if resp.StatusCode != http.StatusAccepted {
-		t.Errorf("Actions.CancelWorkflowRunByID returned status: %d, want %d", resp.StatusCode, http.StatusAccepted)
+		t.Errorf("Actions.CancelWorkflowRunByID returned status: %v, want %v", resp.StatusCode, http.StatusAccepted)
 	}
 
 	const methodName = "CancelWorkflowRunByID"
@@ -201,115 +498,284 @@ func TestActionsService_CancelWorkflowRunByID(t *testing.T) {
 	})
 }
 
-func TestActionsService_GetWorkflowRunLogs(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestActionsService_ForceCancelWorkflowRunByID(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/actions/runs/399444496/logs", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "GET")
-		http.Redirect(w, r, "http://github.com/a", http.StatusFound)
+	mux.HandleFunc("/repos/o/r/actions/runs/3434/force-cancel", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		w.WriteHeader(http.StatusAccepted)
 	})
 
-	ctx := context.Background()
-	url, resp, err := client.Actions.GetWorkflowRunLogs(ctx, "o", "r", 399444496, true)
-	if err != nil {
-		t.Errorf("Actions.GetWorkflowRunLogs returned error: %v", err)
+	ctx := t.Context()
+	resp, err := client.Actions.ForceCancelWorkflowRunByID(ctx, "o", "r", 3434)
+	if !errors.As(err, new(*AcceptedError)) {
+		t.Errorf("Actions.ForceCancelWorkflowRunByID returned error: %v (want AcceptedError)", err)
 	}
-	if resp.StatusCode != http.StatusFound {
-		t.Errorf("Actions.GetWorkflowRunLogs returned status: %d, want %d", resp.StatusCode, http.StatusFound)
-	}
-	want := "http://github.com/a"
-	if url.String() != want {
-		t.Errorf("Actions.GetWorkflowRunLogs returned %+v, want %+v", url.String(), want)
+	if resp.StatusCode != http.StatusAccepted {
+		t.Errorf("Actions.ForceCancelWorkflowRunByID returned status: %v, want %v", resp.StatusCode, http.StatusAccepted)
 	}
 
-	const methodName = "GetWorkflowRunLogs"
+	const methodName = "ForceCancelWorkflowRunByID"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Actions.GetWorkflowRunLogs(ctx, "\n", "\n", 399444496, true)
+		_, err = client.Actions.ForceCancelWorkflowRunByID(ctx, "\n", "\n", 3434)
 		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Actions.ForceCancelWorkflowRunByID(ctx, "o", "r", 3434)
 	})
 }
 
-func TestActionsService_GetWorkflowRunLogs_StatusMovedPermanently_dontFollowRedirects(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestActionsService_ApproveWorkflowRunByID(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/actions/runs/399444496/logs", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "GET")
-		http.Redirect(w, r, "http://github.com/a", http.StatusMovedPermanently)
+	mux.HandleFunc("/repos/o/r/actions/runs/3434/approve", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		w.WriteHeader(http.StatusCreated)
 	})
 
-	ctx := context.Background()
-	_, resp, _ := client.Actions.GetWorkflowRunLogs(ctx, "o", "r", 399444496, false)
-	if resp.StatusCode != http.StatusMovedPermanently {
-		t.Errorf("Actions.GetWorkflowJobLogs returned status: %d, want %d", resp.StatusCode, http.StatusMovedPermanently)
+	ctx := t.Context()
+	resp, err := client.Actions.ApproveWorkflowRunByID(ctx, "o", "r", 3434)
+	if err != nil {
+		t.Fatalf("Actions.ApproveWorkflowRunByID returned error: %v", err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Actions.ApproveWorkflowRunByID returned status: %v, want %v", resp.StatusCode, http.StatusCreated)
+	}
+
+	const methodName = "ApproveWorkflowRunByID"
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Actions.ApproveWorkflowRunByID(ctx, "\n", "\n", 3434)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Actions.ApproveWorkflowRunByID(ctx, "o", "r", 3434)
+	})
+}
+
+func TestActionsService_GetWorkflowRunLogs(t *testing.T) {
+	t.Parallel()
+	tcs := []struct {
+		name              string
+		respectRateLimits bool
+	}{
+		{
+			name:              "withoutRateLimits",
+			respectRateLimits: false,
+		},
+		{
+			name:              "withRateLimits",
+			respectRateLimits: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client, mux, _ := setup(t)
+			client.rateLimitRedirectionalEndpoints = tc.respectRateLimits
+
+			mux.HandleFunc("/repos/o/r/actions/runs/399444496/logs", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				http.Redirect(w, r, "https://github.com/a", http.StatusFound)
+			})
+
+			ctx := t.Context()
+			url, resp, err := client.Actions.GetWorkflowRunLogs(ctx, "o", "r", 399444496, 1)
+			if err != nil {
+				t.Errorf("Actions.GetWorkflowRunLogs returned error: %v", err)
+			}
+			if resp.StatusCode != http.StatusFound {
+				t.Errorf("Actions.GetWorkflowRunLogs returned status: %v, want %v", resp.StatusCode, http.StatusFound)
+			}
+			want := "https://github.com/a"
+			if url.String() != want {
+				t.Errorf("Actions.GetWorkflowRunLogs returned %+v, want %+v", url, want)
+			}
+
+			const methodName = "GetWorkflowRunLogs"
+			testBadOptions(t, methodName, func() (err error) {
+				_, _, err = client.Actions.GetWorkflowRunLogs(ctx, "\n", "\n", 399444496, 1)
+				return err
+			})
+		})
+	}
+}
+
+func TestActionsService_GetWorkflowRunLogs_StatusMovedPermanently_dontFollowRedirects(t *testing.T) {
+	t.Parallel()
+	tcs := []struct {
+		name              string
+		respectRateLimits bool
+	}{
+		{
+			name:              "withoutRateLimits",
+			respectRateLimits: false,
+		},
+		{
+			name:              "withRateLimits",
+			respectRateLimits: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client, mux, _ := setup(t)
+			client.rateLimitRedirectionalEndpoints = tc.respectRateLimits
+
+			mux.HandleFunc("/repos/o/r/actions/runs/399444496/logs", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				http.Redirect(w, r, "https://github.com/a", http.StatusMovedPermanently)
+			})
+
+			ctx := t.Context()
+			_, resp, _ := client.Actions.GetWorkflowRunLogs(ctx, "o", "r", 399444496, 0)
+			if resp.StatusCode != http.StatusMovedPermanently {
+				t.Errorf("Actions.GetWorkflowRunLogs returned status: %v, want %v", resp.StatusCode, http.StatusMovedPermanently)
+			}
+		})
 	}
 }
 
 func TestActionsService_GetWorkflowRunLogs_StatusMovedPermanently_followRedirects(t *testing.T) {
-	client, mux, serverURL, teardown := setup()
-	defer teardown()
-
-	// Mock a redirect link, which leads to an archive link
-	mux.HandleFunc("/repos/o/r/actions/runs/399444496/logs", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "GET")
-		redirectURL, _ := url.Parse(serverURL + baseURLPath + "/redirect")
-		http.Redirect(w, r, redirectURL.String(), http.StatusMovedPermanently)
-	})
-
-	mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "GET")
-		http.Redirect(w, r, "http://github.com/a", http.StatusFound)
-	})
-
-	ctx := context.Background()
-	url, resp, err := client.Actions.GetWorkflowRunLogs(ctx, "o", "r", 399444496, true)
-	if err != nil {
-		t.Errorf("Actions.GetWorkflowJobLogs returned error: %v", err)
+	t.Parallel()
+	tcs := []struct {
+		name              string
+		respectRateLimits bool
+	}{
+		{
+			name:              "withoutRateLimits",
+			respectRateLimits: false,
+		},
+		{
+			name:              "withRateLimits",
+			respectRateLimits: true,
+		},
 	}
 
-	if resp.StatusCode != http.StatusFound {
-		t.Errorf("Actions.GetWorkflowJobLogs returned status: %d, want %d", resp.StatusCode, http.StatusFound)
-	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client, mux, serverURL := setup(t)
+			client.rateLimitRedirectionalEndpoints = tc.respectRateLimits
 
-	want := "http://github.com/a"
-	if url.String() != want {
-		t.Errorf("Actions.GetWorkflowJobLogs returned %+v, want %+v", url.String(), want)
-	}
+			// Mock a redirect link, which leads to an archive link
+			mux.HandleFunc("/repos/o/r/actions/runs/399444496/logs", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				redirectURL, _ := url.Parse(serverURL + baseURLPath + "/redirect")
+				http.Redirect(w, r, redirectURL.String(), http.StatusMovedPermanently)
+			})
 
-	const methodName = "GetWorkflowRunLogs"
-	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Actions.GetWorkflowRunLogs(ctx, "\n", "\n", 399444496, true)
-		return err
-	})
+			mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				http.Redirect(w, r, "https://github.com/a", http.StatusFound)
+			})
+
+			ctx := t.Context()
+			url, resp, err := client.Actions.GetWorkflowRunLogs(ctx, "o", "r", 399444496, 1)
+			if err != nil {
+				t.Errorf("Actions.GetWorkflowRunLogs returned error: %v", err)
+			}
+
+			if resp.StatusCode != http.StatusFound {
+				t.Errorf("Actions.GetWorkflowRunLogs returned status: %v, want %v", resp.StatusCode, http.StatusFound)
+			}
+
+			want := "https://github.com/a"
+			if url.String() != want {
+				t.Errorf("Actions.GetWorkflowRunLogs returned %+v, want %+v", url, want)
+			}
+
+			const methodName = "GetWorkflowRunLogs"
+			testBadOptions(t, methodName, func() (err error) {
+				_, _, err = client.Actions.GetWorkflowRunLogs(ctx, "\n", "\n", 399444496, 1)
+				return err
+			})
+		})
+	}
 }
 
-func TestActionService_ListRepositoryWorkflowRuns(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestActionsService_GetWorkflowRunLogs_unexpectedCode(t *testing.T) {
+	t.Parallel()
+	tcs := []struct {
+		name              string
+		respectRateLimits bool
+	}{
+		{
+			name:              "withoutRateLimits",
+			respectRateLimits: false,
+		},
+		{
+			name:              "withRateLimits",
+			respectRateLimits: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client, mux, serverURL := setup(t)
+			client.rateLimitRedirectionalEndpoints = tc.respectRateLimits
+
+			// Mock a redirect link, which leads to an archive link
+			mux.HandleFunc("/repos/o/r/actions/runs/399444496/logs", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				redirectURL, _ := url.Parse(serverURL + baseURLPath + "/redirect")
+				http.Redirect(w, r, redirectURL.String(), http.StatusMovedPermanently)
+			})
+
+			mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				w.WriteHeader(http.StatusNoContent)
+			})
+
+			ctx := t.Context()
+			url, resp, err := client.Actions.GetWorkflowRunLogs(ctx, "o", "r", 399444496, 1)
+			if err == nil {
+				t.Fatal("Actions.GetWorkflowRunLogs should return error on unexpected code")
+			}
+			if !strings.Contains(err.Error(), "unexpected status code") {
+				t.Error("Actions.GetWorkflowRunLogs should return unexpected status code")
+			}
+			if got, want := resp.Response.StatusCode, http.StatusNoContent; got != want {
+				t.Errorf("Actions.GetWorkflowRunLogs return status %v, want %v", got, want)
+			}
+			if url != nil {
+				t.Errorf("Actions.GetWorkflowRunLogs return %+v, want nil", url)
+			}
+		})
+	}
+}
+
+func TestActionsService_ListRepositoryWorkflowRuns(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/actions/runs", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testFormValues(t, r, values{"per_page": "2", "page": "2"})
 		fmt.Fprint(w, `{"total_count":2,
 		"workflow_runs":[
-			{"id":298499444,"run_number":301,"created_at":"2020-04-11T11:14:54Z","updated_at":"2020-04-11T11:14:54Z"},
-			{"id":298499445,"run_number":302,"created_at":"2020-04-11T11:14:54Z","updated_at":"2020-04-11T11:14:54Z"}]}`)
+			{"id":298499444,"run_number":301,"created_at":`+refTimeStr(1136178000)+`,"updated_at":`+refTimeStr(1136178001)+`},
+			{"id":298499445,"run_number":302,"created_at":`+refTimeStr(1136178002)+`,"updated_at":`+refTimeStr(1136178003)+`}]}`)
 	})
 
 	opts := &ListWorkflowRunsOptions{ListOptions: ListOptions{Page: 2, PerPage: 2}}
-	ctx := context.Background()
+	ctx := t.Context()
 	runs, _, err := client.Actions.ListRepositoryWorkflowRuns(ctx, "o", "r", opts)
-
 	if err != nil {
 		t.Errorf("Actions.ListRepositoryWorkflowRuns returned error: %v", err)
 	}
 
 	expected := &WorkflowRuns{
-		TotalCount: Int(2),
+		TotalCount: new(2),
 		WorkflowRuns: []*WorkflowRun{
-			{ID: Int64(298499444), RunNumber: Int(301), CreatedAt: &Timestamp{time.Date(2020, time.April, 11, 11, 14, 54, 0, time.UTC)}, UpdatedAt: &Timestamp{time.Date(2020, time.April, 11, 11, 14, 54, 0, time.UTC)}},
-			{ID: Int64(298499445), RunNumber: Int(302), CreatedAt: &Timestamp{time.Date(2020, time.April, 11, 11, 14, 54, 0, time.UTC)}, UpdatedAt: &Timestamp{time.Date(2020, time.April, 11, 11, 14, 54, 0, time.UTC)}},
+			{ID: new(int64(298499444)), RunNumber: new(301), CreatedAt: refTimestamp(1136178000), UpdatedAt: refTimestamp(1136178001)},
+			{ID: new(int64(298499445)), RunNumber: new(302), CreatedAt: refTimestamp(1136178002), UpdatedAt: refTimestamp(1136178003)},
 		},
 	}
 
@@ -334,9 +800,35 @@ func TestActionService_ListRepositoryWorkflowRuns(t *testing.T) {
 	})
 }
 
-func TestActionService_DeleteWorkflowRunLogs(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestActionsService_DeleteWorkflowRun(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/actions/runs/399444496", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "DELETE")
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ctx := t.Context()
+	if _, err := client.Actions.DeleteWorkflowRun(ctx, "o", "r", 399444496); err != nil {
+		t.Errorf("DeleteWorkflowRun returned error: %v", err)
+	}
+
+	const methodName = "DeleteWorkflowRun"
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Actions.DeleteWorkflowRun(ctx, "\n", "\n", 399444496)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Actions.DeleteWorkflowRun(ctx, "o", "r", 399444496)
+	})
+}
+
+func TestActionsService_DeleteWorkflowRunLogs(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/actions/runs/399444496/logs", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
@@ -344,7 +836,7 @@ func TestActionService_DeleteWorkflowRunLogs(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, err := client.Actions.DeleteWorkflowRunLogs(ctx, "o", "r", 399444496); err != nil {
 		t.Errorf("DeleteWorkflowRunLogs returned error: %v", err)
 	}
@@ -360,37 +852,85 @@ func TestActionService_DeleteWorkflowRunLogs(t *testing.T) {
 	})
 }
 
+func TestActionsService_ReviewCustomDeploymentProtectionRule(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/actions/runs/9444496/deployment_protection_rule", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	request := ReviewCustomDeploymentProtectionRuleRequest{
+		EnvironmentName: "production",
+		State:           "approved",
+		Comment:         "Approve deployment",
+	}
+
+	ctx := t.Context()
+	if _, err := client.Actions.ReviewCustomDeploymentProtectionRule(ctx, "o", "r", 9444496, request); err != nil {
+		t.Errorf("ReviewCustomDeploymentProtectionRule returned error: %v", err)
+	}
+
+	const methodName = "ReviewCustomDeploymentProtectionRule"
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Actions.ReviewCustomDeploymentProtectionRule(ctx, "\n", "\n", 9444496, request)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Actions.ReviewCustomDeploymentProtectionRule(ctx, "o", "r", 9444496, request)
+	})
+}
+
 func TestActionsService_GetWorkflowRunUsageByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/actions/runs/29679449/timing", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprint(w, `{"billable":{"UBUNTU":{"total_ms":180000,"jobs":1},"MACOS":{"total_ms":240000,"jobs":4},"WINDOWS":{"total_ms":300000,"jobs":2}},"run_duration_ms":500000}`)
+		fmt.Fprint(w, `{"billable":{"UBUNTU":{"total_ms":180000,"jobs":1,"job_runs":[{"job_id":1,"duration_ms":60000}]},"MACOS":{"total_ms":240000,"jobs":2,"job_runs":[{"job_id":2,"duration_ms":30000},{"job_id":3,"duration_ms":10000}]},"WINDOWS":{"total_ms":300000,"jobs":2}},"run_duration_ms":500000}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	workflowRunUsage, _, err := client.Actions.GetWorkflowRunUsageByID(ctx, "o", "r", 29679449)
 	if err != nil {
 		t.Errorf("Actions.GetWorkflowRunUsageByID returned error: %v", err)
 	}
 
 	want := &WorkflowRunUsage{
-		Billable: &WorkflowRunEnvironment{
-			Ubuntu: &WorkflowRunBill{
-				TotalMS: Int64(180000),
-				Jobs:    Int(1),
+		Billable: &WorkflowRunBillMap{
+			"UBUNTU": &WorkflowRunBill{
+				TotalMS: new(int64(180000)),
+				Jobs:    new(1),
+				JobRuns: []*WorkflowRunJobRun{
+					{
+						JobID:      new(1),
+						DurationMS: new(int64(60000)),
+					},
+				},
 			},
-			MacOS: &WorkflowRunBill{
-				TotalMS: Int64(240000),
-				Jobs:    Int(4),
+			"MACOS": &WorkflowRunBill{
+				TotalMS: new(int64(240000)),
+				Jobs:    new(2),
+				JobRuns: []*WorkflowRunJobRun{
+					{
+						JobID:      new(2),
+						DurationMS: new(int64(30000)),
+					},
+					{
+						JobID:      new(3),
+						DurationMS: new(int64(10000)),
+					},
+				},
 			},
-			Windows: &WorkflowRunBill{
-				TotalMS: Int64(300000),
-				Jobs:    Int(2),
+			"WINDOWS": &WorkflowRunBill{
+				TotalMS: new(int64(300000)),
+				Jobs:    new(2),
 			},
 		},
-		RunDurationMS: Int64(500000),
+		RunDurationMS: new(int64(500000)),
 	}
 
 	if !cmp.Equal(workflowRunUsage, want) {
@@ -412,430 +952,158 @@ func TestActionsService_GetWorkflowRunUsageByID(t *testing.T) {
 	})
 }
 
-func TestWorkflowRun_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WorkflowRun{}, "{}")
+func TestActionsService_PendingDeployments(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	u := &WorkflowRun{
-		ID:         Int64(1),
-		Name:       String("n"),
-		NodeID:     String("nid"),
-		HeadBranch: String("hb"),
-		HeadSHA:    String("hs"),
-		RunNumber:  Int(1),
-		Event:      String("e"),
-		Status:     String("s"),
-		Conclusion: String("c"),
-		WorkflowID: Int64(1),
-		URL:        String("u"),
-		HTMLURL:    String("h"),
-		PullRequests: []*PullRequest{
-			{
-				URL:    String("u"),
-				ID:     Int64(1),
-				Number: Int(1),
-				Head: &PullRequestBranch{
-					Ref: String("r"),
-					SHA: String("s"),
-					Repo: &Repository{
-						ID:   Int64(1),
-						URL:  String("s"),
-						Name: String("n"),
-					},
-				},
-				Base: &PullRequestBranch{
-					Ref: String("r"),
-					SHA: String("s"),
-					Repo: &Repository{
-						ID:   Int64(1),
-						URL:  String("u"),
-						Name: String("n"),
-					},
-				},
-			},
-		},
-		CreatedAt:     &Timestamp{referenceTime},
-		UpdatedAt:     &Timestamp{referenceTime},
-		JobsURL:       String("j"),
-		LogsURL:       String("l"),
-		CheckSuiteURL: String("c"),
-		ArtifactsURL:  String("a"),
-		CancelURL:     String("c"),
-		RerunURL:      String("r"),
-		HeadCommit: &HeadCommit{
-			Message: String("m"),
-			Author: &CommitAuthor{
-				Name:  String("n"),
-				Email: String("e"),
-				Login: String("l"),
-			},
-			URL:       String("u"),
-			Distinct:  Bool(false),
-			SHA:       String("s"),
-			ID:        String("i"),
-			TreeID:    String("tid"),
-			Timestamp: &Timestamp{referenceTime},
-			Committer: &CommitAuthor{
-				Name:  String("n"),
-				Email: String("e"),
-				Login: String("l"),
-			},
-		},
-		WorkflowURL: String("w"),
-		Repository: &Repository{
-			ID:   Int64(1),
-			URL:  String("u"),
-			Name: String("n"),
-		},
-		HeadRepository: &Repository{
-			ID:   Int64(1),
-			URL:  String("u"),
-			Name: String("n"),
-		},
+	input := PendingDeploymentsRequest{EnvironmentIDs: []int64{3, 4}, State: "approved", Comment: ""}
+
+	mux.HandleFunc("/repos/o/r/actions/runs/399444496/pending_deployments", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testJSONBody(t, r, input)
+		fmt.Fprint(w, `[{"id":1}, {"id":2}]`)
+	})
+
+	ctx := t.Context()
+	deployments, _, err := client.Actions.PendingDeployments(ctx, "o", "r", 399444496, input)
+	if err != nil {
+		t.Errorf("Actions.PendingDeployments returned error: %v", err)
 	}
 
-	want := `{
-		"id": 1,
-		"name": "n",
-		"node_id": "nid",
-		"head_branch": "hb",
-		"head_sha": "hs",
-		"run_number": 1,
-		"event": "e",
-		"status": "s",
-		"conclusion": "c",
-		"workflow_id": 1,
-		"url": "u",
-		"html_url": "h",
-		"pull_requests": [
+	want := []*Deployment{{ID: new(int64(1))}, {ID: new(int64(2))}}
+	if !cmp.Equal(deployments, want) {
+		t.Errorf("Actions.PendingDeployments returned %+v, want %+v", deployments, want)
+	}
+
+	const methodName = "PendingDeployments"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Actions.PendingDeployments(ctx, "\n", "\n", 399444496, input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Actions.PendingDeployments(ctx, "o", "r", 399444496, input)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestActionsService_GetPendingDeployments(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/actions/runs/399444496/pending_deployments", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `[
 			{
-				"id":1,
-				"number":1,
-				"url":"u",
-				"head":{
-					"ref":"r",
-					"sha":"s",
-					"repo": {
-						"id":1,
-						"name":"n",
-						"url":"s"
+				"environment": {
+					"id": 1,
+					"node_id": "nid",
+					"name": "n",
+					"url": "u",
+					"html_url": "hu"
+				},
+				"wait_timer": 0,
+				"wait_timer_started_at": `+refTimeStr(1136178000)+`,
+				"current_user_can_approve": false,
+				"reviewers": []
+			},
+			{
+				"environment": {
+					"id": 2,
+					"node_id": "nid",
+					"name": "n",
+					"url": "u",
+					"html_url": "hu"
+				},
+				"wait_timer": 13,
+				"wait_timer_started_at": `+refTimeStr(1136178001)+`,
+				"current_user_can_approve": true,
+				"reviewers": [
+					{
+						"type": "User",
+						"reviewer": {
+							"login": "l"
 						}
 					},
-					"base": {
-						"ref":"r",
-						"sha":"s",
-						"repo": {
-							"id":1,
-							"name":"n",
-							"url":"u"
+					{
+						"type": "Team",
+						"reviewer": {
+							"name": "t",
+							"slug": "s"
 						}
 					}
+				]
 			}
-		],
-		"created_at": ` + referenceTimeStr + `,
-		"updated_at": ` + referenceTimeStr + `,
-		"jobs_url": "j",
-		"logs_url": "l",
-		"check_suite_url": "c",
-		"artifacts_url": "a",
-		"cancel_url": "c",
-		"rerun_url": "r",
-		"head_commit": {
-			"message": "m",
-			"author": {
-				"name": "n",
-				"email": "e",
-				"username": "l"
+		]`)
+	})
+
+	ctx := t.Context()
+	deployments, _, err := client.Actions.GetPendingDeployments(ctx, "o", "r", 399444496)
+	if err != nil {
+		t.Errorf("Actions.GetPendingDeployments returned error: %v", err)
+	}
+
+	want := []*PendingDeployment{
+		{
+			Environment: &PendingDeploymentEnvironment{
+				ID:      new(int64(1)),
+				NodeID:  new("nid"),
+				Name:    new("n"),
+				URL:     new("u"),
+				HTMLURL: new("hu"),
 			},
-			"url": "u",
-			"distinct": false,
-			"sha": "s",
-			"id": "i",
-			"tree_id": "tid",
-			"timestamp": ` + referenceTimeStr + `,
-			"committer": {
-				"name": "n",
-				"email": "e",
-				"username": "l"
-			}
+			WaitTimer:             new(int64(0)),
+			WaitTimerStartedAt:    refTimestamp(1136178000),
+			CurrentUserCanApprove: new(false),
+			Reviewers:             []*RequiredReviewer{},
 		},
-		"workflow_url": "w",
-		"repository": {
-			"id": 1,
-			"url": "u",
-			"name": "n"
+		{
+			Environment: &PendingDeploymentEnvironment{
+				ID:      new(int64(2)),
+				NodeID:  new("nid"),
+				Name:    new("n"),
+				URL:     new("u"),
+				HTMLURL: new("hu"),
+			},
+			WaitTimer:             new(int64(13)),
+			WaitTimerStartedAt:    refTimestamp(1136178001),
+			CurrentUserCanApprove: new(true),
+			Reviewers: []*RequiredReviewer{
+				{
+					Type: new("User"),
+					Reviewer: &User{
+						Login: new("l"),
+					},
+				},
+				{
+					Type: new("Team"),
+					Reviewer: &Team{
+						Name: new("t"),
+						Slug: new("s"),
+					},
+				},
+			},
 		},
-		"head_repository": {
-			"id": 1,
-			"url": "u",
-			"name": "n"
+	}
+
+	if !cmp.Equal(deployments, want) {
+		t.Errorf("Actions.GetPendingDeployments returned %+v, want %+v", deployments, want)
+	}
+
+	const methodName = "GetPendingDeployments"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Actions.GetPendingDeployments(ctx, "\n", "\n", 399444496)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Actions.GetPendingDeployments(ctx, "o", "r", 399444496)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestWorkflowRuns_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WorkflowRuns{}, "{}")
-
-	u := &WorkflowRuns{
-		TotalCount: Int(1),
-		WorkflowRuns: []*WorkflowRun{
-			{
-				ID:         Int64(1),
-				Name:       String("n"),
-				NodeID:     String("nid"),
-				HeadBranch: String("hb"),
-				HeadSHA:    String("hs"),
-				RunNumber:  Int(1),
-				Event:      String("e"),
-				Status:     String("s"),
-				Conclusion: String("c"),
-				WorkflowID: Int64(1),
-				URL:        String("u"),
-				HTMLURL:    String("h"),
-				PullRequests: []*PullRequest{
-					{
-						URL:    String("u"),
-						ID:     Int64(1),
-						Number: Int(1),
-						Head: &PullRequestBranch{
-							Ref: String("r"),
-							SHA: String("s"),
-							Repo: &Repository{
-								ID:   Int64(1),
-								URL:  String("s"),
-								Name: String("n"),
-							},
-						},
-						Base: &PullRequestBranch{
-							Ref: String("r"),
-							SHA: String("s"),
-							Repo: &Repository{
-								ID:   Int64(1),
-								URL:  String("u"),
-								Name: String("n"),
-							},
-						},
-					},
-				},
-				CreatedAt:     &Timestamp{referenceTime},
-				UpdatedAt:     &Timestamp{referenceTime},
-				JobsURL:       String("j"),
-				LogsURL:       String("l"),
-				CheckSuiteURL: String("c"),
-				ArtifactsURL:  String("a"),
-				CancelURL:     String("c"),
-				RerunURL:      String("r"),
-				HeadCommit: &HeadCommit{
-					Message: String("m"),
-					Author: &CommitAuthor{
-						Name:  String("n"),
-						Email: String("e"),
-						Login: String("l"),
-					},
-					URL:       String("u"),
-					Distinct:  Bool(false),
-					SHA:       String("s"),
-					ID:        String("i"),
-					TreeID:    String("tid"),
-					Timestamp: &Timestamp{referenceTime},
-					Committer: &CommitAuthor{
-						Name:  String("n"),
-						Email: String("e"),
-						Login: String("l"),
-					},
-				},
-				WorkflowURL: String("w"),
-				Repository: &Repository{
-					ID:   Int64(1),
-					URL:  String("u"),
-					Name: String("n"),
-				},
-				HeadRepository: &Repository{
-					ID:   Int64(1),
-					URL:  String("u"),
-					Name: String("n"),
-				},
-			},
-		},
-	}
-
-	want := `{
-		"total_count": 1,
-		"workflow_runs": [
-			{
-				"id": 1,
-				"name": "n",
-				"node_id": "nid",
-				"head_branch": "hb",
-				"head_sha": "hs",
-				"run_number": 1,
-				"event": "e",
-				"status": "s",
-				"conclusion": "c",
-				"workflow_id": 1,
-				"url": "u",
-				"html_url": "h",
-				"pull_requests": [
-					{
-						"id":1,
-						"number":1,
-						"url":"u",
-						"head":{
-							"ref":"r",
-							"sha":"s",
-							"repo": {
-								"id":1,
-								"name":"n",
-								"url":"s"
-								}
-							},
-							"base": {
-								"ref":"r",
-								"sha":"s",
-								"repo": {
-									"id":1,
-									"name":"n",
-									"url":"u"
-								}
-							}
-					}
-				],
-				"created_at": ` + referenceTimeStr + `,
-				"updated_at": ` + referenceTimeStr + `,
-				"jobs_url": "j",
-				"logs_url": "l",
-				"check_suite_url": "c",
-				"artifacts_url": "a",
-				"cancel_url": "c",
-				"rerun_url": "r",
-				"head_commit": {
-					"message": "m",
-					"author": {
-						"name": "n",
-						"email": "e",
-						"username": "l"
-					},
-					"url": "u",
-					"distinct": false,
-					"sha": "s",
-					"id": "i",
-					"tree_id": "tid",
-					"timestamp": ` + referenceTimeStr + `,
-					"committer": {
-						"name": "n",
-						"email": "e",
-						"username": "l"
-					}
-				},
-				"workflow_url": "w",
-				"repository": {
-					"id": 1,
-					"url": "u",
-					"name": "n"
-				},
-				"head_repository": {
-					"id": 1,
-					"url": "u",
-					"name": "n"
-				}
-			}
-		]
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestWorkflowRunBill_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WorkflowRunBill{}, "{}")
-
-	u := &WorkflowRunBill{
-		TotalMS: Int64(1),
-		Jobs:    Int(1),
-	}
-
-	want := `{
-		"total_ms": 1,
-		"jobs": 1
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestWorkflowRunEnvironment_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WorkflowRunEnvironment{}, "{}")
-
-	u := &WorkflowRunEnvironment{
-		Ubuntu: &WorkflowRunBill{
-			TotalMS: Int64(1),
-			Jobs:    Int(1),
-		},
-		MacOS: &WorkflowRunBill{
-			TotalMS: Int64(1),
-			Jobs:    Int(1),
-		},
-		Windows: &WorkflowRunBill{
-			TotalMS: Int64(1),
-			Jobs:    Int(1),
-		},
-	}
-
-	want := `{
-		"UBUNTU": {
-			"total_ms": 1,
-			"jobs": 1
-		},
-		"MACOS": {
-			"total_ms": 1,
-			"jobs": 1
-		},
-		"WINDOWS": {
-			"total_ms": 1,
-			"jobs": 1
-		}
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestWorkflowRunUsage_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WorkflowRunUsage{}, "{}")
-
-	u := &WorkflowRunUsage{
-		Billable: &WorkflowRunEnvironment{
-			Ubuntu: &WorkflowRunBill{
-				TotalMS: Int64(1),
-				Jobs:    Int(1),
-			},
-			MacOS: &WorkflowRunBill{
-				TotalMS: Int64(1),
-				Jobs:    Int(1),
-			},
-			Windows: &WorkflowRunBill{
-				TotalMS: Int64(1),
-				Jobs:    Int(1),
-			},
-		},
-		RunDurationMS: Int64(1),
-	}
-
-	want := `{
-		"billable": {
-			"UBUNTU": {
-				"total_ms": 1,
-				"jobs": 1
-			},
-			"MACOS": {
-				"total_ms": 1,
-				"jobs": 1
-			},
-			"WINDOWS": {
-				"total_ms": 1,
-				"jobs": 1
-			}
-		},
-		"run_duration_ms": 1
-	}`
-
-	testJSONMarshal(t, u, want)
+		return resp, err
+	})
 }

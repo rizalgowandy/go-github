@@ -12,10 +12,10 @@ import (
 
 // Scope models a GitHub authorization scope.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/oauth/#scopes
+// GitHub API docs: https://docs.github.com/rest/oauth/#scopes
 type Scope string
 
-// This is the set of scopes for GitHub API V3
+// This is the set of scopes for GitHub API V3.
 const (
 	ScopeNone           Scope = "(no scope)" // REVISIT: is this actually returned, or just a documentation artifact?
 	ScopeUser           Scope = "user"
@@ -50,7 +50,7 @@ const (
 // This service requires HTTP Basic Authentication; it cannot be accessed using
 // an OAuth token.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/oauth_authorizations/
+// GitHub API docs: https://docs.github.com/rest/oauth-authorizations?apiVersion=2022-11-28
 type AuthorizationsService service
 
 // Authorization represents an individual GitHub authorization.
@@ -121,7 +121,7 @@ func (a AuthorizationRequest) String() string {
 // fields. That is, you may provide only one of "Scopes", or "AddScopes", or
 // "RemoveScopes".
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/oauth_authorizations/#update-an-existing-authorization
+// GitHub API docs: https://docs.github.com/rest/oauth-authorizations?apiVersion=2022-11-28#update-an-existing-authorization
 type AuthorizationUpdateRequest struct {
 	Scopes       []string `json:"scopes,omitempty"`
 	AddScopes    []string `json:"add_scopes,omitempty"`
@@ -143,7 +143,9 @@ func (a AuthorizationUpdateRequest) String() string {
 //
 // The returned Authorization.User field will be populated.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#check-a-token
+// GitHub API docs: https://docs.github.com/rest/apps/oauth-applications?apiVersion=2022-11-28#check-a-token
+//
+//meta:operation POST /applications/{client_id}/token
 func (s *AuthorizationsService) Check(ctx context.Context, clientID, accessToken string) (*Authorization, *Response, error) {
 	u := fmt.Sprintf("applications/%v/token", clientID)
 
@@ -151,14 +153,14 @@ func (s *AuthorizationsService) Check(ctx context.Context, clientID, accessToken
 		AccessToken string `json:"access_token"`
 	}{AccessToken: accessToken}
 
-	req, err := s.client.NewRequest("POST", u, reqBody)
+	req, err := s.client.NewRequest(ctx, "POST", u, reqBody)
 	if err != nil {
 		return nil, nil, err
 	}
 	req.Header.Set("Accept", mediaTypeOAuthAppPreview)
 
-	a := new(Authorization)
-	resp, err := s.client.Do(ctx, req, a)
+	var a *Authorization
+	resp, err := s.client.Do(req, &a)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -176,7 +178,9 @@ func (s *AuthorizationsService) Check(ctx context.Context, clientID, accessToken
 //
 // The returned Authorization.User field will be populated.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#reset-a-token
+// GitHub API docs: https://docs.github.com/rest/apps/oauth-applications?apiVersion=2022-11-28#reset-a-token
+//
+//meta:operation PATCH /applications/{client_id}/token
 func (s *AuthorizationsService) Reset(ctx context.Context, clientID, accessToken string) (*Authorization, *Response, error) {
 	u := fmt.Sprintf("applications/%v/token", clientID)
 
@@ -184,14 +188,14 @@ func (s *AuthorizationsService) Reset(ctx context.Context, clientID, accessToken
 		AccessToken string `json:"access_token"`
 	}{AccessToken: accessToken}
 
-	req, err := s.client.NewRequest("PATCH", u, reqBody)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, reqBody)
 	if err != nil {
 		return nil, nil, err
 	}
 	req.Header.Set("Accept", mediaTypeOAuthAppPreview)
 
-	a := new(Authorization)
-	resp, err := s.client.Do(ctx, req, a)
+	var a *Authorization
+	resp, err := s.client.Do(req, &a)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -205,7 +209,9 @@ func (s *AuthorizationsService) Reset(ctx context.Context, clientID, accessToken
 // username is the OAuth application clientID, and the password is its
 // clientSecret. Invalid tokens will return a 404 Not Found.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#delete-an-app-token
+// GitHub API docs: https://docs.github.com/rest/apps/oauth-applications?apiVersion=2022-11-28#delete-an-app-token
+//
+//meta:operation DELETE /applications/{client_id}/token
 func (s *AuthorizationsService) Revoke(ctx context.Context, clientID, accessToken string) (*Response, error) {
 	u := fmt.Sprintf("applications/%v/token", clientID)
 
@@ -213,20 +219,22 @@ func (s *AuthorizationsService) Revoke(ctx context.Context, clientID, accessToke
 		AccessToken string `json:"access_token"`
 	}{AccessToken: accessToken}
 
-	req, err := s.client.NewRequest("DELETE", u, reqBody)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, reqBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Accept", mediaTypeOAuthAppPreview)
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // DeleteGrant deletes an OAuth application grant. Deleting an application's
 // grant will also delete all OAuth tokens associated with the application for
 // the user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#delete-an-app-authorization
+// GitHub API docs: https://docs.github.com/rest/apps/oauth-applications?apiVersion=2022-11-28#delete-an-app-authorization
+//
+//meta:operation DELETE /applications/{client_id}/grant
 func (s *AuthorizationsService) DeleteGrant(ctx context.Context, clientID, accessToken string) (*Response, error) {
 	u := fmt.Sprintf("applications/%v/grant", clientID)
 
@@ -234,13 +242,13 @@ func (s *AuthorizationsService) DeleteGrant(ctx context.Context, clientID, acces
 		AccessToken string `json:"access_token"`
 	}{AccessToken: accessToken}
 
-	req, err := s.client.NewRequest("DELETE", u, reqBody)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, reqBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Accept", mediaTypeOAuthAppPreview)
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // CreateImpersonation creates an impersonation OAuth token.
@@ -249,16 +257,18 @@ func (s *AuthorizationsService) DeleteGrant(ctx context.Context, clientID, acces
 // you can e.g. create or delete a user's public SSH key. NOTE: creating a
 // new token automatically revokes an existing one.
 //
-// GitHub API docs: https://developer.github.com/enterprise/v3/enterprise-admin/users/#create-an-impersonation-oauth-token
-func (s *AuthorizationsService) CreateImpersonation(ctx context.Context, username string, authReq *AuthorizationRequest) (*Authorization, *Response, error) {
+// GitHub API docs: https://docs.github.com/enterprise-server@3.22/rest/enterprise-admin/users#create-an-impersonation-oauth-token
+//
+//meta:operation POST /admin/users/{username}/authorizations
+func (s *AuthorizationsService) CreateImpersonation(ctx context.Context, username string, body *AuthorizationRequest) (*Authorization, *Response, error) {
 	u := fmt.Sprintf("admin/users/%v/authorizations", username)
-	req, err := s.client.NewRequest("POST", u, authReq)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	a := new(Authorization)
-	resp, err := s.client.Do(ctx, req, a)
+	var a *Authorization
+	resp, err := s.client.Do(req, &a)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -269,13 +279,15 @@ func (s *AuthorizationsService) CreateImpersonation(ctx context.Context, usernam
 //
 // NOTE: there can be only one at a time.
 //
-// GitHub API docs: https://developer.github.com/enterprise/v3/enterprise-admin/users/#delete-an-impersonation-oauth-token
+// GitHub API docs: https://docs.github.com/enterprise-server@3.22/rest/enterprise-admin/users#delete-an-impersonation-oauth-token
+//
+//meta:operation DELETE /admin/users/{username}/authorizations
 func (s *AuthorizationsService) DeleteImpersonation(ctx context.Context, username string) (*Response, error) {
 	u := fmt.Sprintf("admin/users/%v/authorizations", username)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

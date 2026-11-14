@@ -7,12 +7,15 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
 // ListHooks lists all Hooks for the specified organization.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#list-organization-webhooks
+// GitHub API docs: https://docs.github.com/rest/orgs/webhooks?apiVersion=2022-11-28#list-organization-webhooks
+//
+//meta:operation GET /orgs/{org}/hooks
 func (s *OrganizationsService) ListHooks(ctx context.Context, org string, opts *ListOptions) ([]*Hook, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/hooks", org)
 	u, err := addOptions(u, opts)
@@ -20,13 +23,13 @@ func (s *OrganizationsService) ListHooks(ctx context.Context, org string, opts *
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var hooks []*Hook
-	resp, err := s.client.Do(ctx, req, &hooks)
+	resp, err := s.client.Do(req, &hooks)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -36,16 +39,23 @@ func (s *OrganizationsService) ListHooks(ctx context.Context, org string, opts *
 
 // GetHook returns a single specified Hook.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#get-an-organization-webhook
+// GitHub API docs: https://docs.github.com/rest/orgs/webhooks?apiVersion=2022-11-28#get-an-organization-webhook
+//
+//meta:operation GET /orgs/{org}/hooks/{hook_id}
 func (s *OrganizationsService) GetHook(ctx context.Context, org string, id int64) (*Hook, *Response, error) {
-	u := fmt.Sprintf("orgs/%v/hooks/%d", org, id)
-	req, err := s.client.NewRequest("GET", u, nil)
+	u := fmt.Sprintf("orgs/%v/hooks/%v", org, id)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	hook := new(Hook)
-	resp, err := s.client.Do(ctx, req, hook)
-	return hook, resp, err
+
+	var hook *Hook
+	resp, err := s.client.Do(req, &hook)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return hook, resp, nil
 }
 
 // CreateHook creates a Hook for the specified org.
@@ -54,8 +64,14 @@ func (s *OrganizationsService) GetHook(ctx context.Context, org string, id int64
 // Note that only a subset of the hook fields are used and hook must
 // not be nil.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#create-an-organization-webhook
+// GitHub API docs: https://docs.github.com/rest/orgs/webhooks?apiVersion=2022-11-28#create-an-organization-webhook
+//
+//meta:operation POST /orgs/{org}/hooks
 func (s *OrganizationsService) CreateHook(ctx context.Context, org string, hook *Hook) (*Hook, *Response, error) {
+	if hook == nil {
+		return nil, nil, errors.New("hook must be provided")
+	}
+
 	u := fmt.Sprintf("orgs/%v/hooks", org)
 
 	hookReq := &createHookRequest{
@@ -65,13 +81,13 @@ func (s *OrganizationsService) CreateHook(ctx context.Context, org string, hook 
 		Config: hook.Config,
 	}
 
-	req, err := s.client.NewRequest("POST", u, hookReq)
+	req, err := s.client.NewRequest(ctx, "POST", u, hookReq)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	h := new(Hook)
-	resp, err := s.client.Do(ctx, req, h)
+	var h *Hook
+	resp, err := s.client.Do(req, &h)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -81,38 +97,51 @@ func (s *OrganizationsService) CreateHook(ctx context.Context, org string, hook 
 
 // EditHook updates a specified Hook.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#update-an-organization-webhook
-func (s *OrganizationsService) EditHook(ctx context.Context, org string, id int64, hook *Hook) (*Hook, *Response, error) {
-	u := fmt.Sprintf("orgs/%v/hooks/%d", org, id)
-	req, err := s.client.NewRequest("PATCH", u, hook)
+// GitHub API docs: https://docs.github.com/rest/orgs/webhooks?apiVersion=2022-11-28#update-an-organization-webhook
+//
+//meta:operation PATCH /orgs/{org}/hooks/{hook_id}
+func (s *OrganizationsService) EditHook(ctx context.Context, org string, id int64, body *Hook) (*Hook, *Response, error) {
+	u := fmt.Sprintf("orgs/%v/hooks/%v", org, id)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
-	h := new(Hook)
-	resp, err := s.client.Do(ctx, req, h)
-	return h, resp, err
+
+	var h *Hook
+	resp, err := s.client.Do(req, &h)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return h, resp, nil
 }
 
 // PingHook triggers a 'ping' event to be sent to the Hook.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#ping-an-organization-webhook
+// GitHub API docs: https://docs.github.com/rest/orgs/webhooks?apiVersion=2022-11-28#ping-an-organization-webhook
+//
+//meta:operation POST /orgs/{org}/hooks/{hook_id}/pings
 func (s *OrganizationsService) PingHook(ctx context.Context, org string, id int64) (*Response, error) {
-	u := fmt.Sprintf("orgs/%v/hooks/%d/pings", org, id)
-	req, err := s.client.NewRequest("POST", u, nil)
+	u := fmt.Sprintf("orgs/%v/hooks/%v/pings", org, id)
+	req, err := s.client.NewRequest(ctx, "POST", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+
+	return s.client.Do(req, nil)
 }
 
 // DeleteHook deletes a specified Hook.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/orgs/#delete-an-organization-webhook
+// GitHub API docs: https://docs.github.com/rest/orgs/webhooks?apiVersion=2022-11-28#delete-an-organization-webhook
+//
+//meta:operation DELETE /orgs/{org}/hooks/{hook_id}
 func (s *OrganizationsService) DeleteHook(ctx context.Context, org string, id int64) (*Response, error) {
-	u := fmt.Sprintf("orgs/%v/hooks/%d", org, id)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	u := fmt.Sprintf("orgs/%v/hooks/%v", org, id)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+
+	return s.client.Do(req, nil)
 }

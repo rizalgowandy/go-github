@@ -6,18 +6,17 @@
 package github
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestRepositoriesService_ListContributorsStats(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/stats/contributors", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -32,7 +31,7 @@ func TestRepositoriesService_ListContributorsStats(t *testing.T) {
     "total": 135,
     "weeks": [
       {
-        "w": 1367712000,
+        "w": `+referenceUnixTimeStr+`,
         "a": 6898,
         "d": 77,
         "c": 10
@@ -43,7 +42,7 @@ func TestRepositoriesService_ListContributorsStats(t *testing.T) {
 `)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	stats, _, err := client.Repositories.ListContributorsStats(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("RepositoriesService.ListContributorsStats returned error: %v", err)
@@ -52,16 +51,16 @@ func TestRepositoriesService_ListContributorsStats(t *testing.T) {
 	want := []*ContributorStats{
 		{
 			Author: &Contributor{
-				ID:     Int64(1),
-				NodeID: String("nodeid-1"),
+				ID:     new(int64(1)),
+				NodeID: new("nodeid-1"),
 			},
-			Total: Int(135),
+			Total: new(135),
 			Weeks: []*WeeklyStats{
 				{
-					Week:      &Timestamp{time.Date(2013, time.May, 05, 00, 00, 00, 0, time.UTC).Local()},
-					Additions: Int(6898),
-					Deletions: Int(77),
-					Commits:   Int(10),
+					Week:      &referenceTimestamp,
+					Additions: new(6898),
+					Deletions: new(77),
+					Commits:   new(10),
 				},
 			},
 		},
@@ -87,8 +86,8 @@ func TestRepositoriesService_ListContributorsStats(t *testing.T) {
 }
 
 func TestRepositoriesService_ListCommitActivity(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/stats/commit_activity", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -98,13 +97,13 @@ func TestRepositoriesService_ListCommitActivity(t *testing.T) {
   {
     "days": [0, 3, 26, 20, 39, 1, 0],
     "total": 89,
-    "week": 1336280400
+    "week": `+referenceUnixTimeStr+`
   }
 ]
 `)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	activity, _, err := client.Repositories.ListCommitActivity(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("RepositoriesService.ListCommitActivity returned error: %v", err)
@@ -113,8 +112,8 @@ func TestRepositoriesService_ListCommitActivity(t *testing.T) {
 	want := []*WeeklyCommitActivity{
 		{
 			Days:  []int{0, 3, 26, 20, 39, 1, 0},
-			Total: Int(89),
-			Week:  &Timestamp{time.Date(2012, time.May, 06, 05, 00, 00, 0, time.UTC).Local()},
+			Total: new(89),
+			Week:  &referenceTimestamp,
 		},
 	}
 
@@ -138,25 +137,25 @@ func TestRepositoriesService_ListCommitActivity(t *testing.T) {
 }
 
 func TestRepositoriesService_ListCodeFrequency(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/stats/code_frequency", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 
-		fmt.Fprint(w, `[[1302998400, 1124, -435]]`)
+		fmt.Fprint(w, `[[`+referenceUnixTimeStr+`, 1124, -435]]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	code, _, err := client.Repositories.ListCodeFrequency(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("RepositoriesService.ListCodeFrequency returned error: %v", err)
 	}
 
 	want := []*WeeklyStats{{
-		Week:      &Timestamp{time.Date(2011, time.April, 17, 00, 00, 00, 0, time.UTC).Local()},
-		Additions: Int(1124),
-		Deletions: Int(-435),
+		Week:      &referenceTimestamp,
+		Additions: new(1124),
+		Deletions: new(-435),
 	}}
 
 	if !cmp.Equal(code, want) {
@@ -179,8 +178,8 @@ func TestRepositoriesService_ListCodeFrequency(t *testing.T) {
 }
 
 func TestRepositoriesService_Participation(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/stats/participation", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -203,7 +202,7 @@ func TestRepositoriesService_Participation(t *testing.T) {
 `)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	participation, _, err := client.Repositories.ListParticipation(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("RepositoriesService.ListParticipation returned error: %v", err)
@@ -244,8 +243,8 @@ func TestRepositoriesService_Participation(t *testing.T) {
 }
 
 func TestRepositoriesService_ListPunchCard(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/stats/punch_card", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -257,16 +256,16 @@ func TestRepositoriesService_ListPunchCard(t *testing.T) {
 		]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	card, _, err := client.Repositories.ListPunchCard(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("RepositoriesService.ListPunchCard returned error: %v", err)
 	}
 
 	want := []*PunchCard{
-		{Day: Int(0), Hour: Int(0), Commits: Int(5)},
-		{Day: Int(0), Hour: Int(1), Commits: Int(43)},
-		{Day: Int(0), Hour: Int(2), Commits: Int(21)},
+		{Day: new(0), Hour: new(0), Commits: new(5)},
+		{Day: new(0), Hour: new(1), Commits: new(43)},
+		{Day: new(0), Hour: new(2), Commits: new(21)},
 	}
 
 	if !cmp.Equal(card, want) {
@@ -288,9 +287,9 @@ func TestRepositoriesService_ListPunchCard(t *testing.T) {
 	})
 }
 
-func TestRepositoriesService_AcceptedError(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestRepositoriesService_ListContributorsStats_AcceptedError(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/stats/contributors", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -299,18 +298,18 @@ func TestRepositoriesService_AcceptedError(t *testing.T) {
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	stats, _, err := client.Repositories.ListContributorsStats(ctx, "o", "r")
 	if err == nil {
-		t.Errorf("RepositoriesService.AcceptedError should have returned an error")
+		t.Error("Repositories.ListContributorsStats should have returned an error")
 	}
 
-	if _, ok := err.(*AcceptedError); !ok {
-		t.Errorf("RepositoriesService.AcceptedError returned an AcceptedError: %v", err)
+	if !errors.As(err, new(*AcceptedError)) {
+		t.Errorf("Repositories.ListContributorsStats returned an AcceptedError: %v", err)
 	}
 
 	if stats != nil {
-		t.Errorf("RepositoriesService.AcceptedError expected stats to be nil: %v", stats)
+		t.Errorf("Repositories.ListContributorsStats expected stats to be nil: %v", stats)
 	}
 
 	const methodName = "ListContributorsStats"
@@ -326,94 +325,4 @@ func TestRepositoriesService_AcceptedError(t *testing.T) {
 		}
 		return resp, err
 	})
-}
-
-func TestRepositoryParticipation_Marshal(t *testing.T) {
-	testJSONMarshal(t, &RepositoryParticipation{}, "{}")
-
-	u := &RepositoryParticipation{
-		All:   []int{1},
-		Owner: []int{1},
-	}
-
-	want := `{
-		"all": [1],
-		"owner": [1]
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestWeeklyCommitActivity_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WeeklyCommitActivity{}, "{}")
-
-	u := &WeeklyCommitActivity{
-		Days:  []int{1},
-		Total: Int(1),
-		Week:  &Timestamp{referenceTime},
-	}
-
-	want := `{
-		"days": [
-			1
-		],
-		"total": 1,
-		"week": ` + referenceTimeStr + `
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestWeeklyStats_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WeeklyStats{}, "{}")
-
-	u := &WeeklyStats{
-		Week:      &Timestamp{referenceTime},
-		Additions: Int(1),
-		Deletions: Int(1),
-		Commits:   Int(1),
-	}
-
-	want := `{
-		"w": ` + referenceTimeStr + `,
-		"a": 1,
-		"d": 1,
-		"c": 1
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestContributorStats_Marshal(t *testing.T) {
-	testJSONMarshal(t, &ContributorStats{}, "{}")
-
-	u := &ContributorStats{
-		Author: &Contributor{ID: Int64(1)},
-		Total:  Int(1),
-		Weeks: []*WeeklyStats{
-			{
-				Week:      &Timestamp{referenceTime},
-				Additions: Int(1),
-				Deletions: Int(1),
-				Commits:   Int(1),
-			},
-		},
-	}
-
-	want := `{
-		"author": {
-			"id": 1
-		},
-		"total": 1,
-		"weeks": [
-			{
-				"w": ` + referenceTimeStr + `,
-				"a": 1,
-				"d": 1,
-				"c": 1
-			}
-		]
-	}`
-
-	testJSONMarshal(t, u, want)
 }

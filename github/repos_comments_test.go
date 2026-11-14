@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -16,8 +14,8 @@ import (
 )
 
 func TestRepositoriesService_ListComments(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/comments", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -27,13 +25,13 @@ func TestRepositoriesService_ListComments(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	comments, _, err := client.Repositories.ListComments(ctx, "o", "r", opt)
 	if err != nil {
 		t.Errorf("Repositories.ListComments returned error: %v", err)
 	}
 
-	want := []*RepositoryComment{{ID: Int64(1)}, {ID: Int64(2)}}
+	want := []*RepositoryComment{{ID: new(int64(1))}, {ID: new(int64(2))}}
 	if !cmp.Equal(comments, want) {
 		t.Errorf("Repositories.ListComments returned %+v, want %+v", comments, want)
 	}
@@ -54,17 +52,17 @@ func TestRepositoriesService_ListComments(t *testing.T) {
 }
 
 func TestRepositoriesService_ListComments_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Repositories.ListComments(ctx, "%", "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_ListCommitComments(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/commits/s/comments", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -74,13 +72,13 @@ func TestRepositoriesService_ListCommitComments(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	comments, _, err := client.Repositories.ListCommitComments(ctx, "o", "r", "s", opt)
 	if err != nil {
 		t.Errorf("Repositories.ListCommitComments returned error: %v", err)
 	}
 
-	want := []*RepositoryComment{{ID: Int64(1)}, {ID: Int64(2)}}
+	want := []*RepositoryComment{{ID: new(int64(1))}, {ID: new(int64(2))}}
 	if !cmp.Equal(comments, want) {
 		t.Errorf("Repositories.ListCommitComments returned %+v, want %+v", comments, want)
 	}
@@ -101,39 +99,33 @@ func TestRepositoriesService_ListCommitComments(t *testing.T) {
 }
 
 func TestRepositoriesService_ListCommitComments_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Repositories.ListCommitComments(ctx, "%", "%", "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_CreateComment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &RepositoryComment{Body: String("b")}
+	input := CreateCommitCommentRequest{Body: "b"}
 
 	mux.HandleFunc("/repos/o/r/commits/s/comments", func(w http.ResponseWriter, r *http.Request) {
-		v := new(RepositoryComment)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	comment, _, err := client.Repositories.CreateComment(ctx, "o", "r", "s", input)
 	if err != nil {
 		t.Errorf("Repositories.CreateComment returned error: %v", err)
 	}
 
-	want := &RepositoryComment{ID: Int64(1)}
+	want := &RepositoryComment{ID: new(int64(1))}
 	if !cmp.Equal(comment, want) {
 		t.Errorf("Repositories.CreateComment returned %+v, want %+v", comment, want)
 	}
@@ -154,17 +146,17 @@ func TestRepositoriesService_CreateComment(t *testing.T) {
 }
 
 func TestRepositoriesService_CreateComment_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
-	_, _, err := client.Repositories.CreateComment(ctx, "%", "%", "%", nil)
+	ctx := t.Context()
+	_, _, err := client.Repositories.CreateComment(ctx, "%", "%", "%", CreateCommitCommentRequest{})
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_GetComment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/comments/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -172,13 +164,13 @@ func TestRepositoriesService_GetComment(t *testing.T) {
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	comment, _, err := client.Repositories.GetComment(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.GetComment returned error: %v", err)
 	}
 
-	want := &RepositoryComment{ID: Int64(1)}
+	want := &RepositoryComment{ID: new(int64(1))}
 	if !cmp.Equal(comment, want) {
 		t.Errorf("Repositories.GetComment returned %+v, want %+v", comment, want)
 	}
@@ -199,39 +191,34 @@ func TestRepositoriesService_GetComment(t *testing.T) {
 }
 
 func TestRepositoriesService_GetComment_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Repositories.GetComment(ctx, "%", "%", 1)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_UpdateComment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &RepositoryComment{Body: String("b")}
+	input := UpdateCommitCommentRequest{Body: "b"}
 
 	mux.HandleFunc("/repos/o/r/comments/1", func(w http.ResponseWriter, r *http.Request) {
-		v := new(RepositoryComment)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
+		testJSONBody(t, r, input)
 
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	comment, _, err := client.Repositories.UpdateComment(ctx, "o", "r", 1, input)
 	if err != nil {
 		t.Errorf("Repositories.UpdateComment returned error: %v", err)
 	}
 
-	want := &RepositoryComment{ID: Int64(1)}
+	want := &RepositoryComment{ID: new(int64(1))}
 	if !cmp.Equal(comment, want) {
 		t.Errorf("Repositories.UpdateComment returned %+v, want %+v", comment, want)
 	}
@@ -252,23 +239,23 @@ func TestRepositoriesService_UpdateComment(t *testing.T) {
 }
 
 func TestRepositoriesService_UpdateComment_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
-	_, _, err := client.Repositories.UpdateComment(ctx, "%", "%", 1, nil)
+	ctx := t.Context()
+	_, _, err := client.Repositories.UpdateComment(ctx, "%", "%", 1, UpdateCommitCommentRequest{})
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_DeleteComment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/comments/1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/comments/1", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.DeleteComment(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.DeleteComment returned error: %v", err)
@@ -286,106 +273,10 @@ func TestRepositoriesService_DeleteComment(t *testing.T) {
 }
 
 func TestRepositoriesService_DeleteComment_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.DeleteComment(ctx, "%", "%", 1)
 	testURLParseError(t, err)
-}
-
-func TestRepositoryComment_Marshal(t *testing.T) {
-	testJSONMarshal(t, &RepositoryComment{}, "{}")
-
-	r := &RepositoryComment{
-		HTMLURL:  String("hurl"),
-		URL:      String("url"),
-		ID:       Int64(1),
-		NodeID:   String("nid"),
-		CommitID: String("cid"),
-		User: &User{
-			Login:           String("l"),
-			ID:              Int64(1),
-			URL:             String("u"),
-			AvatarURL:       String("a"),
-			GravatarID:      String("g"),
-			Name:            String("n"),
-			Company:         String("c"),
-			Blog:            String("b"),
-			Location:        String("l"),
-			Email:           String("e"),
-			Hireable:        Bool(true),
-			Bio:             String("b"),
-			TwitterUsername: String("t"),
-			PublicRepos:     Int(1),
-			Followers:       Int(1),
-			Following:       Int(1),
-			CreatedAt:       &Timestamp{referenceTime},
-			SuspendedAt:     &Timestamp{referenceTime},
-		},
-		Reactions: &Reactions{
-			TotalCount: Int(1),
-			PlusOne:    Int(1),
-			MinusOne:   Int(1),
-			Laugh:      Int(1),
-			Confused:   Int(1),
-			Heart:      Int(1),
-			Hooray:     Int(1),
-			Rocket:     Int(1),
-			Eyes:       Int(1),
-			URL:        String("u"),
-		},
-		CreatedAt: &referenceTime,
-		UpdatedAt: &referenceTime,
-		Body:      String("body"),
-		Path:      String("path"),
-		Position:  Int(1),
-	}
-
-	want := `{
-		"html_url": "hurl",
-		"url": "url",
-		"id": 1,
-		"node_id": "nid",
-		"commit_id": "cid",
-		"user": {
-			"login": "l",
-			"id": 1,
-			"avatar_url": "a",
-			"gravatar_id": "g",
-			"name": "n",
-			"company": "c",
-			"blog": "b",
-			"location": "l",
-			"email": "e",
-			"hireable": true,
-			"bio": "b",
-			"twitter_username": "t",
-			"public_repos": 1,
-			"followers": 1,
-			"following": 1,
-			"created_at": ` + referenceTimeStr + `,
-			"suspended_at": ` + referenceTimeStr + `,
-			"url": "u"
-		},
-		"reactions": {
-			"total_count": 1,
-			"+1": 1,
-			"-1": 1,
-			"laugh": 1,
-			"confused": 1,
-			"heart": 1,
-			"hooray": 1,
-			"rocket": 1,
-			"eyes": 1,
-			"url": "u"
-		},
-		"created_at": ` + referenceTimeStr + `,
-		"updated_at": ` + referenceTimeStr + `,
-		"body": "body",
-		"path": "path",
-		"position": 1
-	}`
-
-	testJSONMarshal(t, r, want)
 }

@@ -7,12 +7,11 @@ package github
 
 import (
 	"bytes"
-	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
-	"os"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -20,8 +19,8 @@ import (
 )
 
 func TestRepositoriesService_ListReleases(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -30,12 +29,12 @@ func TestRepositoriesService_ListReleases(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	releases, _, err := client.Repositories.ListReleases(ctx, "o", "r", opt)
 	if err != nil {
 		t.Errorf("Repositories.ListReleases returned error: %v", err)
 	}
-	want := []*RepositoryRelease{{ID: Int64(1)}}
+	want := []*RepositoryRelease{{ID: 1}}
 	if !cmp.Equal(releases, want) {
 		t.Errorf("Repositories.ListReleases returned %+v, want %+v", releases, want)
 	}
@@ -55,22 +54,64 @@ func TestRepositoriesService_ListReleases(t *testing.T) {
 	})
 }
 
+func TestRepositoriesService_GenerateReleaseNotes(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	body := GenerateNotesRequest{
+		TagName: "v1.0.0",
+	}
+
+	mux.HandleFunc("/repos/o/r/releases/generate-notes", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testJSONBody(t, r, body)
+		fmt.Fprint(w, `{"name":"v1.0.0","body":"**Full Changelog**: https://github.com/o/r/compare/v0.9.0...v1.0.0"}`)
+	})
+
+	ctx := t.Context()
+	releases, _, err := client.Repositories.GenerateReleaseNotes(ctx, "o", "r", body)
+	if err != nil {
+		t.Errorf("Repositories.GenerateReleaseNotes returned error: %v", err)
+	}
+	want := &RepositoryReleaseNotes{
+		Name: "v1.0.0",
+		Body: "**Full Changelog**: https://github.com/o/r/compare/v0.9.0...v1.0.0",
+	}
+	if !cmp.Equal(releases, want) {
+		t.Errorf("Repositories.GenerateReleaseNotes returned %+v, want %+v", releases, want)
+	}
+
+	const methodName = "GenerateReleaseNotes"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Repositories.GenerateReleaseNotes(ctx, "\n", "\n", body)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Repositories.GenerateReleaseNotes(ctx, "o", "r", body)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
 func TestRepositoriesService_GetRelease(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":1,"author":{"login":"l"}}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release, resp, err := client.Repositories.GetRelease(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.GetRelease returned error: %v\n%v", err, resp.Body)
 	}
 
-	want := &RepositoryRelease{ID: Int64(1), Author: &User{Login: String("l")}}
+	want := &RepositoryRelease{ID: 1, Author: &User{Login: new("l")}}
 	if !cmp.Equal(release, want) {
 		t.Errorf("Repositories.GetRelease returned %+v, want %+v", release, want)
 	}
@@ -91,21 +132,21 @@ func TestRepositoriesService_GetRelease(t *testing.T) {
 }
 
 func TestRepositoriesService_GetLatestRelease(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases/latest", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":3}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release, resp, err := client.Repositories.GetLatestRelease(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("Repositories.GetLatestRelease returned error: %v\n%v", err, resp.Body)
 	}
 
-	want := &RepositoryRelease{ID: Int64(3)}
+	want := &RepositoryRelease{ID: 3}
 	if !cmp.Equal(release, want) {
 		t.Errorf("Repositories.GetLatestRelease returned %+v, want %+v", release, want)
 	}
@@ -126,21 +167,21 @@ func TestRepositoriesService_GetLatestRelease(t *testing.T) {
 }
 
 func TestRepositoriesService_GetReleaseByTag(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases/tags/foo", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":13}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release, resp, err := client.Repositories.GetReleaseByTag(ctx, "o", "r", "foo")
 	if err != nil {
 		t.Errorf("Repositories.GetReleaseByTag returned error: %v\n%v", err, resp.Body)
 	}
 
-	want := &RepositoryRelease{ID: Int64(13)}
+	want := &RepositoryRelease{ID: 13}
 	if !cmp.Equal(release, want) {
 		t.Errorf("Repositories.GetReleaseByTag returned %+v, want %+v", release, want)
 	}
@@ -161,49 +202,29 @@ func TestRepositoriesService_GetReleaseByTag(t *testing.T) {
 }
 
 func TestRepositoriesService_CreateRelease(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &RepositoryRelease{
-		Name:                   String("v1.0"),
-		DiscussionCategoryName: String("General"),
-		// Fields to be removed:
-		ID:          Int64(2),
-		CreatedAt:   &Timestamp{referenceTime},
-		PublishedAt: &Timestamp{referenceTime},
-		URL:         String("http://url/"),
-		HTMLURL:     String("http://htmlurl/"),
-		AssetsURL:   String("http://assetsurl/"),
-		Assets:      []*ReleaseAsset{{ID: Int64(5)}},
-		UploadURL:   String("http://uploadurl/"),
-		ZipballURL:  String("http://zipballurl/"),
-		TarballURL:  String("http://tarballurl/"),
-		Author:      &User{Name: String("octocat")},
-		NodeID:      String("nodeid"),
+	input := CreateReleaseRequest{
+		TagName:                "v1.0",
+		Name:                   new("v1.0"),
+		DiscussionCategoryName: new("General"),
+		GenerateReleaseNotes:   new(true),
 	}
 
 	mux.HandleFunc("/repos/o/r/releases", func(w http.ResponseWriter, r *http.Request) {
-		v := new(repositoryReleaseRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		want := &repositoryReleaseRequest{
-			Name:                   String("v1.0"),
-			DiscussionCategoryName: String("General"),
-		}
-		if !cmp.Equal(v, want) {
-			t.Errorf("Request body = %+v, want %+v", v, want)
-		}
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release, _, err := client.Repositories.CreateRelease(ctx, "o", "r", input)
 	if err != nil {
 		t.Errorf("Repositories.CreateRelease returned error: %v", err)
 	}
 
-	want := &RepositoryRelease{ID: Int64(1)}
+	want := &RepositoryRelease{ID: 1}
 	if !cmp.Equal(release, want) {
 		t.Errorf("Repositories.CreateRelease returned %+v, want %+v", release, want)
 	}
@@ -223,61 +244,39 @@ func TestRepositoriesService_CreateRelease(t *testing.T) {
 	})
 }
 
-func TestRepositoriesService_EditRelease(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestRepositoriesService_UpdateRelease(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &RepositoryRelease{
-		Name:                   String("n"),
-		DiscussionCategoryName: String("General"),
-		// Fields to be removed:
-		ID:          Int64(2),
-		CreatedAt:   &Timestamp{referenceTime},
-		PublishedAt: &Timestamp{referenceTime},
-		URL:         String("http://url/"),
-		HTMLURL:     String("http://htmlurl/"),
-		AssetsURL:   String("http://assetsurl/"),
-		Assets:      []*ReleaseAsset{{ID: Int64(5)}},
-		UploadURL:   String("http://uploadurl/"),
-		ZipballURL:  String("http://zipballurl/"),
-		TarballURL:  String("http://tarballurl/"),
-		Author:      &User{Name: String("octocat")},
-		NodeID:      String("nodeid"),
+	input := UpdateReleaseRequest{
+		Name:                   new("n"),
+		DiscussionCategoryName: new("General"),
 	}
 
 	mux.HandleFunc("/repos/o/r/releases/1", func(w http.ResponseWriter, r *http.Request) {
-		v := new(repositoryReleaseRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		want := &repositoryReleaseRequest{
-			Name:                   String("n"),
-			DiscussionCategoryName: String("General"),
-		}
-		if !cmp.Equal(v, want) {
-			t.Errorf("Request body = %+v, want %+v", v, want)
-		}
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
-	release, _, err := client.Repositories.EditRelease(ctx, "o", "r", 1, input)
+	ctx := t.Context()
+	release, _, err := client.Repositories.UpdateRelease(ctx, "o", "r", 1, input)
 	if err != nil {
-		t.Errorf("Repositories.EditRelease returned error: %v", err)
+		t.Errorf("Repositories.UpdateRelease returned error: %v", err)
 	}
-	want := &RepositoryRelease{ID: Int64(1)}
+	want := &RepositoryRelease{ID: 1}
 	if !cmp.Equal(release, want) {
-		t.Errorf("Repositories.EditRelease returned = %+v, want %+v", release, want)
+		t.Errorf("Repositories.UpdateRelease returned = %+v, want %+v", release, want)
 	}
 
-	const methodName = "EditRelease"
+	const methodName = "UpdateRelease"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Repositories.EditRelease(ctx, "\n", "\n", 1, input)
+		_, _, err = client.Repositories.UpdateRelease(ctx, "\n", "\n", 1, input)
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Repositories.EditRelease(ctx, "o", "r", 1, input)
+		got, resp, err := client.Repositories.UpdateRelease(ctx, "o", "r", 1, input)
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -286,14 +285,14 @@ func TestRepositoriesService_EditRelease(t *testing.T) {
 }
 
 func TestRepositoriesService_DeleteRelease(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/releases/1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/releases/1", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.DeleteRelease(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.DeleteRelease returned error: %v", err)
@@ -311,8 +310,8 @@ func TestRepositoriesService_DeleteRelease(t *testing.T) {
 }
 
 func TestRepositoriesService_ListReleaseAssets(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases/1/assets", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -321,12 +320,12 @@ func TestRepositoriesService_ListReleaseAssets(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	assets, _, err := client.Repositories.ListReleaseAssets(ctx, "o", "r", 1, opt)
 	if err != nil {
 		t.Errorf("Repositories.ListReleaseAssets returned error: %v", err)
 	}
-	want := []*ReleaseAsset{{ID: Int64(1)}}
+	want := []*ReleaseAsset{{ID: new(int64(1))}}
 	if !cmp.Equal(assets, want) {
 		t.Errorf("Repositories.ListReleaseAssets returned %+v, want %+v", assets, want)
 	}
@@ -347,20 +346,20 @@ func TestRepositoriesService_ListReleaseAssets(t *testing.T) {
 }
 
 func TestRepositoriesService_GetReleaseAsset(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	asset, _, err := client.Repositories.GetReleaseAsset(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.GetReleaseAsset returned error: %v", err)
 	}
-	want := &ReleaseAsset{ID: Int64(1)}
+	want := &ReleaseAsset{ID: new(int64(1))}
 	if !cmp.Equal(asset, want) {
 		t.Errorf("Repositories.GetReleaseAsset returned %+v, want %+v", asset, want)
 	}
@@ -381,8 +380,8 @@ func TestRepositoriesService_GetReleaseAsset(t *testing.T) {
 }
 
 func TestRepositoriesService_DownloadReleaseAsset_Stream(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -392,13 +391,13 @@ func TestRepositoriesService_DownloadReleaseAsset_Stream(t *testing.T) {
 		fmt.Fprint(w, "Hello World")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	reader, _, err := client.Repositories.DownloadReleaseAsset(ctx, "o", "r", 1, nil)
 	if err != nil {
 		t.Errorf("Repositories.DownloadReleaseAsset returned error: %v", err)
 	}
 	want := []byte("Hello World")
-	content, err := ioutil.ReadAll(reader)
+	content, err := io.ReadAll(reader)
 	if err != nil {
 		t.Errorf("Repositories.DownloadReleaseAsset returned bad reader: %v", err)
 	}
@@ -414,8 +413,8 @@ func TestRepositoriesService_DownloadReleaseAsset_Stream(t *testing.T) {
 }
 
 func TestRepositoriesService_DownloadReleaseAsset_Redirect(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -423,7 +422,7 @@ func TestRepositoriesService_DownloadReleaseAsset_Redirect(t *testing.T) {
 		http.Redirect(w, r, "/yo", http.StatusFound)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, got, err := client.Repositories.DownloadReleaseAsset(ctx, "o", "r", 1, nil)
 	if err != nil {
 		t.Errorf("Repositories.DownloadReleaseAsset returned error: %v", err)
@@ -435,8 +434,8 @@ func TestRepositoriesService_DownloadReleaseAsset_Redirect(t *testing.T) {
 }
 
 func TestRepositoriesService_DownloadReleaseAsset_FollowRedirect(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -446,17 +445,20 @@ func TestRepositoriesService_DownloadReleaseAsset_FollowRedirect(t *testing.T) {
 	})
 	mux.HandleFunc("/yo", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		testHeader(t, r, "Accept", "*/*")
+		testHeader(t, r, "Accept", defaultMediaType)
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", "attachment; filename=hello-world.txt")
 		fmt.Fprint(w, "Hello World")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	reader, _, err := client.Repositories.DownloadReleaseAsset(ctx, "o", "r", 1, http.DefaultClient)
-	content, err := ioutil.ReadAll(reader)
 	if err != nil {
 		t.Errorf("Repositories.DownloadReleaseAsset returned error: %v", err)
+	}
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		t.Errorf("Reading Repositories.DownloadReleaseAsset returned error: %v", err)
 	}
 	reader.Close()
 	want := []byte("Hello World")
@@ -465,9 +467,131 @@ func TestRepositoriesService_DownloadReleaseAsset_FollowRedirect(t *testing.T) {
 	}
 }
 
+func TestRepositoriesService_DownloadReleaseAsset_FollowMultipleRedirects(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", defaultMediaType)
+		// /yo, below will be served as baseURLPath/yo
+		http.Redirect(w, r, baseURLPath+"/yo", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/yo", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html;charset=utf-8")
+		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", defaultMediaType)
+		// /yo2, below will be served as baseURLPath/yo2
+		http.Redirect(w, r, baseURLPath+"/yo2", http.StatusFound)
+	})
+	mux.HandleFunc("/yo2", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", "attachment; filename=hello-world.txt")
+		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", defaultMediaType)
+		fmt.Fprint(w, "Hello World")
+	})
+
+	ctx := t.Context()
+	reader, _, err := client.Repositories.DownloadReleaseAsset(ctx, "o", "r", 1, http.DefaultClient)
+	if err != nil {
+		t.Errorf("Repositories.DownloadReleaseAsset returned error: %v", err)
+	}
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		t.Errorf("Reading Repositories.DownloadReleaseAsset returned error: %v", err)
+	}
+	reader.Close()
+	want := []byte("Hello World")
+	if !bytes.Equal(want, content) {
+		t.Errorf("Repositories.DownloadReleaseAsset returned %+v, want %+v", content, want)
+	}
+}
+
+func TestRepositoriesService_DownloadReleaseAsset_FollowRedirectToError(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", defaultMediaType)
+		// /yo, below will be served as baseURLPath/yo
+		http.Redirect(w, r, baseURLPath+"/yo", http.StatusFound)
+	})
+	mux.HandleFunc("/yo", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", defaultMediaType)
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	ctx := t.Context()
+	resp, loc, err := client.Repositories.DownloadReleaseAsset(ctx, "o", "r", 1, http.DefaultClient)
+	if err == nil {
+		t.Error("Repositories.DownloadReleaseAsset did not return an error")
+	}
+	if resp != nil {
+		resp.Close()
+		t.Error("Repositories.DownloadReleaseAsset returned stream, want nil")
+	}
+	if loc != "" {
+		t.Errorf(`Repositories.DownloadReleaseAsset returned "%v", want empty ""`, loc)
+	}
+}
+
+// CheckResponse substitutes resp.Body with a re-readable copy on error
+// responses; downloadReleaseAssetFromURL must still close the original body it
+// replaces. Unlike its sibling tests, the recorder wraps the follow-redirects
+// client's transport: that client, not the library client, performs the
+// redirected request, so wrapping the library client would only ever observe
+// the first hop's correctly-closed redirect response and never the leak.
+func TestRepositoriesService_DownloadReleaseAsset_FollowRedirectToErrorClosesOriginalBody(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", defaultMediaType)
+		// /yo, below will be served as baseURLPath/yo
+		http.Redirect(w, r, baseURLPath+"/yo", http.StatusFound)
+	})
+	mux.HandleFunc("/yo", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", defaultMediaType)
+		http.Error(w, `{"message":"Not Found"}`, 404)
+	})
+
+	var closed bool
+	followRedirectsClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			resp, err := http.DefaultTransport.RoundTrip(req)
+			if resp != nil {
+				resp.Body = &closeRecorder{ReadCloser: resp.Body, closed: &closed}
+			}
+			return resp, err
+		}),
+	}
+
+	ctx := t.Context()
+	rc, loc, err := client.Repositories.DownloadReleaseAsset(ctx, "o", "r", 1, followRedirectsClient)
+	if err == nil {
+		t.Error("Repositories.DownloadReleaseAsset did not return an error")
+	}
+	if rc != nil {
+		rc.Close()
+		t.Error("Repositories.DownloadReleaseAsset returned stream, want nil")
+	}
+	if loc != "" {
+		t.Errorf(`Repositories.DownloadReleaseAsset returned "%v", want empty ""`, loc)
+	}
+	if !closed {
+		t.Error("original response body was not closed on an error response")
+	}
+}
+
 func TestRepositoriesService_DownloadReleaseAsset_APIError(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -476,7 +600,7 @@ func TestRepositoriesService_DownloadReleaseAsset_APIError(t *testing.T) {
 		fmt.Fprint(w, `{"message":"Not Found","documentation_url":"https://developer.github.com/v3"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	resp, loc, err := client.Repositories.DownloadReleaseAsset(ctx, "o", "r", 1, nil)
 	if err == nil {
 		t.Error("Repositories.DownloadReleaseAsset did not return an error")
@@ -488,45 +612,40 @@ func TestRepositoriesService_DownloadReleaseAsset_APIError(t *testing.T) {
 	}
 
 	if loc != "" {
-		t.Errorf(`Repositories.DownloadReleaseAsset returned "%s", want empty ""`, loc)
+		t.Errorf(`Repositories.DownloadReleaseAsset returned "%v", want empty ""`, loc)
 	}
 }
 
-func TestRepositoriesService_EditReleaseAsset(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestRepositoriesService_UpdateReleaseAsset(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &ReleaseAsset{Name: String("n")}
+	input := UpdateReleaseAssetRequest{Name: new("n")}
 
 	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
-		v := new(ReleaseAsset)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
-	asset, _, err := client.Repositories.EditReleaseAsset(ctx, "o", "r", 1, input)
+	ctx := t.Context()
+	asset, _, err := client.Repositories.UpdateReleaseAsset(ctx, "o", "r", 1, input)
 	if err != nil {
-		t.Errorf("Repositories.EditReleaseAsset returned error: %v", err)
+		t.Errorf("Repositories.UpdateReleaseAsset returned error: %v", err)
 	}
-	want := &ReleaseAsset{ID: Int64(1)}
+	want := &ReleaseAsset{ID: new(int64(1))}
 	if !cmp.Equal(asset, want) {
-		t.Errorf("Repositories.EditReleaseAsset returned = %+v, want %+v", asset, want)
+		t.Errorf("Repositories.UpdateReleaseAsset returned = %+v, want %+v", asset, want)
 	}
 
-	const methodName = "EditReleaseAsset"
+	const methodName = "UpdateReleaseAsset"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Repositories.EditReleaseAsset(ctx, "\n", "\n", 1, input)
+		_, _, err = client.Repositories.UpdateReleaseAsset(ctx, "\n", "\n", 1, input)
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Repositories.EditReleaseAsset(ctx, "o", "r", 1, input)
+		got, resp, err := client.Repositories.UpdateReleaseAsset(ctx, "o", "r", 1, input)
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -535,14 +654,14 @@ func TestRepositoriesService_EditReleaseAsset(t *testing.T) {
 }
 
 func TestRepositoriesService_DeleteReleaseAsset(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/releases/assets/1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/releases/assets/1", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.DeleteReleaseAsset(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.DeleteReleaseAsset returned error: %v", err)
@@ -560,6 +679,7 @@ func TestRepositoriesService_DeleteReleaseAsset(t *testing.T) {
 }
 
 func TestRepositoriesService_UploadReleaseAsset(t *testing.T) {
+	t.Parallel()
 	var (
 		defaultUploadOptions     = &UploadOptions{Name: "n"}
 		defaultExpectedFormValue = values{"name": "n"}
@@ -615,163 +735,339 @@ func TestRepositoriesService_UploadReleaseAsset(t *testing.T) {
 		},
 	}
 
-	client, mux, _, teardown := setup()
-	defer teardown()
+	client, mux, _ := setup(t)
 
 	for key, test := range uploadTests {
-		releaseEndpoint := fmt.Sprintf("/repos/o/r/releases/%d/assets", key)
+		releaseEndpoint := fmt.Sprintf("/repos/o/r/releases/%v/assets", key)
 		mux.HandleFunc(releaseEndpoint, func(w http.ResponseWriter, r *http.Request) {
 			testMethod(t, r, "POST")
 			testHeader(t, r, "Content-Type", test.expectedMediaType)
 			testHeader(t, r, "Content-Length", "12")
 			testFormValues(t, r, test.expectedFormValues)
-			testBody(t, r, "Upload me !\n")
+			testPlainBody(t, r, "Upload me !\n")
 
-			fmt.Fprintf(w, `{"id":1}`)
+			fmt.Fprint(w, `{"id":1}`)
 		})
 
-		file, dir, err := openTestFile(test.fileName, "Upload me !\n")
-		if err != nil {
-			t.Fatalf("Unable to create temp file: %v", err)
-		}
-		defer os.RemoveAll(dir)
+		file := openTestFile(t, test.fileName, "Upload me !\n")
 
-		ctx := context.Background()
+		ctx := t.Context()
 		asset, _, err := client.Repositories.UploadReleaseAsset(ctx, "o", "r", int64(key), test.uploadOpts, file)
 		if err != nil {
-			t.Errorf("Repositories.UploadReleaseAssert returned error: %v", err)
+			t.Errorf("Repositories.UploadReleaseAsset returned error: %v", err)
 		}
-		want := &ReleaseAsset{ID: Int64(1)}
+		want := &ReleaseAsset{ID: new(int64(1))}
 		if !cmp.Equal(asset, want) {
-			t.Errorf("Repositories.UploadReleaseAssert returned %+v, want %+v", asset, want)
+			t.Errorf("Repositories.UploadReleaseAsset returned %+v, want %+v", asset, want)
 		}
 
 		const methodName = "UploadReleaseAsset"
+		testBadOptions(t, methodName, func() (err error) {
+			_, _, err = client.Repositories.UploadReleaseAsset(ctx, "o", "r", int64(key), test.uploadOpts, nil)
+			return err
+		})
 		testBadOptions(t, methodName, func() (err error) {
 			_, _, err = client.Repositories.UploadReleaseAsset(ctx, "\n", "\n", int64(key), test.uploadOpts, file)
 			return err
 		})
 	}
+	testNewRequestAndDoFailure(t, "UploadReleaseAsset", client, func() (*Response, error) {
+		got, resp, err := client.Repositories.UploadReleaseAsset(t.Context(), "o", "r", 1, defaultUploadOptions, openTestFile(t, "upload.txt", "Upload me !\n"))
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure UploadReleaseAsset = %#v, want nil", got)
+		}
+		return resp, err
+	})
 }
 
-func TestRepositoryReleaseRequest_Marshal(t *testing.T) {
-	testJSONMarshal(t, &repositoryReleaseRequest{}, "{}")
+func TestRepositoriesService_UploadReleaseAssetFromRelease(t *testing.T) {
+	t.Parallel()
 
-	u := &repositoryReleaseRequest{
-		TagName:                String("tn"),
-		TargetCommitish:        String("tc"),
-		Name:                   String("name"),
-		Body:                   String("body"),
-		Draft:                  Bool(false),
-		Prerelease:             Bool(false),
-		DiscussionCategoryName: String("dcn"),
+	var (
+		defaultUploadOptions     = &UploadOptions{Name: "n.txt"}
+		defaultExpectedFormValue = values{"name": "n.txt"}
+		mediaTypeTextPlain       = "text/plain; charset=utf-8"
+	)
+
+	client, mux, _ := setup(t)
+
+	// Use the same endpoint path used in other release asset tests.
+	mux.HandleFunc("/repos/o/r/releases/1/assets", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testHeader(t, r, "Content-Type", mediaTypeTextPlain)
+		testHeader(t, r, "Content-Length", "12")
+		testFormValues(t, r, defaultExpectedFormValue)
+		testPlainBody(t, r, "Upload me !\n")
+
+		fmt.Fprint(w, `{"id":1}`)
+	})
+
+	body := []byte("Upload me !\n")
+	reader := bytes.NewReader(body)
+	size := int64(len(body))
+
+	// Provide a templated upload URL like GitHub returns.
+	release := &RepositoryRelease{
+		UploadURL: "/repos/o/r/releases/1/assets{?name,label}",
 	}
 
-	want := `{
-		"tag_name": "tn",
-		"target_commitish": "tc",
-		"name": "name",
-		"body": "body",
-		"draft": false,
-		"prerelease": false,
-		"discussion_category_name": "dcn"
-	}`
-
-	testJSONMarshal(t, u, want)
+	ctx := t.Context()
+	asset, _, err := client.Repositories.UploadReleaseAssetFromRelease(ctx, release, defaultUploadOptions, reader, size)
+	if err != nil {
+		t.Fatalf("Repositories.UploadReleaseAssetFromRelease returned error: %v", err)
+	}
+	want := &ReleaseAsset{ID: new(int64(1))}
+	if !cmp.Equal(asset, want) {
+		t.Fatalf("Repositories.UploadReleaseAssetFromRelease returned %+v, want %+v", asset, want)
+	}
 }
 
-func TestReleaseAsset_Marshal(t *testing.T) {
-	testJSONMarshal(t, &ReleaseAsset{}, "{}")
+func TestRepositoriesService_UploadReleaseAssetFromRelease_AbsoluteTemplate(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	u := &ReleaseAsset{
-		ID:                 Int64(1),
-		URL:                String("url"),
-		Name:               String("name"),
-		Label:              String("label"),
-		State:              String("state"),
-		ContentType:        String("ct"),
-		Size:               Int(1),
-		DownloadCount:      Int(1),
-		CreatedAt:          &Timestamp{referenceTime},
-		UpdatedAt:          &Timestamp{referenceTime},
-		BrowserDownloadURL: String("bdu"),
-		Uploader:           &User{ID: Int64(1)},
-		NodeID:             String("nid"),
+	mux.HandleFunc("/repos/o/r/releases/1/assets", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testFormValues(t, r, values{"name": "abs.txt"})
+		fmt.Fprint(w, `{"id":1}`)
+	})
+
+	body := []byte("Upload me !\n")
+	reader := bytes.NewReader(body)
+	size := int64(len(body))
+
+	// Build an absolute URL using the test client's BaseURL.
+	absoluteUploadURL := client.baseURL.String() + "repos/o/r/releases/1/assets{?name,label}"
+	release := &RepositoryRelease{UploadURL: absoluteUploadURL}
+
+	opts := &UploadOptions{Name: "abs.txt"}
+	ctx := t.Context()
+	asset, _, err := client.Repositories.UploadReleaseAssetFromRelease(ctx, release, opts, reader, size)
+	if err != nil {
+		t.Fatalf("UploadReleaseAssetFromRelease returned error: %v", err)
 	}
-
-	want := `{
-		"id": 1,
-		"url": "url",
-		"name": "name",
-		"label": "label",
-		"state": "state",
-		"content_type": "ct",
-		"size": 1,
-		"download_count": 1,
-		"created_at": ` + referenceTimeStr + `,
-		"updated_at": ` + referenceTimeStr + `,
-		"browser_download_url": "bdu",
-		"uploader": {
-			"id": 1
-		},
-		"node_id": "nid"
-	}`
-
-	testJSONMarshal(t, u, want)
+	want := &ReleaseAsset{ID: new(int64(1))}
+	if !cmp.Equal(asset, want) {
+		t.Fatalf("UploadReleaseAssetFromRelease returned %+v, want %+v", asset, want)
+	}
 }
 
-func TestRepositoryRelease_Marshal(t *testing.T) {
-	testJSONMarshal(t, &RepositoryRelease{}, "{}")
+func TestRepositoriesService_UploadReleaseAssetFromRelease_ForeignHostIsRejected(t *testing.T) {
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	u := &RepositoryRelease{
-		TagName:                String("tn"),
-		TargetCommitish:        String("tc"),
-		Name:                   String("name"),
-		Body:                   String("body"),
-		Draft:                  Bool(false),
-		Prerelease:             Bool(false),
-		DiscussionCategoryName: String("dcn"),
-		ID:                     Int64(1),
-		CreatedAt:              &Timestamp{referenceTime},
-		PublishedAt:            &Timestamp{referenceTime},
-		URL:                    String("url"),
-		HTMLURL:                String("hurl"),
-		AssetsURL:              String("aurl"),
-		Assets:                 []*ReleaseAsset{{ID: Int64(1)}},
-		UploadURL:              String("uurl"),
-		ZipballURL:             String("zurl"),
-		TarballURL:             String("turl"),
-		Author:                 &User{ID: Int64(1)},
-		NodeID:                 String("nid"),
+	// A response that hands out an absolute upload URL naming a different host must
+	// not be able to take the caller's artifact with it. Withholding only the
+	// credential would not be enough here: the body would still arrive, and the call
+	// would return a nil error and a *ReleaseAsset, telling the caller the upload
+	// succeeded when the bytes went somewhere the caller never configured. So the
+	// destination is refused instead, and the foreign host is never contacted at all.
+	reached := make(chan struct{}, 1)
+	foreign := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		select {
+		case reached <- struct{}{}:
+		default:
+		}
+		fmt.Fprint(w, `{"id":1}`)
+	}))
+	t.Cleanup(foreign.Close)
+
+	authedClient, err := client.Clone(WithAuthToken("secret-token"))
+	if err != nil {
+		t.Fatalf("Client.Clone returned error: %v", err)
 	}
 
-	want := `{
-		"tag_name": "tn",
-		"target_commitish": "tc",
-		"name": "name",
-		"body": "body",
-		"draft": false,
-		"prerelease": false,
-		"discussion_category_name": "dcn",
-		"id": 1,
-		"created_at": ` + referenceTimeStr + `,
-		"published_at": ` + referenceTimeStr + `,
-		"url": "url",
-		"html_url": "hurl",
-		"assets_url": "aurl",
-		"assets": [
-			{
-				"id": 1
-			}
-		],
-		"upload_url": "uurl",
-		"zipball_url": "zurl",
-		"tarball_url": "turl",
-		"author": {
-			"id": 1
-		},
-		"node_id": "nid"
-	}`
+	body := []byte("artifact\n")
+	reader := bytes.NewReader(body)
+	size := int64(len(body))
 
-	testJSONMarshal(t, u, want)
+	release := &RepositoryRelease{UploadURL: foreign.URL + "/upload{?name,label}"}
+	ctx := t.Context()
+	asset, _, err := authedClient.Repositories.UploadReleaseAssetFromRelease(
+		ctx, release, &UploadOptions{Name: "n.txt"}, reader, size,
+	)
+	if !errors.Is(err, ErrUntrustedDestination) {
+		t.Fatalf("UploadReleaseAssetFromRelease to a foreign host: want ErrUntrustedDestination, got err=%v", err)
+	}
+	if asset != nil {
+		t.Errorf("UploadReleaseAssetFromRelease returned asset %+v for a refused upload, want nil", asset)
+	}
+
+	select {
+	case <-reached:
+		t.Fatal("the artifact was sent to a foreign host; the upload must be refused before any byte is written")
+	default:
+	}
+}
+
+func TestRepositoriesService_UploadReleaseAssetFromRelease_ConfiguredUploadHost(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	// The counterpart to the rejection above: an absolute URL naming the client's own
+	// configured upload origin is the ordinary case and must still be uploaded to.
+	mux.HandleFunc("/repos/o/r/releases/1/assets", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testFormValues(t, r, values{"name": "cfg.txt"})
+		testPlainBody(t, r, "Upload me !\n")
+		fmt.Fprint(w, `{"id":1}`)
+	})
+
+	body := []byte("Upload me !\n")
+	reader := bytes.NewReader(body)
+	size := int64(len(body))
+
+	uploadURL := client.uploadURL.String() + "repos/o/r/releases/1/assets{?name,label}"
+	release := &RepositoryRelease{UploadURL: uploadURL}
+
+	ctx := t.Context()
+	asset, _, err := client.Repositories.UploadReleaseAssetFromRelease(
+		ctx, release, &UploadOptions{Name: "cfg.txt"}, reader, size,
+	)
+	if err != nil {
+		t.Fatalf("UploadReleaseAssetFromRelease returned error: %v", err)
+	}
+	want := &ReleaseAsset{ID: new(int64(1))}
+	if !cmp.Equal(asset, want) {
+		t.Fatalf("UploadReleaseAssetFromRelease returned %+v, want %+v", asset, want)
+	}
+}
+
+func TestRepositoriesService_UploadReleaseAssetFromRelease_MalformedUploadURL(t *testing.T) {
+	t.Parallel()
+	client, _, _ := setup(t)
+
+	// net/url rejects ASCII control characters, so a response naming such a URL must
+	// surface as an error rather than a panic or an upload to an unchecked host.
+	release := &RepositoryRelease{UploadURL: "https://uploads.github.com/\x7f/upload{?name,label}"}
+	ctx := t.Context()
+	_, _, err := client.Repositories.UploadReleaseAssetFromRelease(
+		ctx, release, &UploadOptions{Name: "n.txt"}, bytes.NewReader([]byte("x")), 1,
+	)
+	if err == nil {
+		t.Fatal("expected an error for an unparsable upload URL, got nil")
+	}
+}
+
+func TestRepositoriesService_UploadReleaseAssetFromRelease_NilRelease(t *testing.T) {
+	t.Parallel()
+	client, _, _ := setup(t)
+
+	body := []byte("Upload me !\n")
+	reader := bytes.NewReader(body)
+	size := int64(len(body))
+
+	ctx := t.Context()
+	_, _, err := client.Repositories.UploadReleaseAssetFromRelease(ctx, nil, &UploadOptions{Name: "n.txt"}, reader, size)
+	if err == nil {
+		t.Fatal("expected error for nil release, got nil")
+	}
+
+	const methodName = "UploadReleaseAssetFromRelease"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Repositories.UploadReleaseAssetFromRelease(ctx, nil, &UploadOptions{Name: "n.txt"}, reader, size)
+		return err
+	})
+}
+
+func TestRepositoriesService_UploadReleaseAssetFromRelease_NilReader(t *testing.T) {
+	t.Parallel()
+	client, _, _ := setup(t)
+
+	release := &RepositoryRelease{UploadURL: "/repos/o/r/releases/1/assets{?name,label}"}
+
+	ctx := t.Context()
+	_, _, err := client.Repositories.UploadReleaseAssetFromRelease(ctx, release, &UploadOptions{Name: "n.txt"}, nil, 12)
+	if err == nil {
+		t.Fatal("expected error when reader is nil")
+	}
+
+	const methodName = "UploadReleaseAssetFromRelease"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Repositories.UploadReleaseAssetFromRelease(ctx, release, &UploadOptions{Name: "n.txt"}, nil, 12)
+		return err
+	})
+}
+
+func TestRepositoriesService_UploadReleaseAssetFromRelease_NegativeSize(t *testing.T) {
+	t.Parallel()
+	client, _, _ := setup(t)
+
+	release := &RepositoryRelease{UploadURL: "/repos/o/r/releases/1/assets{?name,label}"}
+
+	body := []byte("Upload me !\n")
+	reader := bytes.NewReader(body)
+
+	ctx := t.Context()
+	_, _, err := client.Repositories.UploadReleaseAssetFromRelease(ctx, release, &UploadOptions{Name: "n..txt"}, reader, -1)
+	if err == nil {
+		t.Fatal("expected error when size is negative")
+	}
+}
+
+func TestRepositoriesService_UploadReleaseAssetFromRelease_NoOpts(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	// No opts: we just assert that the handler is hit and body is as expected.
+	mux.HandleFunc("/repos/o/r/releases/1/assets", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testPlainBody(t, r, "Upload me !\n")
+		fmt.Fprint(w, `{"id":1}`)
+	})
+
+	body := []byte("Upload me !\n")
+	reader := bytes.NewReader(body)
+	size := int64(len(body))
+
+	release := &RepositoryRelease{UploadURL: "/repos/o/r/releases/1/assets{?name,label}"}
+
+	ctx := t.Context()
+	asset, _, err := client.Repositories.UploadReleaseAssetFromRelease(ctx, release, nil, reader, size)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := &ReleaseAsset{ID: new(int64(1))}
+	if !cmp.Equal(asset, want) {
+		t.Fatalf("Repositories.UploadReleaseAssetFromRelease returned %+v, want %+v", asset, want)
+	}
+
+	const methodName = "UploadReleaseAssetFromRelease"
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Repositories.UploadReleaseAssetFromRelease(ctx, release, nil, reader, size)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestRepositoriesService_UploadReleaseAssetFromRelease_WithMediaType(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	// Expect explicit media type to be used.
+	mux.HandleFunc("/repos/o/r/releases/1/assets", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testHeader(t, r, "Content-Type", "image/png")
+		fmt.Fprint(w, `{"id":1}`)
+	})
+
+	body := []byte("Binary!")
+	reader := bytes.NewReader(body)
+	size := int64(len(body))
+
+	release := &RepositoryRelease{UploadURL: "/repos/o/r/releases/1/assets{?name,label}"}
+
+	opts := &UploadOptions{Name: "n.txt", MediaType: "image/png"}
+
+	ctx := t.Context()
+	asset, _, err := client.Repositories.UploadReleaseAssetFromRelease(ctx, release, opts, reader, size)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := &ReleaseAsset{ID: new(int64(1))}
+	if !cmp.Equal(asset, want) {
+		t.Fatalf("UploadReleaseAssetFromRelease returned %+v, want %+v", asset, want)
+	}
 }

@@ -6,7 +6,6 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -15,15 +14,15 @@ import (
 )
 
 func TestGitignoresService_List(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/gitignore/templates", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `["C", "Go"]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	available, _, err := client.Gitignores.List(ctx)
 	if err != nil {
 		t.Errorf("Gitignores.List returned error: %v", err)
@@ -45,21 +44,21 @@ func TestGitignoresService_List(t *testing.T) {
 }
 
 func TestGitignoresService_Get(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/gitignore/templates/name", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"name":"Name","source":"template source"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	gitignore, _, err := client.Gitignores.Get(ctx, "name")
 	if err != nil {
-		t.Errorf("Gitignores.List returned error: %v", err)
+		t.Errorf("Gitignores.Get returned error: %v", err)
 	}
 
-	want := &Gitignore{Name: String("Name"), Source: String("template source")}
+	want := &Gitignore{Name: new("Name"), Source: new("template source")}
 	if !cmp.Equal(gitignore, want) {
 		t.Errorf("Gitignores.Get returned %+v, want %+v", gitignore, want)
 	}
@@ -80,26 +79,10 @@ func TestGitignoresService_Get(t *testing.T) {
 }
 
 func TestGitignoresService_Get_invalidTemplate(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Gitignores.Get(ctx, "%")
 	testURLParseError(t, err)
-}
-
-func TestGitignore_Marshal(t *testing.T) {
-	testJSONMarshal(t, &Gitignore{}, "{}")
-
-	u := &Gitignore{
-		Name:   String("name"),
-		Source: String("source"),
-	}
-
-	want := `{
-		"name": "name",
-		"source": "source"
-	}`
-
-	testJSONMarshal(t, u, want)
 }

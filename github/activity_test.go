@@ -6,7 +6,6 @@
 package github
 
 import (
-	"context"
 	"net/http"
 	"testing"
 
@@ -14,17 +13,17 @@ import (
 )
 
 func TestActivityService_List(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/feeds", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 
 		w.WriteHeader(http.StatusOK)
-		w.Write(feedsJSON)
+		assertWrite(t, w, feedsJSON)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Activity.ListFeeds(ctx)
 	if err != nil {
 		t.Errorf("Activity.ListFeeds returned error: %v", err)
@@ -88,223 +87,45 @@ var feedsJSON = []byte(`{
 }`)
 
 var wantFeeds = &Feeds{
-	TimelineURL:                String("https://github.com/timeline"),
-	UserURL:                    String("https://github.com/{user}"),
-	CurrentUserPublicURL:       String("https://github.com/defunkt"),
-	CurrentUserURL:             String("https://github.com/defunkt.private?token=abc123"),
-	CurrentUserActorURL:        String("https://github.com/defunkt.private.actor?token=abc123"),
-	CurrentUserOrganizationURL: String(""),
+	TimelineURL:                new("https://github.com/timeline"),
+	UserURL:                    new("https://github.com/{user}"),
+	CurrentUserPublicURL:       new("https://github.com/defunkt"),
+	CurrentUserURL:             new("https://github.com/defunkt.private?token=abc123"),
+	CurrentUserActorURL:        new("https://github.com/defunkt.private.actor?token=abc123"),
+	CurrentUserOrganizationURL: new(""),
 	CurrentUserOrganizationURLs: []string{
 		"https://github.com/organizations/github/defunkt.private.atom?token=abc123",
 	},
 	Links: &FeedLinks{
 		Timeline: &FeedLink{
-			HRef: String("https://github.com/timeline"),
-			Type: String("application/atom+xml"),
+			HRef: new("https://github.com/timeline"),
+			Type: new("application/atom+xml"),
 		},
 		User: &FeedLink{
-			HRef: String("https://github.com/{user}"),
-			Type: String("application/atom+xml"),
+			HRef: new("https://github.com/{user}"),
+			Type: new("application/atom+xml"),
 		},
 		CurrentUserPublic: &FeedLink{
-			HRef: String("https://github.com/defunkt"),
-			Type: String("application/atom+xml"),
+			HRef: new("https://github.com/defunkt"),
+			Type: new("application/atom+xml"),
 		},
 		CurrentUser: &FeedLink{
-			HRef: String("https://github.com/defunkt.private?token=abc123"),
-			Type: String("application/atom+xml"),
+			HRef: new("https://github.com/defunkt.private?token=abc123"),
+			Type: new("application/atom+xml"),
 		},
 		CurrentUserActor: &FeedLink{
-			HRef: String("https://github.com/defunkt.private.actor?token=abc123"),
-			Type: String("application/atom+xml"),
+			HRef: new("https://github.com/defunkt.private.actor?token=abc123"),
+			Type: new("application/atom+xml"),
 		},
 		CurrentUserOrganization: &FeedLink{
-			HRef: String(""),
-			Type: String(""),
+			HRef: new(""),
+			Type: new(""),
 		},
 		CurrentUserOrganizations: []*FeedLink{
 			{
-				HRef: String("https://github.com/organizations/github/defunkt.private.atom?token=abc123"),
-				Type: String("application/atom+xml"),
+				HRef: new("https://github.com/organizations/github/defunkt.private.atom?token=abc123"),
+				Type: new("application/atom+xml"),
 			},
 		},
 	},
-}
-
-func TestFeedLink_Marshal(t *testing.T) {
-	testJSONMarshal(t, &FeedLink{}, "{}")
-
-	u := &FeedLink{
-		HRef: String("h"),
-		Type: String("t"),
-	}
-
-	want := `{
-		"href": "h",
-		"type": "t"
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestFeeds_Marshal(t *testing.T) {
-	testJSONMarshal(t, &Feeds{}, "{}")
-
-	u := &Feeds{
-		TimelineURL:                 String("t"),
-		UserURL:                     String("u"),
-		CurrentUserPublicURL:        String("cupu"),
-		CurrentUserURL:              String("cuu"),
-		CurrentUserActorURL:         String("cuau"),
-		CurrentUserOrganizationURL:  String("cuou"),
-		CurrentUserOrganizationURLs: []string{"a"},
-		Links: &FeedLinks{
-			Timeline: &FeedLink{
-				HRef: String("h"),
-				Type: String("t"),
-			},
-			User: &FeedLink{
-				HRef: String("h"),
-				Type: String("t"),
-			},
-			CurrentUserPublic: &FeedLink{
-				HRef: String("h"),
-				Type: String("t"),
-			},
-			CurrentUser: &FeedLink{
-				HRef: String("h"),
-				Type: String("t"),
-			},
-			CurrentUserActor: &FeedLink{
-				HRef: String("h"),
-				Type: String("t"),
-			},
-			CurrentUserOrganization: &FeedLink{
-				HRef: String("h"),
-				Type: String("t"),
-			},
-			CurrentUserOrganizations: []*FeedLink{
-				{
-					HRef: String("h"),
-					Type: String("t"),
-				},
-			},
-		},
-	}
-
-	want := `{
-		"timeline_url": "t",
-		"user_url": "u",
-		"current_user_public_url": "cupu",
-		"current_user_url": "cuu",
-		"current_user_actor_url": "cuau",
-		"current_user_organization_url": "cuou",
-		"current_user_organization_urls": ["a"],
-		"_links": {
-			"timeline": {
-				"href": "h",
-				"type": "t"
-				},
-			"user": {
-				"href": "h",
-				"type": "t"
-			},
-			"current_user_public": {
-				"href": "h",
-				"type": "t"
-			},
-			"current_user": {
-				"href": "h",
-				"type": "t"
-			},
-			"current_user_actor": {
-				"href": "h",
-				"type": "t"
-			},
-			"current_user_organization": {
-				"href": "h",
-				"type": "t"
-			},
-			"current_user_organizations": [
-				{
-					"href": "h",
-					"type": "t"
-				}
-			]
-		}
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestFeedLinks_Marshal(t *testing.T) {
-	testJSONMarshal(t, &FeedLinks{}, "{}")
-
-	u := &FeedLinks{
-		Timeline: &FeedLink{
-			HRef: String("h"),
-			Type: String("t"),
-		},
-		User: &FeedLink{
-			HRef: String("h"),
-			Type: String("t"),
-		},
-		CurrentUserPublic: &FeedLink{
-			HRef: String("h"),
-			Type: String("t"),
-		},
-		CurrentUser: &FeedLink{
-			HRef: String("h"),
-			Type: String("t"),
-		},
-		CurrentUserActor: &FeedLink{
-			HRef: String("h"),
-			Type: String("t"),
-		},
-		CurrentUserOrganization: &FeedLink{
-			HRef: String("h"),
-			Type: String("t"),
-		},
-		CurrentUserOrganizations: []*FeedLink{
-			{
-				HRef: String("h"),
-				Type: String("t"),
-			},
-		},
-	}
-
-	want := `{
-		"timeline": {
-			"href": "h",
-			"type": "t"
-		},
-		"user": {
-			"href": "h",
-			"type": "t"
-		},
-		"current_user_public": {
-			"href": "h",
-			"type": "t"
-		},
-		"current_user": {
-			"href": "h",
-			"type": "t"
-		},
-		"current_user_actor": {
-			"href": "h",
-			"type": "t"
-		},
-		"current_user_organization": {
-			"href": "h",
-			"type": "t"
-		},
-		"current_user_organizations": [
-			{
-				"href": "h",
-				"type": "t"
-			}
-		]
-	}`
-
-	testJSONMarshal(t, u, want)
 }

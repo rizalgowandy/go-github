@@ -6,7 +6,6 @@
 package github
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,24 +15,30 @@ import (
 )
 
 func TestRequiredReviewer_UnmarshalJSON(t *testing.T) {
-	var testCases = map[string]struct {
+	t.Parallel()
+	testCases := map[string]struct {
 		data      []byte
 		wantRule  []*RequiredReviewer
 		wantError bool
 	}{
 		"User Reviewer": {
 			data:      []byte(`[{"type": "User", "reviewer": {"id": 1,"login": "octocat"}}]`),
-			wantRule:  []*RequiredReviewer{{Type: String("User"), Reviewer: &User{ID: Int64(1), Login: String("octocat")}}},
+			wantRule:  []*RequiredReviewer{{Type: new("User"), Reviewer: &User{ID: new(int64(1)), Login: new("octocat")}}},
 			wantError: false,
 		},
 		"Team Reviewer": {
 			data:      []byte(`[{"type": "Team", "reviewer": {"id": 1, "name": "Justice League"}}]`),
-			wantRule:  []*RequiredReviewer{{Type: String("Team"), Reviewer: &Team{ID: Int64(1), Name: String("Justice League")}}},
+			wantRule:  []*RequiredReviewer{{Type: new("Team"), Reviewer: &Team{ID: new(int64(1)), Name: new("Justice League")}}},
+			wantError: false,
+		},
+		"Enterprise Team Reviewer": {
+			data:      []byte(`[{"type": "BusinessTeam", "reviewer": {"id": 1, "name": "Justice League"}}]`),
+			wantRule:  []*RequiredReviewer{{Type: new("Team"), Reviewer: &Team{ID: new(int64(1)), Name: new("Justice League")}}},
 			wantError: false,
 		},
 		"Both Types Reviewer": {
 			data:      []byte(`[{"type": "User", "reviewer": {"id": 1,"login": "octocat"}},{"type": "Team", "reviewer": {"id": 1, "name": "Justice League"}}]`),
-			wantRule:  []*RequiredReviewer{{Type: String("User"), Reviewer: &User{ID: Int64(1), Login: String("octocat")}}, {Type: String("Team"), Reviewer: &Team{ID: Int64(1), Name: String("Justice League")}}},
+			wantRule:  []*RequiredReviewer{{Type: new("User"), Reviewer: &User{ID: new(int64(1)), Login: new("octocat")}}, {Type: new("Team"), Reviewer: &Team{ID: new(int64(1)), Name: new("Justice League")}}},
 			wantError: false,
 		},
 		"Empty JSON Object": {
@@ -46,19 +51,34 @@ func TestRequiredReviewer_UnmarshalJSON(t *testing.T) {
 			wantRule:  []*RequiredReviewer{},
 			wantError: true,
 		},
-		"Wrong Type Type in Reviewer Object": {
+		"Wrong Type in Reviewer Object": {
 			data:      []byte(`[{"type": 1, "reviewer": {"id": 1}}]`),
+			wantRule:  []*RequiredReviewer{{Type: nil, Reviewer: nil}},
+			wantError: true,
+		},
+		"Missing Type in Reviewer Object": {
+			data:      []byte(`[{"reviewer": {"id": 1}}]`),
+			wantRule:  []*RequiredReviewer{{Type: nil, Reviewer: nil}},
+			wantError: true,
+		},
+		"Null Type in Reviewer Object": {
+			data:      []byte(`[{"type": null, "reviewer": {"id": 1}}]`),
 			wantRule:  []*RequiredReviewer{{Type: nil, Reviewer: nil}},
 			wantError: true,
 		},
 		"Wrong ID Type in User Object": {
 			data:      []byte(`[{"type": "User", "reviewer": {"id": "string"}}]`),
-			wantRule:  []*RequiredReviewer{{Type: String("User"), Reviewer: nil}},
+			wantRule:  []*RequiredReviewer{{Type: new("User"), Reviewer: nil}},
 			wantError: true,
 		},
 		"Wrong ID Type in Team Object": {
 			data:      []byte(`[{"type": "Team", "reviewer": {"id": "string"}}]`),
-			wantRule:  []*RequiredReviewer{{Type: String("Team"), Reviewer: nil}},
+			wantRule:  []*RequiredReviewer{{Type: new("Team"), Reviewer: nil}},
+			wantError: true,
+		},
+		"Wrong ID Type in Enterprise Team Object": {
+			data:      []byte(`[{"type": "BusinessTeam", "reviewer": {"id": "string"}}]`),
+			wantRule:  []*RequiredReviewer{{Type: new("BusinessTeam"), Reviewer: nil}},
 			wantError: true,
 		},
 		"Wrong Type of Reviewer": {
@@ -70,13 +90,14 @@ func TestRequiredReviewer_UnmarshalJSON(t *testing.T) {
 
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			rule := []*RequiredReviewer{}
 			err := json.Unmarshal(test.data, &rule)
 			if err != nil && !test.wantError {
-				t.Errorf("RequiredReviewer.UnmarshalJSON returned an error when we expected nil")
+				t.Error("RequiredReviewer.UnmarshalJSON returned an error when we expected nil")
 			}
 			if err == nil && test.wantError {
-				t.Errorf("RequiredReviewer.UnmarshalJSON returned no error when we expected one")
+				t.Error("RequiredReviewer.UnmarshalJSON returned no error when we expected one")
 			}
 			if !cmp.Equal(test.wantRule, rule) {
 				t.Errorf("RequiredReviewer.UnmarshalJSON expected rule %+v, got %+v", test.wantRule, rule)
@@ -86,46 +107,47 @@ func TestRequiredReviewer_UnmarshalJSON(t *testing.T) {
 }
 
 func TestCreateUpdateEnvironment_MarshalJSON(t *testing.T) {
-	cu := &CreateUpdateEnvironment{}
+	t.Parallel()
+	cu := CreateUpdateEnvironment{}
 
-	got, err := cu.MarshalJSON()
-	if err != nil {
-		t.Errorf("MarshalJSON: %v", err)
-	}
-
-	want := `{"wait_timer":0,"reviewers":null,"deployment_branch_policy":null}`
-	if string(got) != want {
-		t.Errorf("MarshalJSON = %s, want %v", got, want)
-	}
+	want := `{"wait_timer":0,"reviewers":null,"can_admins_bypass":true,"deployment_branch_policy":null}`
+	testJSONMarshalOnly(t, cu, want)
+	testJSONMarshalOnly(t, &cu, want)
 }
 
 func TestRepositoriesService_ListEnvironments(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/environments", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"total_count":1, "environments":[{"id":1}, {"id": 2}]}`)
 	})
 
-	ctx := context.Background()
-	environments, _, err := client.Repositories.ListEnvironments(ctx, "o", "r")
+	opt := &EnvironmentListOptions{
+		ListOptions: ListOptions{
+			Page:    2,
+			PerPage: 2,
+		},
+	}
+	ctx := t.Context()
+	environments, _, err := client.Repositories.ListEnvironments(ctx, "o", "r", opt)
 	if err != nil {
 		t.Errorf("Repositories.ListEnvironments returned error: %v", err)
 	}
-	want := &EnvResponse{TotalCount: Int(1), Environments: []*Environment{{ID: Int64(1)}, {ID: Int64(2)}}}
+	want := &EnvResponse{TotalCount: new(1), Environments: []*Environment{{ID: new(int64(1))}, {ID: new(int64(2))}}}
 	if !cmp.Equal(environments, want) {
 		t.Errorf("Repositories.ListEnvironments returned %+v, want %+v", environments, want)
 	}
 
 	const methodName = "ListEnvironments"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Repositories.ListEnvironments(ctx, "\n", "\n")
+		_, _, err = client.Repositories.ListEnvironments(ctx, "\n", "\n", opt)
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Repositories.ListEnvironments(ctx, "o", "r")
+		got, resp, err := client.Repositories.ListEnvironments(ctx, "o", "r", opt)
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -134,21 +156,21 @@ func TestRepositoriesService_ListEnvironments(t *testing.T) {
 }
 
 func TestRepositoriesService_GetEnvironment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/environments/e", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprint(w, `{"id": 1,"name": "staging", "deployment_branch_policy": {"protected_branches": true,	"custom_branch_policies": false}}`)
+		fmt.Fprint(w, `{"id": 1,"name": "staging", "deployment_branch_policy": {"protected_branches": true,	"custom_branch_policies": false}, "can_admins_bypass": false}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release, resp, err := client.Repositories.GetEnvironment(ctx, "o", "r", "e")
 	if err != nil {
 		t.Errorf("Repositories.GetEnvironment returned error: %v\n%v", err, resp.Body)
 	}
 
-	want := &Environment{ID: Int64(1), Name: String("staging"), DeploymentBranchPolicy: &BranchPolicy{ProtectedBranches: Bool(true), CustomBranchPolicies: Bool(false)}}
+	want := &Environment{ID: new(int64(1)), Name: new("staging"), DeploymentBranchPolicy: &BranchPolicy{ProtectedBranches: new(true), CustomBranchPolicies: new(false)}, CanAdminsBypass: new(false)}
 	if !cmp.Equal(release, want) {
 		t.Errorf("Repositories.GetEnvironment returned %+v, want %+v", release, want)
 	}
@@ -168,33 +190,62 @@ func TestRepositoriesService_GetEnvironment(t *testing.T) {
 	})
 }
 
+func TestRepositoriesService_GetEnvironment_EscapeName(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name        string
+		escapedName string
+	}{
+		{name: "staging", escapedName: "staging"},
+		{name: "team/staging", escapedName: "team%2Fstaging"},
+		{name: "staging%25", escapedName: "staging%2525"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			client, mux, _ := setup(t)
+
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				if got, want := r.URL.EscapedPath(), "/repos/o/repo/environments/"+tt.escapedName; got != want {
+					t.Errorf("Request path = %q, want %q", got, want)
+				}
+				if got, want := r.URL.Path, "/repos/o/repo/environments/"+tt.name; got != want {
+					t.Errorf("Decoded request path = %q, want %q", got, want)
+				}
+				fmt.Fprint(w, `{}`)
+			})
+
+			ctx := t.Context()
+			_, _, err := client.Repositories.GetEnvironment(ctx, "o", "repo", tt.name)
+			if err != nil {
+				t.Fatalf("Repositories.GetEnvironment returned error: %v", err)
+			}
+		})
+	}
+}
+
 func TestRepositoriesService_CreateEnvironment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	input := &CreateUpdateEnvironment{
-		WaitTimer: Int(30),
+		WaitTimer: new(30),
 	}
 
 	mux.HandleFunc("/repos/o/r/environments/e", func(w http.ResponseWriter, r *http.Request) {
-		v := new(CreateUpdateEnvironment)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PUT")
-		want := &CreateUpdateEnvironment{WaitTimer: Int(30)}
-		if !cmp.Equal(v, want) {
-			t.Errorf("Request body = %+v, want %+v", v, want)
-		}
+		want := &CreateUpdateEnvironment{WaitTimer: new(30), CanAdminsBypass: new(true)}
+		testJSONBody(t, r, want)
 		fmt.Fprint(w, `{"id": 1, "name": "staging",	"protection_rules": [{"id": 1, "type": "wait_timer", "wait_timer": 30}]}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	release, _, err := client.Repositories.CreateUpdateEnvironment(ctx, "o", "r", "e", input)
 	if err != nil {
 		t.Errorf("Repositories.CreateUpdateEnvironment returned error: %v", err)
 	}
 
-	want := &Environment{ID: Int64(1), Name: String("staging"), ProtectionRules: []*ProtectionRule{{ID: Int64(1), Type: String("wait_timer"), WaitTimer: Int(30)}}}
+	want := &Environment{ID: new(int64(1)), Name: new("staging"), ProtectionRules: []*ProtectionRule{{ID: new(int64(1)), Type: new("wait_timer"), WaitTimer: new(30)}}}
 	if !cmp.Equal(release, want) {
 		t.Errorf("Repositories.CreateUpdateEnvironment returned %+v, want %+v", release, want)
 	}
@@ -214,15 +265,106 @@ func TestRepositoriesService_CreateEnvironment(t *testing.T) {
 	})
 }
 
-func TestRepositoriesService_DeleteEnvironment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestRepositoriesService_CreateEnvironment_noEnterprise(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := &CreateUpdateEnvironment{}
+	callCount := 0
 
 	mux.HandleFunc("/repos/o/r/environments/e", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		if callCount == 0 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			callCount++
+		} else {
+			// The retry sends a createUpdateEnvironmentNoEnterprise, whose only
+			// field is deployment_branch_policy, null here because input is empty.
+			testJSONBodyRaw(t, r, `{"deployment_branch_policy":null}`)
+			fmt.Fprint(w, `{"id": 1, "name": "staging",	"protection_rules": []}`)
+		}
+	})
+
+	ctx := t.Context()
+	release, _, err := client.Repositories.CreateUpdateEnvironment(ctx, "o", "r", "e", input)
+	if err != nil {
+		t.Errorf("Repositories.CreateUpdateEnvironment returned error: %v", err)
+	}
+
+	want := &Environment{ID: new(int64(1)), Name: new("staging"), ProtectionRules: []*ProtectionRule{}}
+	if !cmp.Equal(release, want) {
+		t.Errorf("Repositories.CreateUpdateEnvironment returned %+v, want %+v", release, want)
+	}
+}
+
+func TestRepositoriesService_createNewEnvNoEnterprise(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	input := &CreateUpdateEnvironment{
+		DeploymentBranchPolicy: &BranchPolicy{
+			ProtectedBranches:    new(true),
+			CustomBranchPolicies: new(false),
+		},
+	}
+
+	mux.HandleFunc("/repos/o/r/environments/e", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		// The no-enterprise path sends only deployment_branch_policy: none of
+		// can_admins_bypass, reviewers or wait_timer.
+		testJSONBodyRaw(t, r, `{"deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}`)
+		fmt.Fprint(w, `{"id": 1, "name": "staging",	"protection_rules": [{"id": 1, "node_id": "id", "type": "branch_policy"}], "deployment_branch_policy": {"protected_branches": true, "custom_branch_policies": false}}`)
+	})
+
+	ctx := t.Context()
+	release, _, err := client.Repositories.createNewEnvNoEnterprise(ctx, "repos/o/r/environments/e", input)
+	if err != nil {
+		t.Errorf("Repositories.createNewEnvNoEnterprise returned error: %v", err)
+	}
+
+	want := &Environment{
+		ID:   new(int64(1)),
+		Name: new("staging"),
+		ProtectionRules: []*ProtectionRule{
+			{
+				ID:     new(int64(1)),
+				NodeID: new("id"),
+				Type:   new("branch_policy"),
+			},
+		},
+		DeploymentBranchPolicy: &BranchPolicy{
+			ProtectedBranches:    new(true),
+			CustomBranchPolicies: new(false),
+		},
+	}
+	if !cmp.Equal(release, want) {
+		t.Errorf("Repositories.createNewEnvNoEnterprise returned %+v, want %+v", release, want)
+	}
+
+	const methodName = "createNewEnvNoEnterprise"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Repositories.createNewEnvNoEnterprise(ctx, "\n", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Repositories.createNewEnvNoEnterprise(ctx, "repos/o/r/environments/e", input)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
+}
+
+func TestRepositoriesService_DeleteEnvironment(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/environments/e", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.DeleteEnvironment(ctx, "o", "r", "e")
 	if err != nil {
 		t.Errorf("Repositories.DeleteEnvironment returned error: %v", err)
@@ -237,92 +379,4 @@ func TestRepositoriesService_DeleteEnvironment(t *testing.T) {
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
 		return client.Repositories.DeleteEnvironment(ctx, "o", "r", "e")
 	})
-}
-
-func TestRepoEnvironment_Marshal(t *testing.T) {
-	testJSONMarshal(t, &EnvResponse{}, "{}")
-
-	repoEnv := &EnvResponse{
-		TotalCount: Int(1),
-		Environments: []*Environment{
-			{
-				Owner:           String("me"),
-				Repo:            String("se"),
-				EnvironmentName: String("dev"),
-				WaitTimer:       Int(123),
-				Reviewers: []*EnvReviewers{
-					{
-						Type: String("main"),
-						ID:   Int64(1),
-					},
-					{
-						Type: String("rev"),
-						ID:   Int64(2),
-					},
-				},
-				DeploymentBranchPolicy: &BranchPolicy{
-					ProtectedBranches:    Bool(false),
-					CustomBranchPolicies: Bool(false),
-				},
-				ID:        Int64(2),
-				NodeID:    String("star"),
-				Name:      String("eg"),
-				URL:       String("https://hey.in"),
-				HTMLURL:   String("htmlurl"),
-				CreatedAt: &Timestamp{referenceTime},
-				UpdatedAt: &Timestamp{referenceTime},
-				ProtectionRules: []*ProtectionRule{
-					{
-						ID:        Int64(21),
-						NodeID:    String("mnb"),
-						Type:      String("ewq"),
-						WaitTimer: Int(9090),
-					},
-				},
-			},
-		},
-	}
-
-	want := `{
-		"total_count":1,
-		"environments":[
-		   {
-			  "owner":"me",
-			  "repo":"se",
-			  "environment_name":"dev",
-			  "wait_timer":123,
-			  "reviewers":[
-				 {
-					"type":"main",
-					"id":1
-				 },
-				 {
-					"type":"rev",
-					"id":2
-				 }
-			  ],
-			  "deployment_branch_policy":{
-				 "protected_branches":false,
-				 "custom_branch_policies":false
-			  },
-			  "id":2,
-			  "node_id":"star",
-			  "name":"eg",
-			  "url":"https://hey.in",
-			  "html_url":"htmlurl",
-			  "created_at":` + referenceTimeStr + `,
-			  "updated_at":` + referenceTimeStr + `,
-			  "protection_rules":[
-				 {
-					"id":21,
-					"node_id":"mnb",
-					"type":"ewq",
-					"wait_timer":9090
-				 }
-			  ]
-		   }
-		]
-	 }`
-
-	testJSONMarshal(t, repoEnv, want)
 }

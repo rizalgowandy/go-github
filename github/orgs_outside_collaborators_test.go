@@ -6,7 +6,7 @@
 package github
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -15,8 +15,8 @@ import (
 )
 
 func TestOrganizationsService_ListOutsideCollaborators(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/outside_collaborators", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -31,13 +31,13 @@ func TestOrganizationsService_ListOutsideCollaborators(t *testing.T) {
 		Filter:      "2fa_disabled",
 		ListOptions: ListOptions{Page: 2},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	members, _, err := client.Organizations.ListOutsideCollaborators(ctx, "o", opt)
 	if err != nil {
 		t.Errorf("Organizations.ListOutsideCollaborators returned error: %v", err)
 	}
 
-	want := []*User{{ID: Int64(1)}}
+	want := []*User{{ID: new(int64(1))}}
 	if !cmp.Equal(members, want) {
 		t.Errorf("Organizations.ListOutsideCollaborators returned %+v, want %+v", members, want)
 	}
@@ -58,24 +58,24 @@ func TestOrganizationsService_ListOutsideCollaborators(t *testing.T) {
 }
 
 func TestOrganizationsService_ListOutsideCollaborators_invalidOrg(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Organizations.ListOutsideCollaborators(ctx, "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestOrganizationsService_RemoveOutsideCollaborator(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	handler := func(w http.ResponseWriter, r *http.Request) {
+	handler := func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	}
 	mux.HandleFunc("/orgs/o/outside_collaborators/u", handler)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.RemoveOutsideCollaborator(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.RemoveOutsideCollaborator returned error: %v", err)
@@ -93,8 +93,8 @@ func TestOrganizationsService_RemoveOutsideCollaborator(t *testing.T) {
 }
 
 func TestOrganizationsService_RemoveOutsideCollaborator_NonMember(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
@@ -102,18 +102,18 @@ func TestOrganizationsService_RemoveOutsideCollaborator_NonMember(t *testing.T) 
 	}
 	mux.HandleFunc("/orgs/o/outside_collaborators/u", handler)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.RemoveOutsideCollaborator(ctx, "o", "u")
-	if err, ok := err.(*ErrorResponse); !ok {
-		t.Errorf("Organizations.RemoveOutsideCollaborator did not return an error")
-	} else if err.Response.StatusCode != http.StatusNotFound {
-		t.Errorf("Organizations.RemoveOutsideCollaborator did not return 404 status code")
+	if rerr, ok := errors.AsType[*ErrorResponse](err); !ok {
+		t.Error("Organizations.RemoveOutsideCollaborator did not return an error")
+	} else if rerr.Response.StatusCode != http.StatusNotFound {
+		t.Error("Organizations.RemoveOutsideCollaborator did not return 404 status code")
 	}
 }
 
 func TestOrganizationsService_RemoveOutsideCollaborator_Member(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
@@ -121,25 +121,25 @@ func TestOrganizationsService_RemoveOutsideCollaborator_Member(t *testing.T) {
 	}
 	mux.HandleFunc("/orgs/o/outside_collaborators/u", handler)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.RemoveOutsideCollaborator(ctx, "o", "u")
-	if err, ok := err.(*ErrorResponse); !ok {
-		t.Errorf("Organizations.RemoveOutsideCollaborator did not return an error")
-	} else if err.Response.StatusCode != http.StatusUnprocessableEntity {
-		t.Errorf("Organizations.RemoveOutsideCollaborator did not return 422 status code")
+	if rerr, ok := errors.AsType[*ErrorResponse](err); !ok {
+		t.Error("Organizations.RemoveOutsideCollaborator did not return an error")
+	} else if rerr.Response.StatusCode != http.StatusUnprocessableEntity {
+		t.Error("Organizations.RemoveOutsideCollaborator did not return 422 status code")
 	}
 }
 
 func TestOrganizationsService_ConvertMemberToOutsideCollaborator(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	handler := func(w http.ResponseWriter, r *http.Request) {
+	handler := func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
 	}
 	mux.HandleFunc("/orgs/o/outside_collaborators/u", handler)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.ConvertMemberToOutsideCollaborator(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.ConvertMemberToOutsideCollaborator returned error: %v", err)
@@ -157,8 +157,8 @@ func TestOrganizationsService_ConvertMemberToOutsideCollaborator(t *testing.T) {
 }
 
 func TestOrganizationsService_ConvertMemberToOutsideCollaborator_NonMemberOrLastOwner(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
@@ -166,11 +166,11 @@ func TestOrganizationsService_ConvertMemberToOutsideCollaborator_NonMemberOrLast
 	}
 	mux.HandleFunc("/orgs/o/outside_collaborators/u", handler)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.ConvertMemberToOutsideCollaborator(ctx, "o", "u")
-	if err, ok := err.(*ErrorResponse); !ok {
-		t.Errorf("Organizations.ConvertMemberToOutsideCollaborator did not return an error")
-	} else if err.Response.StatusCode != http.StatusForbidden {
-		t.Errorf("Organizations.ConvertMemberToOutsideCollaborator did not return 403 status code")
+	if rerr, ok := errors.AsType[*ErrorResponse](err); !ok {
+		t.Error("Organizations.ConvertMemberToOutsideCollaborator did not return an error")
+	} else if rerr.Response.StatusCode != http.StatusForbidden {
+		t.Error("Organizations.ConvertMemberToOutsideCollaborator did not return 403 status code")
 	}
 }

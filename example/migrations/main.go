@@ -11,28 +11,26 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
-	"github.com/google/go-github/v39/github"
-	"golang.org/x/oauth2"
+	"github.com/google/go-github/v93/github"
 )
 
 func fetchAllUserMigrations() ([]*github.UserMigration, error) {
 	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: "<GITHUB_AUTH_TOKEN>"},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
+	client, err := github.NewClient(github.WithAuthToken("<GITHUB_AUTH_TOKEN>"))
+	if err != nil {
+		return nil, err
+	}
 
-	migrations, _, err := client.Migrations.ListUserMigrations(ctx)
+	migrations, _, err := client.Migrations.ListUserMigrations(ctx, &github.ListOptions{Page: 1})
 	return migrations, err
 }
 
 func main() {
 	migrations, err := fetchAllUserMigrations()
 	if err != nil {
-		fmt.Printf("Error %v\n", err)
-		return
+		log.Fatalf("Error: %v", err)
 	}
 
 	for i, m := range migrations {

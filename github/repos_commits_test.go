@@ -6,7 +6,6 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -15,12 +14,11 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"golang.org/x/crypto/openpgp"
 )
 
 func TestRepositoriesService_ListCommits(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	// given
 	mux.HandleFunc("/repos/o/r/commits", func(w http.ResponseWriter, r *http.Request) {
@@ -30,26 +28,26 @@ func TestRepositoriesService_ListCommits(t *testing.T) {
 				"sha":    "s",
 				"path":   "p",
 				"author": "a",
-				"since":  "2013-08-01T00:00:00Z",
-				"until":  "2013-09-03T00:00:00Z",
+				"since":  referenceTimeRaw,
+				"until":  "2007-03-04T15:04:05Z",
 			})
-		fmt.Fprintf(w, `[{"sha": "s"}]`)
+		fmt.Fprint(w, `[{"sha": "s"}]`)
 	})
 
 	opt := &CommitsListOptions{
 		SHA:    "s",
 		Path:   "p",
 		Author: "a",
-		Since:  time.Date(2013, time.August, 1, 0, 0, 0, 0, time.UTC),
-		Until:  time.Date(2013, time.September, 3, 0, 0, 0, 0, time.UTC),
+		Since:  referenceTime,
+		Until:  time.Date(2007, time.March, 4, 15, 4, 5, 0, time.UTC),
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	commits, _, err := client.Repositories.ListCommits(ctx, "o", "r", opt)
 	if err != nil {
 		t.Errorf("Repositories.ListCommits returned error: %v", err)
 	}
 
-	want := []*RepositoryCommit{{SHA: String("s")}}
+	want := []*RepositoryCommit{{SHA: new("s")}}
 	if !cmp.Equal(commits, want) {
 		t.Errorf("Repositories.ListCommits returned %+v, want %+v", commits, want)
 	}
@@ -70,13 +68,13 @@ func TestRepositoriesService_ListCommits(t *testing.T) {
 }
 
 func TestRepositoriesService_GetCommit(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/commits/s", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testFormValues(t, r, values{"per_page": "2", "page": "2"})
-		fmt.Fprintf(w, `{
+		fmt.Fprint(w, `{
 		  "sha": "s",
 		  "commit": { "message": "m" },
 		  "author": { "login": "l" },
@@ -100,44 +98,44 @@ func TestRepositoriesService_GetCommit(t *testing.T) {
 	})
 
 	opts := &ListOptions{Page: 2, PerPage: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	commit, _, err := client.Repositories.GetCommit(ctx, "o", "r", "s", opts)
 	if err != nil {
 		t.Errorf("Repositories.GetCommit returned error: %v", err)
 	}
 
 	want := &RepositoryCommit{
-		SHA: String("s"),
+		SHA: new("s"),
 		Commit: &Commit{
-			Message: String("m"),
+			Message: new("m"),
 		},
 		Author: &User{
-			Login: String("l"),
+			Login: new("l"),
 		},
 		Committer: &User{
-			Login: String("l"),
+			Login: new("l"),
 		},
 		Parents: []*Commit{
 			{
-				SHA: String("s"),
+				SHA: new("s"),
 			},
 		},
 		Stats: &CommitStats{
-			Additions: Int(104),
-			Deletions: Int(4),
-			Total:     Int(108),
+			Additions: new(104),
+			Deletions: new(4),
+			Total:     new(108),
 		},
 		Files: []*CommitFile{
 			{
-				Filename:    String("f"),
-				Additions:   Int(10),
-				Deletions:   Int(2),
-				Changes:     Int(12),
-				Status:      String("s"),
-				Patch:       String("p"),
-				BlobURL:     String("b"),
-				RawURL:      String("r"),
-				ContentsURL: String("c"),
+				Filename:    new("f"),
+				Additions:   new(10),
+				Deletions:   new(2),
+				Changes:     new(12),
+				Status:      new("s"),
+				Patch:       new("p"),
+				BlobURL:     new("b"),
+				RawURL:      new("r"),
+				ContentsURL: new("c"),
 			},
 		},
 	}
@@ -161,8 +159,8 @@ func TestRepositoriesService_GetCommit(t *testing.T) {
 }
 
 func TestRepositoriesService_GetCommitRaw_diff(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	const rawStr = "@@diff content"
 
@@ -172,14 +170,14 @@ func TestRepositoriesService_GetCommitRaw_diff(t *testing.T) {
 		fmt.Fprint(w, rawStr)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Repositories.GetCommitRaw(ctx, "o", "r", "s", RawOptions{Type: Diff})
 	if err != nil {
 		t.Fatalf("Repositories.GetCommitRaw returned error: %v", err)
 	}
 	want := rawStr
 	if got != want {
-		t.Errorf("Repositories.GetCommitRaw returned %s want %s", got, want)
+		t.Errorf("Repositories.GetCommitRaw returned %v want %v", got, want)
 	}
 
 	const methodName = "GetCommitRaw"
@@ -198,8 +196,8 @@ func TestRepositoriesService_GetCommitRaw_diff(t *testing.T) {
 }
 
 func TestRepositoriesService_GetCommitRaw_patch(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	const rawStr = "@@patch content"
 
@@ -209,22 +207,22 @@ func TestRepositoriesService_GetCommitRaw_patch(t *testing.T) {
 		fmt.Fprint(w, rawStr)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Repositories.GetCommitRaw(ctx, "o", "r", "s", RawOptions{Type: Patch})
 	if err != nil {
 		t.Fatalf("Repositories.GetCommitRaw returned error: %v", err)
 	}
 	want := rawStr
 	if got != want {
-		t.Errorf("Repositories.GetCommitRaw returned %s want %s", got, want)
+		t.Errorf("Repositories.GetCommitRaw returned %v want %v", got, want)
 	}
 }
 
 func TestRepositoriesService_GetCommitRaw_invalid(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Repositories.GetCommitRaw(ctx, "o", "r", "s", RawOptions{100})
 	if err == nil {
 		t.Fatal("Repositories.GetCommitRaw should return error")
@@ -235,18 +233,19 @@ func TestRepositoriesService_GetCommitRaw_invalid(t *testing.T) {
 }
 
 func TestRepositoriesService_GetCommitSHA1(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
+
 	const sha1 = "01234abcde"
 
 	mux.HandleFunc("/repos/o/r/commits/master", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testHeader(t, r, "Accept", mediaTypeV3SHA)
 
-		fmt.Fprintf(w, sha1)
+		fmt.Fprint(w, sha1)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Repositories.GetCommitSHA1(ctx, "o", "r", "master", "")
 	if err != nil {
 		t.Errorf("Repositories.GetCommitSHA1 returned error: %v", err)
@@ -267,7 +266,7 @@ func TestRepositoriesService_GetCommitSHA1(t *testing.T) {
 
 	got, _, err = client.Repositories.GetCommitSHA1(ctx, "o", "r", "tag", sha1)
 	if err == nil {
-		t.Errorf("Expected HTTP 304 response")
+		t.Error("Expected HTTP 304 response")
 	}
 
 	want = ""
@@ -291,18 +290,19 @@ func TestRepositoriesService_GetCommitSHA1(t *testing.T) {
 }
 
 func TestRepositoriesService_NonAlphabetCharacter_GetCommitSHA1(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
+
 	const sha1 = "01234abcde"
 
-	mux.HandleFunc("/repos/o/r/commits/master%20hash", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/commits/master%2520hash", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testHeader(t, r, "Accept", mediaTypeV3SHA)
 
-		fmt.Fprintf(w, sha1)
+		fmt.Fprint(w, sha1)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Repositories.GetCommitSHA1(ctx, "o", "r", "master%20hash", "")
 	if err != nil {
 		t.Errorf("Repositories.GetCommitSHA1 returned error: %v", err)
@@ -322,7 +322,7 @@ func TestRepositoriesService_NonAlphabetCharacter_GetCommitSHA1(t *testing.T) {
 
 	got, _, err = client.Repositories.GetCommitSHA1(ctx, "o", "r", "tag", sha1)
 	if err == nil {
-		t.Errorf("Expected HTTP 304 response")
+		t.Error("Expected HTTP 304 response")
 	}
 
 	if want := ""; got != want {
@@ -331,18 +331,19 @@ func TestRepositoriesService_NonAlphabetCharacter_GetCommitSHA1(t *testing.T) {
 }
 
 func TestRepositoriesService_TrailingPercent_GetCommitSHA1(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
+
 	const sha1 = "01234abcde"
 
 	mux.HandleFunc("/repos/o/r/commits/comm%", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testHeader(t, r, "Accept", mediaTypeV3SHA)
 
-		fmt.Fprintf(w, sha1)
+		fmt.Fprint(w, sha1)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Repositories.GetCommitSHA1(ctx, "o", "r", "comm%", "")
 	if err != nil {
 		t.Errorf("Repositories.GetCommitSHA1 returned error: %v", err)
@@ -362,7 +363,7 @@ func TestRepositoriesService_TrailingPercent_GetCommitSHA1(t *testing.T) {
 
 	got, _, err = client.Repositories.GetCommitSHA1(ctx, "o", "r", "tag", sha1)
 	if err == nil {
-		t.Errorf("Expected HTTP 304 response")
+		t.Error("Expected HTTP 304 response")
 	}
 
 	if want := ""; got != want {
@@ -371,6 +372,7 @@ func TestRepositoriesService_TrailingPercent_GetCommitSHA1(t *testing.T) {
 }
 
 func TestRepositoriesService_CompareCommits(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		base string
 		head string
@@ -380,132 +382,138 @@ func TestRepositoriesService_CompareCommits(t *testing.T) {
 		{base: "`~!@#$%^&*()_+-=[]\\{}|;':\",./<>?/*-+123base", head: "head123`~!@#$%^&*()_+-=[]\\{}|;':\",./<>?/*-+"},
 	}
 
-	for _, sample := range testCases {
-		client, mux, _, teardown := setup()
+	for i, sample := range testCases {
+		t.Run(fmt.Sprintf("case #%v", i+1), func(t *testing.T) {
+			t.Parallel()
+			client, mux, _ := setup(t)
 
-		base := sample.base
-		head := sample.head
-		escapedBase := url.QueryEscape(base)
-		escapedHead := url.QueryEscape(head)
+			base := sample.base
+			head := sample.head
 
-		pattern := fmt.Sprintf("/repos/o/r/compare/%v...%v", base, head)
+			encodedBase := url.PathEscape(base)
+			encodedHead := url.PathEscape(head)
 
-		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			testMethod(t, r, "GET")
-			testFormValues(t, r, values{"per_page": "2", "page": "2"})
-			fmt.Fprintf(w, `{
-		  "base_commit": {
-		    "sha": "s",
-		    "commit": {
-		      "author": { "name": "n" },
-		      "committer": { "name": "n" },
-		      "message": "m",
-		      "tree": { "sha": "t" }
-		    },
-		    "author": { "login": "l" },
-		    "committer": { "login": "l" },
-		    "parents": [ { "sha": "s" } ]
-		  },
-		  "status": "s",
-		  "ahead_by": 1,
-		  "behind_by": 2,
-		  "total_commits": 1,
-		  "commits": [
-		    {
-		      "sha": "s",
-		      "commit": { "author": { "name": "n" } },
-		      "author": { "login": "l" },
-		      "committer": { "login": "l" },
-		      "parents": [ { "sha": "s" } ]
-		    }
-		  ],
-		  "files": [ { "filename": "f" } ],
-		  "html_url":      "https://github.com/o/r/compare/%[1]v...%[2]v",
-		  "permalink_url": "https://github.com/o/r/compare/o:bbcd538c8e72b8c175046e27cc8f907076331401...o:0328041d1152db8ae77652d1618a02e57f745f17",
-		  "diff_url":      "https://github.com/o/r/compare/%[1]v...%[2]v.diff",
-		  "patch_url":     "https://github.com/o/r/compare/%[1]v...%[2]v.patch",
-		  "url":           "https://api.github.com/repos/o/r/compare/%[1]v...%[2]v"
-		}`, escapedBase, escapedHead)
-		})
+			escapedBase := url.QueryEscape(base)
+			escapedHead := url.QueryEscape(head)
 
-		opts := &ListOptions{Page: 2, PerPage: 2}
-		ctx := context.Background()
-		got, _, err := client.Repositories.CompareCommits(ctx, "o", "r", base, head, opts)
-		if err != nil {
-			t.Errorf("Repositories.CompareCommits returned error: %v", err)
-		}
+			pattern := fmt.Sprintf("/repos/o/r/compare/%v...%v", encodedBase, encodedHead)
 
-		want := &CommitsComparison{
-			BaseCommit: &RepositoryCommit{
-				SHA: String("s"),
-				Commit: &Commit{
-					Author:    &CommitAuthor{Name: String("n")},
-					Committer: &CommitAuthor{Name: String("n")},
-					Message:   String("m"),
-					Tree:      &Tree{SHA: String("t")},
-				},
-				Author:    &User{Login: String("l")},
-				Committer: &User{Login: String("l")},
-				Parents: []*Commit{
-					{
-						SHA: String("s"),
-					},
-				},
-			},
-			Status:       String("s"),
-			AheadBy:      Int(1),
-			BehindBy:     Int(2),
-			TotalCommits: Int(1),
-			Commits: []*RepositoryCommit{
-				{
-					SHA: String("s"),
+			mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				testFormValues(t, r, values{"per_page": "2", "page": "2"})
+				fmt.Fprintf(w, `{
+  "base_commit": {
+    "sha": "s",
+    "commit": {
+      "author": { "name": "n" },
+      "committer": { "name": "n" },
+      "message": "m",
+      "tree": { "sha": "t" }
+    },
+    "author": { "login": "l" },
+    "committer": { "login": "l" },
+    "parents": [ { "sha": "s" } ]
+  },
+  "status": "s",
+  "ahead_by": 1,
+  "behind_by": 2,
+  "total_commits": 1,
+  "commits": [
+    {
+      "sha": "s",
+      "commit": { "author": { "name": "n" } },
+      "author": { "login": "l" },
+      "committer": { "login": "l" },
+      "parents": [ { "sha": "s" } ]
+    }
+  ],
+  "files": [ { "filename": "f" } ],
+  "html_url":      "https://github.com/o/r/compare/%[1]v...%[2]v",
+  "permalink_url": "https://github.com/o/r/compare/o:bbcd538c8e72b8c175046e27cc8f907076331401...o:0328041d1152db8ae77652d1618a02e57f745f17",
+  "diff_url":      "https://github.com/o/r/compare/%[1]v...%[2]v.diff",
+  "patch_url":     "https://github.com/o/r/compare/%[1]v...%[2]v.patch",
+  "url":           "https://api.github.com/repos/o/r/compare/%[1]v...%[2]v"
+}`, escapedBase, escapedHead)
+			})
+
+			opts := &ListOptions{Page: 2, PerPage: 2}
+			ctx := t.Context()
+			got, _, err := client.Repositories.CompareCommits(ctx, "o", "r", base, head, opts)
+			if err != nil {
+				t.Errorf("Repositories.CompareCommits returned error: %v", err)
+			}
+
+			want := &CommitsComparison{
+				BaseCommit: &RepositoryCommit{
+					SHA: new("s"),
 					Commit: &Commit{
-						Author: &CommitAuthor{Name: String("n")},
+						Author:    &CommitAuthor{Name: new("n")},
+						Committer: &CommitAuthor{Name: new("n")},
+						Message:   new("m"),
+						Tree:      &Tree{SHA: new("t")},
 					},
-					Author:    &User{Login: String("l")},
-					Committer: &User{Login: String("l")},
+					Author:    &User{Login: new("l")},
+					Committer: &User{Login: new("l")},
 					Parents: []*Commit{
 						{
-							SHA: String("s"),
+							SHA: new("s"),
 						},
 					},
 				},
-			},
-			Files: []*CommitFile{
-				{
-					Filename: String("f"),
+				Status:       new("s"),
+				AheadBy:      new(1),
+				BehindBy:     new(2),
+				TotalCommits: new(1),
+				Commits: []*RepositoryCommit{
+					{
+						SHA: new("s"),
+						Commit: &Commit{
+							Author: &CommitAuthor{Name: new("n")},
+						},
+						Author:    &User{Login: new("l")},
+						Committer: &User{Login: new("l")},
+						Parents: []*Commit{
+							{
+								SHA: new("s"),
+							},
+						},
+					},
 				},
-			},
-			HTMLURL:      String(fmt.Sprintf("https://github.com/o/r/compare/%v...%v", escapedBase, escapedHead)),
-			PermalinkURL: String("https://github.com/o/r/compare/o:bbcd538c8e72b8c175046e27cc8f907076331401...o:0328041d1152db8ae77652d1618a02e57f745f17"),
-			DiffURL:      String(fmt.Sprintf("https://github.com/o/r/compare/%v...%v.diff", escapedBase, escapedHead)),
-			PatchURL:     String(fmt.Sprintf("https://github.com/o/r/compare/%v...%v.patch", escapedBase, escapedHead)),
-			URL:          String(fmt.Sprintf("https://api.github.com/repos/o/r/compare/%v...%v", escapedBase, escapedHead)),
-		}
-
-		if !cmp.Equal(got, want) {
-			t.Errorf("Repositories.CompareCommits returned \n%+v, want \n%+v", got, want)
-		}
-
-		const methodName = "CompareCommits"
-		testBadOptions(t, methodName, func() (err error) {
-			_, _, err = client.Repositories.CompareCommits(ctx, "\n", "\n", "\n", "\n", opts)
-			return err
-		})
-
-		testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-			got, resp, err := client.Repositories.CompareCommits(ctx, "o", "r", base, head, opts)
-			if got != nil {
-				t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+				Files: []*CommitFile{
+					{
+						Filename: new("f"),
+					},
+				},
+				HTMLURL:      new(fmt.Sprintf("https://github.com/o/r/compare/%v...%v", escapedBase, escapedHead)),
+				PermalinkURL: new("https://github.com/o/r/compare/o:bbcd538c8e72b8c175046e27cc8f907076331401...o:0328041d1152db8ae77652d1618a02e57f745f17"),
+				DiffURL:      new(fmt.Sprintf("https://github.com/o/r/compare/%v...%v.diff", escapedBase, escapedHead)),
+				PatchURL:     new(fmt.Sprintf("https://github.com/o/r/compare/%v...%v.patch", escapedBase, escapedHead)),
+				URL:          new(fmt.Sprintf("https://api.github.com/repos/o/r/compare/%v...%v", escapedBase, escapedHead)),
 			}
-			return resp, err
-		})
 
-		teardown()
+			if !cmp.Equal(got, want) {
+				t.Errorf("Repositories.CompareCommits returned \n%+v, want \n%+v", got, want)
+			}
+
+			const methodName = "CompareCommits"
+			testBadOptions(t, methodName, func() (err error) {
+				_, _, err = client.Repositories.CompareCommits(ctx, "\n", "\n", "\n", "\n", opts)
+				return err
+			})
+
+			testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+				got, resp, err := client.Repositories.CompareCommits(ctx, "o", "r", base, head, opts)
+				if got != nil {
+					t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+				}
+				return resp, err
+			})
+		})
 	}
 }
 
 func TestRepositoriesService_CompareCommitsRaw_diff(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		base string
 		head string
@@ -515,49 +523,55 @@ func TestRepositoriesService_CompareCommitsRaw_diff(t *testing.T) {
 		{base: "`~!@#$%^&*()_+-=[]\\{}|;':\",./<>?/*-+123base", head: "head123`~!@#$%^&*()_+-=[]\\{}|;':\",./<>?/*-+"},
 	}
 
-	for _, sample := range testCases {
-		client, mux, _, teardown := setup()
+	for i, sample := range testCases {
+		t.Run(fmt.Sprintf("case #%v", i+1), func(t *testing.T) {
+			t.Parallel()
+			client, mux, _ := setup(t)
 
-		base := sample.base
-		head := sample.head
-		pattern := fmt.Sprintf("/repos/o/r/compare/%v...%v", base, head)
-		const rawStr = "@@diff content"
+			base := sample.base
+			head := sample.head
 
-		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			testMethod(t, r, "GET")
-			testHeader(t, r, "Accept", mediaTypeV3Diff)
-			fmt.Fprint(w, rawStr)
-		})
+			encodedBase := url.PathEscape(base)
+			encodedHead := url.PathEscape(head)
 
-		ctx := context.Background()
-		got, _, err := client.Repositories.CompareCommitsRaw(ctx, "o", "r", base, head, RawOptions{Type: Diff})
-		if err != nil {
-			t.Fatalf("Repositories.GetCommitRaw returned error: %v", err)
-		}
-		want := rawStr
-		if got != want {
-			t.Errorf("Repositories.GetCommitRaw returned %s want %s", got, want)
-		}
+			pattern := fmt.Sprintf("/repos/o/r/compare/%v...%v", encodedBase, encodedHead)
+			const rawStr = "@@diff content"
 
-		const methodName = "CompareCommitsRaw"
-		testBadOptions(t, methodName, func() (err error) {
-			_, _, err = client.Repositories.CompareCommitsRaw(ctx, "\n", "\n", "\n", "\n", RawOptions{Type: Diff})
-			return err
-		})
+			mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				testHeader(t, r, "Accept", mediaTypeV3Diff)
+				fmt.Fprint(w, rawStr)
+			})
 
-		testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-			got, resp, err := client.Repositories.CompareCommitsRaw(ctx, "o", "r", base, head, RawOptions{Type: Diff})
-			if got != "" {
-				t.Errorf("testNewRequestAndDoFailure %v = %#v, want ''", methodName, got)
+			ctx := t.Context()
+			got, _, err := client.Repositories.CompareCommitsRaw(ctx, "o", "r", base, head, RawOptions{Type: Diff})
+			if err != nil {
+				t.Fatalf("Repositories.CompareCommitsRaw returned error: %v", err)
 			}
-			return resp, err
-		})
+			want := rawStr
+			if got != want {
+				t.Errorf("Repositories.CompareCommitsRaw returned %v want %v", got, want)
+			}
 
-		teardown()
+			const methodName = "CompareCommitsRaw"
+			testBadOptions(t, methodName, func() (err error) {
+				_, _, err = client.Repositories.CompareCommitsRaw(ctx, "\n", "\n", "\n", "\n", RawOptions{Type: Diff})
+				return err
+			})
+
+			testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+				got, resp, err := client.Repositories.CompareCommitsRaw(ctx, "o", "r", base, head, RawOptions{Type: Diff})
+				if got != "" {
+					t.Errorf("testNewRequestAndDoFailure %v = %#v, want ''", methodName, got)
+				}
+				return resp, err
+			})
+		})
 	}
 }
 
 func TestRepositoriesService_CompareCommitsRaw_patch(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		base string
 		head string
@@ -567,36 +581,42 @@ func TestRepositoriesService_CompareCommitsRaw_patch(t *testing.T) {
 		{base: "`~!@#$%^&*()_+-=[]\\{}|;':\",./<>?/*-+123base", head: "head123`~!@#$%^&*()_+-=[]\\{}|;':\",./<>?/*-+"},
 	}
 
-	for _, sample := range testCases {
-		client, mux, _, teardown := setup()
+	for i, sample := range testCases {
+		t.Run(fmt.Sprintf("case #%v", i+1), func(t *testing.T) {
+			t.Parallel()
+			client, mux, _ := setup(t)
 
-		base := sample.base
-		head := sample.head
-		pattern := fmt.Sprintf("/repos/o/r/compare/%v...%v", base, head)
-		const rawStr = "@@patch content"
+			base := sample.base
+			head := sample.head
 
-		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			testMethod(t, r, "GET")
-			testHeader(t, r, "Accept", mediaTypeV3Patch)
-			fmt.Fprint(w, rawStr)
+			encodedBase := url.PathEscape(base)
+			encodedHead := url.PathEscape(head)
+
+			pattern := fmt.Sprintf("/repos/o/r/compare/%v...%v", encodedBase, encodedHead)
+			const rawStr = "@@patch content"
+
+			mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+				testMethod(t, r, "GET")
+				testHeader(t, r, "Accept", mediaTypeV3Patch)
+				fmt.Fprint(w, rawStr)
+			})
+
+			ctx := t.Context()
+			got, _, err := client.Repositories.CompareCommitsRaw(ctx, "o", "r", base, head, RawOptions{Type: Patch})
+			if err != nil {
+				t.Fatalf("Repositories.CompareCommitsRaw returned error: %v", err)
+			}
+			want := rawStr
+			if got != want {
+				t.Errorf("Repositories.CompareCommitsRaw returned %v want %v", got, want)
+			}
 		})
-
-		ctx := context.Background()
-		got, _, err := client.Repositories.CompareCommitsRaw(ctx, "o", "r", base, head, RawOptions{Type: Patch})
-		if err != nil {
-			t.Fatalf("Repositories.GetCommitRaw returned error: %v", err)
-		}
-		want := rawStr
-		if got != want {
-			t.Errorf("Repositories.GetCommitRaw returned %s want %s", got, want)
-		}
-
-		teardown()
 	}
 }
 
 func TestRepositoriesService_CompareCommitsRaw_invalid(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
+	ctx := t.Context()
 
 	testCases := []struct {
 		base string
@@ -607,29 +627,31 @@ func TestRepositoriesService_CompareCommitsRaw_invalid(t *testing.T) {
 		{base: "`~!@#$%^&*()_+-=[]\\{}|;':\",./<>?/*-+123base", head: "head123`~!@#$%^&*()_+-=[]\\{}|;':\",./<>?/*-+"},
 	}
 
-	for _, sample := range testCases {
-		client, _, _, teardown := setup()
-		_, _, err := client.Repositories.CompareCommitsRaw(ctx, "o", "r", sample.base, sample.head, RawOptions{100})
-		if err == nil {
-			t.Fatal("Repositories.GetCommitRaw should return error")
-		}
-		if !strings.Contains(err.Error(), "unsupported raw type") {
-			t.Error("Repositories.GetCommitRaw should return unsupported raw type error")
-		}
-		teardown()
+	for i, sample := range testCases {
+		t.Run(fmt.Sprintf("case #%v", i+1), func(t *testing.T) {
+			t.Parallel()
+			client, _, _ := setup(t)
+			_, _, err := client.Repositories.CompareCommitsRaw(ctx, "o", "r", sample.base, sample.head, RawOptions{100})
+			if err == nil {
+				t.Fatal("Repositories.GetCommitRaw should return error")
+			}
+			if !strings.Contains(err.Error(), "unsupported raw type") {
+				t.Error("Repositories.GetCommitRaw should return unsupported raw type error")
+			}
+		})
 	}
 }
 
 func TestRepositoriesService_ListBranchesHeadCommit(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/commits/s/branches-where-head", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprintf(w, `[{"name": "b","commit":{"sha":"2e90302801c870f17b6152327d9b9a03c8eca0e2","url":"https://api.github.com/repos/google/go-github/commits/2e90302801c870f17b6152327d9b9a03c8eca0e2"},"protected":true}]`)
+		fmt.Fprint(w, `[{"name": "b","commit":{"sha":"2e90302801c870f17b6152327d9b9a03c8eca0e2","url":"https://api.github.com/repos/google/go-github/commits/2e90302801c870f17b6152327d9b9a03c8eca0e2"},"protected":true}]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	branches, _, err := client.Repositories.ListBranchesHeadCommit(ctx, "o", "r", "s")
 	if err != nil {
 		t.Errorf("Repositories.ListBranchesHeadCommit returned error: %v", err)
@@ -637,12 +659,12 @@ func TestRepositoriesService_ListBranchesHeadCommit(t *testing.T) {
 
 	want := []*BranchCommit{
 		{
-			Name: String("b"),
+			Name: new("b"),
 			Commit: &Commit{
-				SHA: String("2e90302801c870f17b6152327d9b9a03c8eca0e2"),
-				URL: String("https://api.github.com/repos/google/go-github/commits/2e90302801c870f17b6152327d9b9a03c8eca0e2"),
+				SHA: new("2e90302801c870f17b6152327d9b9a03c8eca0e2"),
+				URL: new("https://api.github.com/repos/google/go-github/commits/2e90302801c870f17b6152327d9b9a03c8eca0e2"),
 			},
-			Protected: Bool(true),
+			Protected: new(true),
 		},
 	}
 	if !cmp.Equal(branches, want) {
@@ -662,308 +684,4 @@ func TestRepositoriesService_ListBranchesHeadCommit(t *testing.T) {
 		}
 		return resp, err
 	})
-}
-
-func TestBranchCommit_Marshal(t *testing.T) {
-	testJSONMarshal(t, &BranchCommit{}, "{}")
-
-	r := &BranchCommit{
-		Name: String("n"),
-		Commit: &Commit{
-			SHA: String("s"),
-			Author: &CommitAuthor{
-				Date:  &referenceTime,
-				Name:  String("n"),
-				Email: String("e"),
-				Login: String("u"),
-			},
-			Committer: &CommitAuthor{
-				Date:  &referenceTime,
-				Name:  String("n"),
-				Email: String("e"),
-				Login: String("u"),
-			},
-			Message: String("m"),
-			Tree: &Tree{
-				SHA: String("s"),
-				Entries: []*TreeEntry{{
-					SHA:     String("s"),
-					Path:    String("p"),
-					Mode:    String("m"),
-					Type:    String("t"),
-					Size:    Int(1),
-					Content: String("c"),
-					URL:     String("u"),
-				}},
-				Truncated: Bool(false),
-			},
-			Parents: nil,
-			Stats: &CommitStats{
-				Additions: Int(1),
-				Deletions: Int(1),
-				Total:     Int(1),
-			},
-			HTMLURL: String("h"),
-			URL:     String("u"),
-			Verification: &SignatureVerification{
-				Verified:  Bool(false),
-				Reason:    String("r"),
-				Signature: String("s"),
-				Payload:   String("p"),
-			},
-			NodeID:       String("n"),
-			CommentCount: Int(1),
-			SigningKey:   &openpgp.Entity{},
-		},
-		Protected: Bool(false),
-	}
-
-	want := `{
-		"name": "n",
-		"commit": {
-			"sha": "s",
-			"author": {
-				"date": ` + referenceTimeStr + `,
-				"name": "n",
-				"email": "e",
-				"username": "u"
-			},
-			"committer": {
-				"date": ` + referenceTimeStr + `,
-				"name": "n",
-				"email": "e",
-				"username": "u"
-			},
-			"message": "m",
-			"tree": {
-				"sha": "s",
-				"tree": [
-					{
-						"sha": "s",
-						"path": "p",
-						"mode": "m",
-						"type": "t",
-						"size": 1,
-						"content": "c",
-						"url": "u"
-					}
-				],
-				"truncated": false
-			},
-			"stats": {
-				"additions": 1,
-				"deletions": 1,
-				"total": 1
-			},
-			"html_url": "h",
-			"url": "u",
-			"verification": {
-				"verified": false,
-				"reason": "r",
-				"signature": "s",
-				"payload": "p"
-			},
-			"node_id": "n",
-			"comment_count": 1
-		},
-		"protected": false
-	}`
-
-	testJSONMarshal(t, r, want)
-}
-
-func TestCommitsComparison_Marshal(t *testing.T) {
-	testJSONMarshal(t, &CommitsComparison{}, "{}")
-
-	r := &CommitsComparison{
-		BaseCommit:      &RepositoryCommit{NodeID: String("nid")},
-		MergeBaseCommit: &RepositoryCommit{NodeID: String("nid")},
-		Status:          String("status"),
-		AheadBy:         Int(1),
-		BehindBy:        Int(1),
-		TotalCommits:    Int(1),
-		Commits: []*RepositoryCommit{
-			{
-				NodeID: String("nid"),
-			},
-		},
-		Files: []*CommitFile{
-			{
-				SHA: String("sha"),
-			},
-		},
-		HTMLURL:      String("hurl"),
-		PermalinkURL: String("purl"),
-		DiffURL:      String("durl"),
-		PatchURL:     String("purl"),
-		URL:          String("url"),
-	}
-
-	want := `{
-		"base_commit": {
-			"node_id": "nid"
-		},
-		"merge_base_commit": {
-			"node_id": "nid"
-		},
-		"status": "status",
-		"ahead_by": 1,
-		"behind_by": 1,
-		"total_commits": 1,
-		"commits": [
-			{
-				"node_id": "nid"
-			}
-		],
-		"files": [
-			{
-				"sha": "sha"
-			}
-		],
-		"html_url": "hurl",
-		"permalink_url": "purl",
-		"diff_url": "durl",
-		"patch_url": "purl",
-		"url": "url"
-	}`
-
-	testJSONMarshal(t, r, want)
-}
-
-func TestCommitFile_Marshal(t *testing.T) {
-	testJSONMarshal(t, &CommitFile{}, "{}")
-
-	r := &CommitFile{
-		SHA:              String("sha"),
-		Filename:         String("fn"),
-		Additions:        Int(1),
-		Deletions:        Int(1),
-		Changes:          Int(1),
-		Status:           String("status"),
-		Patch:            String("patch"),
-		BlobURL:          String("burl"),
-		RawURL:           String("rurl"),
-		ContentsURL:      String("curl"),
-		PreviousFilename: String("pf"),
-	}
-
-	want := `{
-		"sha": "sha",
-		"filename": "fn",
-		"additions": 1,
-		"deletions": 1,
-		"changes": 1,
-		"status": "status",
-		"patch": "patch",
-		"blob_url": "burl",
-		"raw_url": "rurl",
-		"contents_url": "curl",
-		"previous_filename": "pf"
-	}`
-
-	testJSONMarshal(t, r, want)
-}
-
-func TestCommitStats_Marshal(t *testing.T) {
-	testJSONMarshal(t, &CommitStats{}, "{}")
-
-	r := &CommitStats{
-		Additions: Int(1),
-		Deletions: Int(1),
-		Total:     Int(1),
-	}
-
-	want := `{
-		"additions": 1,
-		"deletions": 1,
-		"total": 1
-	}`
-
-	testJSONMarshal(t, r, want)
-}
-
-func TestRepositoryCommit_Marshal(t *testing.T) {
-	testJSONMarshal(t, &RepositoryCommit{}, "{}")
-
-	r := &RepositoryCommit{
-		NodeID: String("nid"),
-		SHA:    String("sha"),
-		Commit: &Commit{
-			Message: String("m"),
-		},
-		Author: &User{
-			Login: String("l"),
-		},
-		Committer: &User{
-			Login: String("l"),
-		},
-		Parents: []*Commit{
-			{
-				SHA: String("s"),
-			},
-		},
-		HTMLURL:     String("hurl"),
-		URL:         String("url"),
-		CommentsURL: String("curl"),
-		Stats: &CommitStats{
-			Additions: Int(104),
-			Deletions: Int(4),
-			Total:     Int(108),
-		},
-		Files: []*CommitFile{
-			{
-				Filename:    String("f"),
-				Additions:   Int(10),
-				Deletions:   Int(2),
-				Changes:     Int(12),
-				Status:      String("s"),
-				Patch:       String("p"),
-				BlobURL:     String("b"),
-				RawURL:      String("r"),
-				ContentsURL: String("c"),
-			},
-		},
-	}
-
-	want := `{
-		"node_id": "nid",
-		"sha": "sha",
-		"commit": {
-			"message": "m"
-		},
-		"author": {
-			"login": "l"
-		},
-		"committer": {
-			"login": "l"
-		},
-		"parents": [
-			{
-				"sha": "s"
-			}
-		],
-		"html_url": "hurl",
-		"url": "url",
-		"comments_url": "curl",
-		"stats": {
-			"additions": 104,
-			"deletions": 4,
-			"total": 108
-		},
-		"files": [
-			{
-				"filename": "f",
-				"additions": 10,
-				"deletions": 2,
-				"changes": 12,
-				"status": "s",
-				"patch": "p",
-				"blob_url": "b",
-				"raw_url": "r",
-				"contents_url": "c"
-			}
-		]
-	}`
-
-	testJSONMarshal(t, r, want)
 }

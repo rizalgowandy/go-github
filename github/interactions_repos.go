@@ -12,20 +12,20 @@ import (
 
 // GetRestrictionsForRepo fetches the interaction restrictions for a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/interactions/#get-interaction-restrictions-for-a-repository
+// GitHub API docs: https://docs.github.com/rest/interactions/repos?apiVersion=2022-11-28#get-interaction-restrictions-for-a-repository
+//
+//meta:operation GET /repos/{owner}/{repo}/interaction-limits
 func (s *InteractionsService) GetRestrictionsForRepo(ctx context.Context, owner, repo string) (*InteractionRestriction, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/interaction-limits", owner, repo)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeInteractionRestrictionsPreview)
 
-	repositoryInteractions := new(InteractionRestriction)
-
-	resp, err := s.client.Do(ctx, req, repositoryInteractions)
+	var repositoryInteractions *InteractionRestriction
+	resp, err := s.client.Do(req, &repositoryInteractions)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -39,23 +39,23 @@ func (s *InteractionsService) GetRestrictionsForRepo(ctx context.Context, owner,
 // for the given repository.
 // Possible values are: "existing_users", "contributors_only", "collaborators_only".
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/interactions/#set-interaction-restrictions-for-a-repository
+// GitHub API docs: https://docs.github.com/rest/interactions/repos?apiVersion=2022-11-28#set-interaction-restrictions-for-a-repository
+//
+//meta:operation PUT /repos/{owner}/{repo}/interaction-limits
 func (s *InteractionsService) UpdateRestrictionsForRepo(ctx context.Context, owner, repo, limit string) (*InteractionRestriction, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/interaction-limits", owner, repo)
 
-	interaction := &InteractionRestriction{Limit: String(limit)}
+	interaction := &InteractionRestriction{Limit: &limit}
 
-	req, err := s.client.NewRequest("PUT", u, interaction)
+	req, err := s.client.NewRequest(ctx, "PUT", u, interaction)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeInteractionRestrictionsPreview)
 
-	repositoryInteractions := new(InteractionRestriction)
-
-	resp, err := s.client.Do(ctx, req, repositoryInteractions)
+	var repositoryInteractions *InteractionRestriction
+	resp, err := s.client.Do(req, &repositoryInteractions)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -65,16 +65,17 @@ func (s *InteractionsService) UpdateRestrictionsForRepo(ctx context.Context, own
 
 // RemoveRestrictionsFromRepo removes the interaction restrictions for a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/interactions/#remove-interaction-restrictions-for-a-repository
+// GitHub API docs: https://docs.github.com/rest/interactions/repos?apiVersion=2022-11-28#remove-interaction-restrictions-for-a-repository
+//
+//meta:operation DELETE /repos/{owner}/{repo}/interaction-limits
 func (s *InteractionsService) RemoveRestrictionsFromRepo(ctx context.Context, owner, repo string) (*Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/interaction-limits", owner, repo)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
 	req.Header.Set("Accept", mediaTypeInteractionRestrictionsPreview)
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

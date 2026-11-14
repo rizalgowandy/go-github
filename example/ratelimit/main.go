@@ -1,0 +1,55 @@
+// Copyright 2023 The go-github AUTHORS. All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// The ratelimit command demonstrates using github_ratelimit and github_pagination.
+// By using the waiters, the client automatically sleeps and retries requests
+// when it hits secondary rate limits.
+// It also prevents the client from abusing the API in case of a primary rate limit.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/gofri/go-github-pagination/githubpagination"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit/github_primary_ratelimit"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit/github_secondary_ratelimit"
+	"github.com/google/go-github/v93/github"
+)
+
+func main() {
+	var username string
+	fmt.Print("Enter GitHub username: ")
+	fmt.Scanf("%s", &username)
+
+	rateLimiter := github_ratelimit.New(nil,
+		github_primary_ratelimit.WithLimitDetectedCallback(func(ctx *github_primary_ratelimit.CallbackContext) {
+			fmt.Printf("Primary rate limit detected: category %v, reset time: %v\n", ctx.Category, ctx.ResetTime)
+		}),
+		github_secondary_ratelimit.WithLimitDetectedCallback(func(ctx *github_secondary_ratelimit.CallbackContext) {
+			fmt.Printf("Secondary rate limit detected: reset time: %v, total sleep time: %v\n", ctx.ResetTime, ctx.TotalSleepTime)
+		}),
+	)
+
+	paginator := githubpagination.New(rateLimiter,
+		githubpagination.WithPerPage(100), // default to 100 results per page
+	)
+	client, err := github.NewClient(github.WithTransport(paginator))
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
+
+	// Example usage of the client
+	repos, _, err := client.Repositories.ListByUser(context.Background(), username, nil)
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+
+	for i, repo := range repos {
+		fmt.Printf("%v. %v\n", i+1, repo.GetName())
+	}
+}

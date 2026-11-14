@@ -1,6 +1,6 @@
 // Copyright 2013 The go-github AUTHORS. All rights reserved.
 //
-// Use of this source code is governed by BSD-style
+// Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package github
@@ -14,7 +14,7 @@ import (
 // GistsService handles communication with the Gist related
 // methods of the GitHub API.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/
+// GitHub API docs: https://docs.github.com/rest/gists?apiVersion=2022-11-28
 type GistsService service
 
 // Gist represents a GitHub's gist.
@@ -28,13 +28,29 @@ type Gist struct {
 	HTMLURL     *string                   `json:"html_url,omitempty"`
 	GitPullURL  *string                   `json:"git_pull_url,omitempty"`
 	GitPushURL  *string                   `json:"git_push_url,omitempty"`
-	CreatedAt   *time.Time                `json:"created_at,omitempty"`
-	UpdatedAt   *time.Time                `json:"updated_at,omitempty"`
+	CreatedAt   *Timestamp                `json:"created_at,omitempty"`
+	UpdatedAt   *Timestamp                `json:"updated_at,omitempty"`
 	NodeID      *string                   `json:"node_id,omitempty"`
 }
 
 func (g Gist) String() string {
 	return Stringify(g)
+}
+
+// CreateGistRequest represents the input for creating a gist.
+type CreateGistRequest struct {
+	Description *string `json:"description,omitempty"`
+	Public      *bool   `json:"public,omitempty"`
+	// Files is the set of files that make up the gist, keyed by filename.
+	Files map[GistFilename]*CreateGistFile `json:"files"`
+}
+
+// UpdateGistRequest represents the input for updating a gist.
+type UpdateGistRequest struct {
+	Description *string `json:"description,omitempty"`
+	// Files is the set of files to add, change or rename, keyed by filename.
+	// Mapping a filename to a nil value deletes that file from the gist.
+	Files map[GistFilename]*UpdateGistFile `json:"files,omitempty"`
 }
 
 // GistFilename represents filename on a gist.
@@ -52,6 +68,23 @@ type GistFile struct {
 
 func (g GistFile) String() string {
 	return Stringify(g)
+}
+
+// CreateGistFile represents a file within a CreateGistRequest, keyed by filename
+// in the request's Files map.
+type CreateGistFile struct {
+	// Content is the contents of the file.
+	Content string `json:"content"`
+}
+
+// UpdateGistFile represents a file within an UpdateGistRequest, keyed by filename
+// in the request's Files map. Mapping a filename to a nil *UpdateGistFile deletes
+// that file from the gist.
+type UpdateGistFile struct {
+	// Content is the new contents of the file.
+	Content *string `json:"content,omitempty"`
+	// Filename, if set, renames the file.
+	Filename *string `json:"filename,omitempty"`
 }
 
 // GistCommit represents a commit on a gist.
@@ -96,8 +129,12 @@ type GistListOptions struct {
 // is authenticated, it will returns all gists for the authenticated
 // user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#list-gists-for-the-authenticated-user
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#list-gists-for-a-user
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#list-gists-for-a-user
+//
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#list-gists-for-the-authenticated-user
+//
+//meta:operation GET /gists
+//meta:operation GET /users/{username}/gists
 func (s *GistsService) List(ctx context.Context, user string, opts *GistListOptions) ([]*Gist, *Response, error) {
 	var u string
 	if user != "" {
@@ -110,13 +147,13 @@ func (s *GistsService) List(ctx context.Context, user string, opts *GistListOpti
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var gists []*Gist
-	resp, err := s.client.Do(ctx, req, &gists)
+	resp, err := s.client.Do(req, &gists)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -126,20 +163,22 @@ func (s *GistsService) List(ctx context.Context, user string, opts *GistListOpti
 
 // ListAll lists all public gists.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#list-public-gists
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#list-public-gists
+//
+//meta:operation GET /gists/public
 func (s *GistsService) ListAll(ctx context.Context, opts *GistListOptions) ([]*Gist, *Response, error) {
 	u, err := addOptions("gists/public", opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var gists []*Gist
-	resp, err := s.client.Do(ctx, req, &gists)
+	resp, err := s.client.Do(req, &gists)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -149,20 +188,22 @@ func (s *GistsService) ListAll(ctx context.Context, opts *GistListOptions) ([]*G
 
 // ListStarred lists starred gists of authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#list-starred-gists
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#list-starred-gists
+//
+//meta:operation GET /gists/starred
 func (s *GistsService) ListStarred(ctx context.Context, opts *GistListOptions) ([]*Gist, *Response, error) {
 	u, err := addOptions("gists/starred", opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var gists []*Gist
-	resp, err := s.client.Do(ctx, req, &gists)
+	resp, err := s.client.Do(req, &gists)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -172,16 +213,18 @@ func (s *GistsService) ListStarred(ctx context.Context, opts *GistListOptions) (
 
 // Get a single gist.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#get-a-gist
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#get-a-gist
+//
+//meta:operation GET /gists/{gist_id}
 func (s *GistsService) Get(ctx context.Context, id string) (*Gist, *Response, error) {
 	u := fmt.Sprintf("gists/%v", id)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	gist := new(Gist)
-	resp, err := s.client.Do(ctx, req, gist)
+	var gist *Gist
+	resp, err := s.client.Do(req, &gist)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -191,16 +234,18 @@ func (s *GistsService) Get(ctx context.Context, id string) (*Gist, *Response, er
 
 // GetRevision gets a specific revision of a gist.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#get-a-gist-revision
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#get-a-gist-revision
+//
+//meta:operation GET /gists/{gist_id}/{sha}
 func (s *GistsService) GetRevision(ctx context.Context, id, sha string) (*Gist, *Response, error) {
 	u := fmt.Sprintf("gists/%v/%v", id, sha)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	gist := new(Gist)
-	resp, err := s.client.Do(ctx, req, gist)
+	var gist *Gist
+	resp, err := s.client.Do(req, &gist)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -210,16 +255,18 @@ func (s *GistsService) GetRevision(ctx context.Context, id, sha string) (*Gist, 
 
 // Create a gist for authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#create-a-gist
-func (s *GistsService) Create(ctx context.Context, gist *Gist) (*Gist, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#create-a-gist
+//
+//meta:operation POST /gists
+func (s *GistsService) Create(ctx context.Context, body CreateGistRequest) (*Gist, *Response, error) {
 	u := "gists"
-	req, err := s.client.NewRequest("POST", u, gist)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	g := new(Gist)
-	resp, err := s.client.Do(ctx, req, g)
+	var g *Gist
+	resp, err := s.client.Do(req, &g)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -227,18 +274,20 @@ func (s *GistsService) Create(ctx context.Context, gist *Gist) (*Gist, *Response
 	return g, resp, nil
 }
 
-// Edit a gist.
+// Update a gist.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#update-a-gist
-func (s *GistsService) Edit(ctx context.Context, id string, gist *Gist) (*Gist, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#update-a-gist
+//
+//meta:operation PATCH /gists/{gist_id}
+func (s *GistsService) Update(ctx context.Context, id string, body UpdateGistRequest) (*Gist, *Response, error) {
 	u := fmt.Sprintf("gists/%v", id)
-	req, err := s.client.NewRequest("PATCH", u, gist)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	g := new(Gist)
-	resp, err := s.client.Do(ctx, req, g)
+	var g *Gist
+	resp, err := s.client.Do(req, &g)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -248,7 +297,9 @@ func (s *GistsService) Edit(ctx context.Context, id string, gist *Gist) (*Gist, 
 
 // ListCommits lists commits of a gist.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#list-gist-commits
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#list-gist-commits
+//
+//meta:operation GET /gists/{gist_id}/commits
 func (s *GistsService) ListCommits(ctx context.Context, id string, opts *ListOptions) ([]*GistCommit, *Response, error) {
 	u := fmt.Sprintf("gists/%v/commits", id)
 	u, err := addOptions(u, opts)
@@ -256,13 +307,13 @@ func (s *GistsService) ListCommits(ctx context.Context, id string, opts *ListOpt
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var gistCommits []*GistCommit
-	resp, err := s.client.Do(ctx, req, &gistCommits)
+	resp, err := s.client.Do(req, &gistCommits)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -272,66 +323,80 @@ func (s *GistsService) ListCommits(ctx context.Context, id string, opts *ListOpt
 
 // Delete a gist.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#delete-a-gist
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#delete-a-gist
+//
+//meta:operation DELETE /gists/{gist_id}
 func (s *GistsService) Delete(ctx context.Context, id string) (*Response, error) {
 	u := fmt.Sprintf("gists/%v", id)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+
+	return s.client.Do(req, nil)
 }
 
 // Star a gist on behalf of authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#star-a-gist
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#star-a-gist
+//
+//meta:operation PUT /gists/{gist_id}/star
 func (s *GistsService) Star(ctx context.Context, id string) (*Response, error) {
 	u := fmt.Sprintf("gists/%v/star", id)
-	req, err := s.client.NewRequest("PUT", u, nil)
+	req, err := s.client.NewRequest(ctx, "PUT", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+
+	return s.client.Do(req, nil)
 }
 
 // Unstar a gist on a behalf of authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#unstar-a-gist
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#unstar-a-gist
+//
+//meta:operation DELETE /gists/{gist_id}/star
 func (s *GistsService) Unstar(ctx context.Context, id string) (*Response, error) {
 	u := fmt.Sprintf("gists/%v/star", id)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+
+	return s.client.Do(req, nil)
 }
 
 // IsStarred checks if a gist is starred by authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#check-if-a-gist-is-starred
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#check-if-a-gist-is-starred
+//
+//meta:operation GET /gists/{gist_id}/star
 func (s *GistsService) IsStarred(ctx context.Context, id string) (bool, *Response, error) {
 	u := fmt.Sprintf("gists/%v/star", id)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return false, nil, err
 	}
-	resp, err := s.client.Do(ctx, req, nil)
+
+	resp, err := s.client.Do(req, nil)
 	starred, err := parseBoolResponse(err)
 	return starred, resp, err
 }
 
 // Fork a gist.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#fork-a-gist
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#fork-a-gist
+//
+//meta:operation POST /gists/{gist_id}/forks
 func (s *GistsService) Fork(ctx context.Context, id string) (*Gist, *Response, error) {
 	u := fmt.Sprintf("gists/%v/forks", id)
-	req, err := s.client.NewRequest("POST", u, nil)
+	req, err := s.client.NewRequest(ctx, "POST", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	g := new(Gist)
-	resp, err := s.client.Do(ctx, req, g)
+	var g *Gist
+	resp, err := s.client.Do(req, &g)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -341,7 +406,9 @@ func (s *GistsService) Fork(ctx context.Context, id string) (*Gist, *Response, e
 
 // ListForks lists forks of a gist.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/gists/#list-gist-forks
+// GitHub API docs: https://docs.github.com/rest/gists/gists?apiVersion=2022-11-28#list-gist-forks
+//
+//meta:operation GET /gists/{gist_id}/forks
 func (s *GistsService) ListForks(ctx context.Context, id string, opts *ListOptions) ([]*GistFork, *Response, error) {
 	u := fmt.Sprintf("gists/%v/forks", id)
 	u, err := addOptions(u, opts)
@@ -349,13 +416,13 @@ func (s *GistsService) ListForks(ctx context.Context, id string, opts *ListOptio
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var gistForks []*GistFork
-	resp, err := s.client.Do(ctx, req, &gistForks)
+	resp, err := s.client.Do(req, &gistForks)
 	if err != nil {
 		return nil, resp, err
 	}

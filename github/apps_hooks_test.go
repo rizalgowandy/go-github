@@ -6,7 +6,6 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -15,8 +14,8 @@ import (
 )
 
 func TestAppsService_GetHookConfig(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/app/hook/config", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -28,17 +27,17 @@ func TestAppsService_GetHookConfig(t *testing.T) {
 		}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	config, _, err := client.Apps.GetHookConfig(ctx)
 	if err != nil {
 		t.Errorf("Apps.GetHookConfig returned error: %v", err)
 	}
 
 	want := &HookConfig{
-		ContentType: String("json"),
-		InsecureSSL: String("0"),
-		Secret:      String("********"),
-		URL:         String("https://example.com/webhook"),
+		ContentType: new("json"),
+		InsecureSSL: new("0"),
+		Secret:      new("********"),
+		URL:         new("https://example.com/webhook"),
 	}
 	if !cmp.Equal(config, want) {
 		t.Errorf("Apps.GetHookConfig returned %+v, want %+v", config, want)
@@ -55,19 +54,19 @@ func TestAppsService_GetHookConfig(t *testing.T) {
 }
 
 func TestAppsService_UpdateHookConfig(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &HookConfig{
-		ContentType: String("json"),
-		InsecureSSL: String("1"),
-		Secret:      String("s"),
-		URL:         String("u"),
+	input := HookConfig{
+		ContentType: new("json"),
+		InsecureSSL: new("1"),
+		Secret:      new("s"),
+		URL:         new("u"),
 	}
 
 	mux.HandleFunc("/app/hook/config", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PATCH")
-		testBody(t, r, `{"content_type":"json","insecure_ssl":"1","url":"u","secret":"s"}`+"\n")
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{
 			"content_type": "json",
 			"insecure_ssl": "1",
@@ -76,17 +75,17 @@ func TestAppsService_UpdateHookConfig(t *testing.T) {
 		}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	config, _, err := client.Apps.UpdateHookConfig(ctx, input)
 	if err != nil {
 		t.Errorf("Apps.UpdateHookConfig returned error: %v", err)
 	}
 
 	want := &HookConfig{
-		ContentType: String("json"),
-		InsecureSSL: String("1"),
-		Secret:      String("********"),
-		URL:         String("u"),
+		ContentType: new("json"),
+		InsecureSSL: new("1"),
+		Secret:      new("********"),
+		URL:         new("u"),
 	}
 	if !cmp.Equal(config, want) {
 		t.Errorf("Apps.UpdateHookConfig returned %+v, want %+v", config, want)

@@ -6,19 +6,16 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestTeamsService_ListDiscussionsByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/organizations/1/team/2/discussions", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -26,7 +23,7 @@ func TestTeamsService_ListDiscussionsByID(t *testing.T) {
 			"direction": "desc",
 			"page":      "2",
 		})
-		fmt.Fprintf(w,
+		fmt.Fprint(w,
 			`[
 				{
 					"author": {
@@ -53,7 +50,7 @@ func TestTeamsService_ListDiscussionsByID(t *testing.T) {
 					"body_version": "version",
 					"comments_count": 1,
 					"comments_url": "https://api.github.com/teams/2/discussions/3/comments",
-					"created_at": "2018-01-01T00:00:00Z",
+					"created_at": `+refTimeStr(1136178000)+`,
 					"last_edited_at": null,
 					"html_url": "https://github.com/orgs/1/teams/2/discussions/3",
 					"node_id": "node",
@@ -62,12 +59,12 @@ func TestTeamsService_ListDiscussionsByID(t *testing.T) {
 					"private": false,
 					"team_url": "https://api.github.com/teams/2",
 					"title": "test",
-					"updated_at": "2018-01-01T00:00:00Z",
+					"updated_at": `+refTimeStr(1136178001)+`,
 					"url": "https://api.github.com/teams/2/discussions/3"
 				}
 			]`)
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	discussions, _, err := client.Teams.ListDiscussionsByID(ctx, 1, 2, &DiscussionListOptions{"desc", ListOptions{Page: 2}})
 	if err != nil {
 		t.Errorf("Teams.ListDiscussionsByID returned error: %v", err)
@@ -76,40 +73,40 @@ func TestTeamsService_ListDiscussionsByID(t *testing.T) {
 	want := []*TeamDiscussion{
 		{
 			Author: &User{
-				Login:             String("author"),
-				ID:                Int64(0),
-				AvatarURL:         String("https://avatars1.githubusercontent.com/u/0?v=4"),
-				GravatarID:        String(""),
-				URL:               String("https://api.github.com/users/author"),
-				HTMLURL:           String("https://github.com/author"),
-				FollowersURL:      String("https://api.github.com/users/author/followers"),
-				FollowingURL:      String("https://api.github.com/users/author/following{/other_user}"),
-				GistsURL:          String("https://api.github.com/users/author/gists{/gist_id}"),
-				StarredURL:        String("https://api.github.com/users/author/starred{/owner}{/repo}"),
-				SubscriptionsURL:  String("https://api.github.com/users/author/subscriptions"),
-				OrganizationsURL:  String("https://api.github.com/users/author/orgs"),
-				ReposURL:          String("https://api.github.com/users/author/repos"),
-				EventsURL:         String("https://api.github.com/users/author/events{/privacy}"),
-				ReceivedEventsURL: String("https://api.github.com/users/author/received_events"),
-				Type:              String("User"),
-				SiteAdmin:         Bool(false),
+				Login:             new("author"),
+				ID:                new(int64(0)),
+				AvatarURL:         new("https://avatars1.githubusercontent.com/u/0?v=4"),
+				GravatarID:        new(""),
+				URL:               new("https://api.github.com/users/author"),
+				HTMLURL:           new("https://github.com/author"),
+				FollowersURL:      new("https://api.github.com/users/author/followers"),
+				FollowingURL:      new("https://api.github.com/users/author/following{/other_user}"),
+				GistsURL:          new("https://api.github.com/users/author/gists{/gist_id}"),
+				StarredURL:        new("https://api.github.com/users/author/starred{/owner}{/repo}"),
+				SubscriptionsURL:  new("https://api.github.com/users/author/subscriptions"),
+				OrganizationsURL:  new("https://api.github.com/users/author/orgs"),
+				ReposURL:          new("https://api.github.com/users/author/repos"),
+				EventsURL:         new("https://api.github.com/users/author/events{/privacy}"),
+				ReceivedEventsURL: new("https://api.github.com/users/author/received_events"),
+				Type:              new("User"),
+				SiteAdmin:         new(false),
 			},
-			Body:          String("test"),
-			BodyHTML:      String("<p>test</p>"),
-			BodyVersion:   String("version"),
-			CommentsCount: Int(1),
-			CommentsURL:   String("https://api.github.com/teams/2/discussions/3/comments"),
-			CreatedAt:     &Timestamp{time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC)},
+			Body:          new("test"),
+			BodyHTML:      new("<p>test</p>"),
+			BodyVersion:   new("version"),
+			CommentsCount: new(1),
+			CommentsURL:   new("https://api.github.com/teams/2/discussions/3/comments"),
+			CreatedAt:     refTimestamp(1136178000),
 			LastEditedAt:  nil,
-			HTMLURL:       String("https://github.com/orgs/1/teams/2/discussions/3"),
-			NodeID:        String("node"),
-			Number:        Int(3),
-			Pinned:        Bool(false),
-			Private:       Bool(false),
-			TeamURL:       String("https://api.github.com/teams/2"),
-			Title:         String("test"),
-			UpdatedAt:     &Timestamp{time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC)},
-			URL:           String("https://api.github.com/teams/2/discussions/3"),
+			HTMLURL:       new("https://github.com/orgs/1/teams/2/discussions/3"),
+			NodeID:        new("node"),
+			Number:        new(3),
+			Pinned:        new(false),
+			Private:       new(false),
+			TeamURL:       new("https://api.github.com/teams/2"),
+			Title:         new("test"),
+			UpdatedAt:     refTimestamp(1136178001),
+			URL:           new("https://api.github.com/teams/2/discussions/3"),
 		},
 	}
 	if !cmp.Equal(discussions, want) {
@@ -132,8 +129,8 @@ func TestTeamsService_ListDiscussionsByID(t *testing.T) {
 }
 
 func TestTeamsService_ListDiscussionsBySlug(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/teams/s/discussions", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -141,7 +138,7 @@ func TestTeamsService_ListDiscussionsBySlug(t *testing.T) {
 			"direction": "desc",
 			"page":      "2",
 		})
-		fmt.Fprintf(w,
+		fmt.Fprint(w,
 			`[
 				{
 					"author": {
@@ -168,7 +165,7 @@ func TestTeamsService_ListDiscussionsBySlug(t *testing.T) {
 					"body_version": "version",
 					"comments_count": 1,
 					"comments_url": "https://api.github.com/teams/2/discussions/3/comments",
-					"created_at": "2018-01-01T00:00:00Z",
+					"created_at": `+refTimeStr(1136178000)+`,
 					"last_edited_at": null,
 					"html_url": "https://github.com/orgs/1/teams/2/discussions/3",
 					"node_id": "node",
@@ -177,12 +174,12 @@ func TestTeamsService_ListDiscussionsBySlug(t *testing.T) {
 					"private": false,
 					"team_url": "https://api.github.com/teams/2",
 					"title": "test",
-					"updated_at": "2018-01-01T00:00:00Z",
+					"updated_at": `+refTimeStr(1136178001)+`,
 					"url": "https://api.github.com/teams/2/discussions/3"
 				}
 			]`)
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	discussions, _, err := client.Teams.ListDiscussionsBySlug(ctx, "o", "s", &DiscussionListOptions{"desc", ListOptions{Page: 2}})
 	if err != nil {
 		t.Errorf("Teams.ListDiscussionsBySlug returned error: %v", err)
@@ -191,40 +188,40 @@ func TestTeamsService_ListDiscussionsBySlug(t *testing.T) {
 	want := []*TeamDiscussion{
 		{
 			Author: &User{
-				Login:             String("author"),
-				ID:                Int64(0),
-				AvatarURL:         String("https://avatars1.githubusercontent.com/u/0?v=4"),
-				GravatarID:        String(""),
-				URL:               String("https://api.github.com/users/author"),
-				HTMLURL:           String("https://github.com/author"),
-				FollowersURL:      String("https://api.github.com/users/author/followers"),
-				FollowingURL:      String("https://api.github.com/users/author/following{/other_user}"),
-				GistsURL:          String("https://api.github.com/users/author/gists{/gist_id}"),
-				StarredURL:        String("https://api.github.com/users/author/starred{/owner}{/repo}"),
-				SubscriptionsURL:  String("https://api.github.com/users/author/subscriptions"),
-				OrganizationsURL:  String("https://api.github.com/users/author/orgs"),
-				ReposURL:          String("https://api.github.com/users/author/repos"),
-				EventsURL:         String("https://api.github.com/users/author/events{/privacy}"),
-				ReceivedEventsURL: String("https://api.github.com/users/author/received_events"),
-				Type:              String("User"),
-				SiteAdmin:         Bool(false),
+				Login:             new("author"),
+				ID:                new(int64(0)),
+				AvatarURL:         new("https://avatars1.githubusercontent.com/u/0?v=4"),
+				GravatarID:        new(""),
+				URL:               new("https://api.github.com/users/author"),
+				HTMLURL:           new("https://github.com/author"),
+				FollowersURL:      new("https://api.github.com/users/author/followers"),
+				FollowingURL:      new("https://api.github.com/users/author/following{/other_user}"),
+				GistsURL:          new("https://api.github.com/users/author/gists{/gist_id}"),
+				StarredURL:        new("https://api.github.com/users/author/starred{/owner}{/repo}"),
+				SubscriptionsURL:  new("https://api.github.com/users/author/subscriptions"),
+				OrganizationsURL:  new("https://api.github.com/users/author/orgs"),
+				ReposURL:          new("https://api.github.com/users/author/repos"),
+				EventsURL:         new("https://api.github.com/users/author/events{/privacy}"),
+				ReceivedEventsURL: new("https://api.github.com/users/author/received_events"),
+				Type:              new("User"),
+				SiteAdmin:         new(false),
 			},
-			Body:          String("test"),
-			BodyHTML:      String("<p>test</p>"),
-			BodyVersion:   String("version"),
-			CommentsCount: Int(1),
-			CommentsURL:   String("https://api.github.com/teams/2/discussions/3/comments"),
-			CreatedAt:     &Timestamp{time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC)},
+			Body:          new("test"),
+			BodyHTML:      new("<p>test</p>"),
+			BodyVersion:   new("version"),
+			CommentsCount: new(1),
+			CommentsURL:   new("https://api.github.com/teams/2/discussions/3/comments"),
+			CreatedAt:     refTimestamp(1136178000),
 			LastEditedAt:  nil,
-			HTMLURL:       String("https://github.com/orgs/1/teams/2/discussions/3"),
-			NodeID:        String("node"),
-			Number:        Int(3),
-			Pinned:        Bool(false),
-			Private:       Bool(false),
-			TeamURL:       String("https://api.github.com/teams/2"),
-			Title:         String("test"),
-			UpdatedAt:     &Timestamp{time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC)},
-			URL:           String("https://api.github.com/teams/2/discussions/3"),
+			HTMLURL:       new("https://github.com/orgs/1/teams/2/discussions/3"),
+			NodeID:        new("node"),
+			Number:        new(3),
+			Pinned:        new(false),
+			Private:       new(false),
+			TeamURL:       new("https://api.github.com/teams/2"),
+			Title:         new("test"),
+			UpdatedAt:     refTimestamp(1136178001),
+			URL:           new("https://api.github.com/teams/2/discussions/3"),
 		},
 	}
 	if !cmp.Equal(discussions, want) {
@@ -247,21 +244,21 @@ func TestTeamsService_ListDiscussionsBySlug(t *testing.T) {
 }
 
 func TestTeamsService_GetDiscussionByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/organizations/1/team/2/discussions/3", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"number":3}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	discussion, _, err := client.Teams.GetDiscussionByID(ctx, 1, 2, 3)
 	if err != nil {
 		t.Errorf("Teams.GetDiscussionByID returned error: %v", err)
 	}
 
-	want := &TeamDiscussion{Number: Int(3)}
+	want := &TeamDiscussion{Number: new(3)}
 	if !cmp.Equal(discussion, want) {
 		t.Errorf("Teams.GetDiscussionByID returned %+v, want %+v", discussion, want)
 	}
@@ -282,21 +279,21 @@ func TestTeamsService_GetDiscussionByID(t *testing.T) {
 }
 
 func TestTeamsService_GetDiscussionBySlug(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/teams/s/discussions/3", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"number":3}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	discussion, _, err := client.Teams.GetDiscussionBySlug(ctx, "o", "s", 3)
 	if err != nil {
 		t.Errorf("Teams.GetDiscussionBySlug returned error: %v", err)
 	}
 
-	want := &TeamDiscussion{Number: Int(3)}
+	want := &TeamDiscussion{Number: new(3)}
 	if !cmp.Equal(discussion, want) {
 		t.Errorf("Teams.GetDiscussionBySlug returned %+v, want %+v", discussion, want)
 	}
@@ -317,30 +314,24 @@ func TestTeamsService_GetDiscussionBySlug(t *testing.T) {
 }
 
 func TestTeamsService_CreateDiscussionByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := TeamDiscussion{Title: String("c_t"), Body: String("c_b")}
+	input := TeamDiscussion{Title: new("c_t"), Body: new("c_b")}
 
 	mux.HandleFunc("/organizations/1/team/2/discussions", func(w http.ResponseWriter, r *http.Request) {
-		v := new(TeamDiscussion)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, &input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"number":3}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	comment, _, err := client.Teams.CreateDiscussionByID(ctx, 1, 2, input)
 	if err != nil {
 		t.Errorf("Teams.CreateDiscussionByID returned error: %v", err)
 	}
 
-	want := &TeamDiscussion{Number: Int(3)}
+	want := &TeamDiscussion{Number: new(3)}
 	if !cmp.Equal(comment, want) {
 		t.Errorf("Teams.CreateDiscussionByID returned %+v, want %+v", comment, want)
 	}
@@ -361,30 +352,24 @@ func TestTeamsService_CreateDiscussionByID(t *testing.T) {
 }
 
 func TestTeamsService_CreateDiscussionBySlug(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := TeamDiscussion{Title: String("c_t"), Body: String("c_b")}
+	input := TeamDiscussion{Title: new("c_t"), Body: new("c_b")}
 
 	mux.HandleFunc("/orgs/o/teams/s/discussions", func(w http.ResponseWriter, r *http.Request) {
-		v := new(TeamDiscussion)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, &input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"number":3}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	comment, _, err := client.Teams.CreateDiscussionBySlug(ctx, "o", "s", input)
 	if err != nil {
 		t.Errorf("Teams.CreateDiscussionBySlug returned error: %v", err)
 	}
 
-	want := &TeamDiscussion{Number: Int(3)}
+	want := &TeamDiscussion{Number: new(3)}
 	if !cmp.Equal(comment, want) {
 		t.Errorf("Teams.CreateDiscussionBySlug returned %+v, want %+v", comment, want)
 	}
@@ -405,30 +390,24 @@ func TestTeamsService_CreateDiscussionBySlug(t *testing.T) {
 }
 
 func TestTeamsService_EditDiscussionByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := TeamDiscussion{Title: String("e_t"), Body: String("e_b")}
+	input := TeamDiscussion{Title: new("e_t"), Body: new("e_b")}
 
 	mux.HandleFunc("/organizations/1/team/2/discussions/3", func(w http.ResponseWriter, r *http.Request) {
-		v := new(TeamDiscussion)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, &input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"number":3}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	comment, _, err := client.Teams.EditDiscussionByID(ctx, 1, 2, 3, input)
 	if err != nil {
 		t.Errorf("Teams.EditDiscussionByID returned error: %v", err)
 	}
 
-	want := &TeamDiscussion{Number: Int(3)}
+	want := &TeamDiscussion{Number: new(3)}
 	if !cmp.Equal(comment, want) {
 		t.Errorf("Teams.EditDiscussionByID returned %+v, want %+v", comment, want)
 	}
@@ -449,30 +428,24 @@ func TestTeamsService_EditDiscussionByID(t *testing.T) {
 }
 
 func TestTeamsService_EditDiscussionBySlug(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := TeamDiscussion{Title: String("e_t"), Body: String("e_b")}
+	input := TeamDiscussion{Title: new("e_t"), Body: new("e_b")}
 
 	mux.HandleFunc("/orgs/o/teams/s/discussions/3", func(w http.ResponseWriter, r *http.Request) {
-		v := new(TeamDiscussion)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, &input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"number":3}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	comment, _, err := client.Teams.EditDiscussionBySlug(ctx, "o", "s", 3, input)
 	if err != nil {
 		t.Errorf("Teams.EditDiscussionBySlug returned error: %v", err)
 	}
 
-	want := &TeamDiscussion{Number: Int(3)}
+	want := &TeamDiscussion{Number: new(3)}
 	if !cmp.Equal(comment, want) {
 		t.Errorf("Teams.EditDiscussionBySlug returned %+v, want %+v", comment, want)
 	}
@@ -493,14 +466,14 @@ func TestTeamsService_EditDiscussionBySlug(t *testing.T) {
 }
 
 func TestTeamsService_DeleteDiscussionByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/organizations/1/team/2/discussions/3", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/organizations/1/team/2/discussions/3", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Teams.DeleteDiscussionByID(ctx, 1, 2, 3)
 	if err != nil {
 		t.Errorf("Teams.DeleteDiscussionByID returned error: %v", err)
@@ -518,14 +491,14 @@ func TestTeamsService_DeleteDiscussionByID(t *testing.T) {
 }
 
 func TestTeamsService_DeleteDiscussionBySlug(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/orgs/o/teams/s/discussions/3", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/orgs/o/teams/s/discussions/3", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Teams.DeleteDiscussionBySlug(ctx, "o", "s", 3)
 	if err != nil {
 		t.Errorf("Teams.DeleteDiscussionBySlug returned error: %v", err)

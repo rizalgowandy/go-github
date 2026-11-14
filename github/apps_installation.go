@@ -8,7 +8,6 @@ package github
 import (
 	"context"
 	"fmt"
-	"strings"
 )
 
 // ListRepositories represents the response from the list repos endpoints.
@@ -19,29 +18,22 @@ type ListRepositories struct {
 
 // ListRepos lists the repositories that are accessible to the authenticated installation.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#list-repositories-accessible-to-the-app-installation
+// GitHub API docs: https://docs.github.com/rest/apps/installations?apiVersion=2022-11-28#list-repositories-accessible-to-the-app-installation
+//
+//meta:operation GET /installation/repositories
 func (s *AppsService) ListRepos(ctx context.Context, opts *ListOptions) (*ListRepositories, *Response, error) {
 	u, err := addOptions("installation/repositories", opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept headers when APIs fully launch.
-	acceptHeaders := []string{
-		mediaTypeTopicsPreview,
-		mediaTypeRepositoryVisibilityPreview,
-		mediaTypeRepositoryTemplatePreview,
-	}
-	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
-
 	var r *ListRepositories
-
-	resp, err := s.client.Do(ctx, req, &r)
+	resp, err := s.client.Do(req, &r)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -52,7 +44,9 @@ func (s *AppsService) ListRepos(ctx context.Context, opts *ListOptions) (*ListRe
 // ListUserRepos lists repositories that are accessible
 // to the authenticated user for an installation.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#list-repositories-accessible-to-the-user-access-token
+// GitHub API docs: https://docs.github.com/rest/apps/installations?apiVersion=2022-11-28#list-repositories-accessible-to-the-user-access-token
+//
+//meta:operation GET /user/installations/{installation_id}/repositories
 func (s *AppsService) ListUserRepos(ctx context.Context, id int64, opts *ListOptions) (*ListRepositories, *Response, error) {
 	u := fmt.Sprintf("user/installations/%v/repositories", id)
 	u, err := addOptions(u, opts)
@@ -60,21 +54,13 @@ func (s *AppsService) ListUserRepos(ctx context.Context, id int64, opts *ListOpt
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept headers when APIs fully launch.
-	acceptHeaders := []string{
-		mediaTypeTopicsPreview,
-		mediaTypeRepositoryVisibilityPreview,
-		mediaTypeRepositoryTemplatePreview,
-	}
-	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
-
 	var r *ListRepositories
-	resp, err := s.client.Do(ctx, req, &r)
+	resp, err := s.client.Do(req, &r)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -84,16 +70,18 @@ func (s *AppsService) ListUserRepos(ctx context.Context, id int64, opts *ListOpt
 
 // AddRepository adds a single repository to an installation.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#add-a-repository-to-an-app-installation
+// GitHub API docs: https://docs.github.com/rest/apps/installations?apiVersion=2022-11-28#add-a-repository-to-an-app-installation
+//
+//meta:operation PUT /user/installations/{installation_id}/repositories/{repository_id}
 func (s *AppsService) AddRepository(ctx context.Context, instID, repoID int64) (*Repository, *Response, error) {
 	u := fmt.Sprintf("user/installations/%v/repositories/%v", instID, repoID)
-	req, err := s.client.NewRequest("PUT", u, nil)
+	req, err := s.client.NewRequest(ctx, "PUT", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	r := new(Repository)
-	resp, err := s.client.Do(ctx, req, r)
+	var r *Repository
+	resp, err := s.client.Do(req, &r)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -103,26 +91,30 @@ func (s *AppsService) AddRepository(ctx context.Context, instID, repoID int64) (
 
 // RemoveRepository removes a single repository from an installation.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#remove-a-repository-from-an-app-installation
+// GitHub API docs: https://docs.github.com/rest/apps/installations?apiVersion=2022-11-28#remove-a-repository-from-an-app-installation
+//
+//meta:operation DELETE /user/installations/{installation_id}/repositories/{repository_id}
 func (s *AppsService) RemoveRepository(ctx context.Context, instID, repoID int64) (*Response, error) {
 	u := fmt.Sprintf("user/installations/%v/repositories/%v", instID, repoID)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // RevokeInstallationToken revokes an installation token.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#revoke-an-installation-access-token
+// GitHub API docs: https://docs.github.com/rest/apps/installations?apiVersion=2022-11-28#revoke-an-installation-access-token
+//
+//meta:operation DELETE /installation/token
 func (s *AppsService) RevokeInstallationToken(ctx context.Context) (*Response, error) {
 	u := "installation/token"
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

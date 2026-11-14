@@ -1,19 +1,53 @@
 on: [push, pull_request]
 name: linter
 
+permissions:
+  contents: read
+
 jobs:
-  lint:
-    strategy:
-      matrix:
-        go-version: [1.x]
-        platform: [ubuntu-latest]
-    runs-on: ${{ matrix.platform }}
-
+  check-generated:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@5c56cd6c9dc07901af25baab6f2b0d9f3b7c3018 #v2.5.2
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
-        version: v1.41
-        args: --verbose
+        persist-credentials: false
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: stable
+        cache-dependency-path: "**/go.sum"
+    - name: Check generated code
+      run: ./script/generate.sh --check
+
+  golangci-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: stable
+        cache-dependency-path: "**/go.sum"
+    - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      with:
+        version: v2.13.1 # sync with version in .custom-gcl.yml
+        experimental: "automatic-module-directories,no-run-logs-group"
+
+  check-openapi:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: stable
+        cache-dependency-path: "**/go.sum"
+    - name: Check OpenAPI
+      run: ./script/metadata.sh update-openapi --validate
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    - name: Check openapi_operations.yaml for entries that no longer do anything
+      run: ./script/metadata.sh check
+    - name: Check request body fields against the OpenAPI schemas
+      run: ./script/check-schema-fields.sh -format github

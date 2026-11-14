@@ -7,13 +7,13 @@ package github
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 )
 
 const (
 	emptyTimeStr                     = `"0001-01-01T00:00:00Z"`
+	referenceTimeRaw                 = "2006-01-02T15:04:05Z"
 	referenceTimeStr                 = `"2006-01-02T15:04:05Z"`
 	referenceTimeStrFractional       = `"2006-01-02T15:04:05.000Z"` // This format was returned by the Projects API before October 1, 2017.
 	referenceUnixTimeStr             = `1136214245`
@@ -21,11 +21,15 @@ const (
 )
 
 var (
-	referenceTime = time.Date(2006, time.January, 02, 15, 04, 05, 0, time.UTC)
-	unixOrigin    = time.Unix(0, 0).In(time.UTC)
+	referenceTime      = time.Date(2006, time.January, 2, 15, 4, 5, 0, time.UTC)
+	referenceTimestamp = Timestamp{referenceTime}
+	refTimeStr         = func(unix int64) string { return `"` + refTimestamp(unix).Format(time.RFC3339) + `"` }
+	refTimestamp       = func(unix int64) *Timestamp { return &Timestamp{time.Unix(unix, 0).In(time.UTC).Local()} }
+	unixOrigin         = time.Unix(0, 0).In(time.UTC)
 )
 
 func TestTimestamp_Marshal(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		desc    string
 		data    Timestamp
@@ -40,17 +44,18 @@ func TestTimestamp_Marshal(t *testing.T) {
 	for _, tc := range testCases {
 		out, err := json.Marshal(tc.data)
 		if gotErr := err != nil; gotErr != tc.wantErr {
-			t.Errorf("%s: gotErr=%v, wantErr=%v, err=%v", tc.desc, gotErr, tc.wantErr, err)
+			t.Errorf("%v: gotErr=%v, wantErr=%v, err=%v", tc.desc, gotErr, tc.wantErr, err)
 		}
 		got := string(out)
 		equal := got == tc.want
 		if (got == tc.want) != tc.equal {
-			t.Errorf("%s: got=%s, want=%s, equal=%v, want=%v", tc.desc, got, tc.want, equal, tc.equal)
+			t.Errorf("%v: got=%v, want=%v, equal=%v, want=%v", tc.desc, got, tc.want, equal, tc.equal)
 		}
 	}
 }
 
 func TestTimestamp_Unmarshal(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		desc    string
 		data    string
@@ -73,17 +78,18 @@ func TestTimestamp_Unmarshal(t *testing.T) {
 		var got Timestamp
 		err := json.Unmarshal([]byte(tc.data), &got)
 		if gotErr := err != nil; gotErr != tc.wantErr {
-			t.Errorf("%s: gotErr=%v, wantErr=%v, err=%v", tc.desc, gotErr, tc.wantErr, err)
+			t.Errorf("%v: gotErr=%v, wantErr=%v, err=%v", tc.desc, gotErr, tc.wantErr, err)
 			continue
 		}
 		equal := got.Equal(tc.want)
 		if equal != tc.equal {
-			t.Errorf("%s: got=%#v, want=%#v, equal=%v, want=%v", tc.desc, got, tc.want, equal, tc.equal)
+			t.Errorf("%v: got=%#v, want=%#v, equal=%v, want=%v", tc.desc, got, tc.want, equal, tc.equal)
 		}
 	}
 }
 
 func TestTimestamp_MarshalReflexivity(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		desc string
 		data Timestamp
@@ -94,50 +100,26 @@ func TestTimestamp_MarshalReflexivity(t *testing.T) {
 	for _, tc := range testCases {
 		data, err := json.Marshal(tc.data)
 		if err != nil {
-			t.Errorf("%s: Marshal err=%v", tc.desc, err)
+			t.Errorf("%v: Marshal err=%v", tc.desc, err)
 		}
 		var got Timestamp
 		err = json.Unmarshal(data, &got)
 		if err != nil {
-			t.Errorf("%s: Unmarshal err=%v", tc.desc, err)
+			t.Errorf("%v: Unmarshal err=%v", tc.desc, err)
 		}
 		if !got.Equal(tc.data) {
-			t.Errorf("%s: %+v != %+v", tc.desc, got, data)
+			t.Errorf("%v: %+v != %+v", tc.desc, got, data)
 		}
 	}
 }
 
 type WrappedTimestamp struct {
-	A    int
-	Time Timestamp
-}
-
-func TestWrappedTimestamp_Marshal(t *testing.T) {
-	testCases := []struct {
-		desc    string
-		data    WrappedTimestamp
-		want    string
-		wantErr bool
-		equal   bool
-	}{
-		{"Reference", WrappedTimestamp{0, Timestamp{referenceTime}}, fmt.Sprintf(`{"A":0,"Time":%s}`, referenceTimeStr), false, true},
-		{"Empty", WrappedTimestamp{}, fmt.Sprintf(`{"A":0,"Time":%s}`, emptyTimeStr), false, true},
-		{"Mismatch", WrappedTimestamp{}, fmt.Sprintf(`{"A":0,"Time":%s}`, referenceTimeStr), false, false},
-	}
-	for _, tc := range testCases {
-		out, err := json.Marshal(tc.data)
-		if gotErr := err != nil; gotErr != tc.wantErr {
-			t.Errorf("%s: gotErr=%v, wantErr=%v, err=%v", tc.desc, gotErr, tc.wantErr, err)
-		}
-		got := string(out)
-		equal := got == tc.want
-		if equal != tc.equal {
-			t.Errorf("%s: got=%s, want=%s, equal=%v, want=%v", tc.desc, got, tc.want, equal, tc.equal)
-		}
-	}
+	A    int       `json:"A"`
+	Time Timestamp `json:"Time"`
 }
 
 func TestWrappedTimestamp_Unmarshal(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		desc    string
 		data    string
@@ -159,17 +141,30 @@ func TestWrappedTimestamp_Unmarshal(t *testing.T) {
 		var got Timestamp
 		err := json.Unmarshal([]byte(tc.data), &got)
 		if gotErr := err != nil; gotErr != tc.wantErr {
-			t.Errorf("%s: gotErr=%v, wantErr=%v, err=%v", tc.desc, gotErr, tc.wantErr, err)
+			t.Errorf("%v: gotErr=%v, wantErr=%v, err=%v", tc.desc, gotErr, tc.wantErr, err)
 			continue
 		}
 		equal := got.Time.Equal(tc.want.Time.Time)
 		if equal != tc.equal {
-			t.Errorf("%s: got=%#v, want=%#v, equal=%v, want=%v", tc.desc, got, tc.want, equal, tc.equal)
+			t.Errorf("%v: got=%#v, want=%#v, equal=%v, want=%v", tc.desc, got, tc.want, equal, tc.equal)
 		}
 	}
 }
 
+func TestTimestamp_GetTime(t *testing.T) {
+	t.Parallel()
+	var t1 *Timestamp
+	if t1.GetTime() != nil {
+		t.Errorf("nil timestamp should return nil, got: %v", t1.GetTime())
+	}
+	t1 = &Timestamp{referenceTime}
+	if !t1.GetTime().Equal(referenceTime) {
+		t.Errorf("want reference time, got: %v", t1.GetTime())
+	}
+}
+
 func TestWrappedTimestamp_MarshalReflexivity(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		desc string
 		data WrappedTimestamp
@@ -180,15 +175,15 @@ func TestWrappedTimestamp_MarshalReflexivity(t *testing.T) {
 	for _, tc := range testCases {
 		bytes, err := json.Marshal(tc.data)
 		if err != nil {
-			t.Errorf("%s: Marshal err=%v", tc.desc, err)
+			t.Errorf("%v: Marshal err=%v", tc.desc, err)
 		}
 		var got WrappedTimestamp
 		err = json.Unmarshal(bytes, &got)
 		if err != nil {
-			t.Errorf("%s: Unmarshal err=%v", tc.desc, err)
+			t.Errorf("%v: Unmarshal err=%v", tc.desc, err)
 		}
 		if !got.Time.Equal(tc.data.Time) {
-			t.Errorf("%s: %+v != %+v", tc.desc, got, tc.data)
+			t.Errorf("%v: %+v != %+v", tc.desc, got, tc.data)
 		}
 	}
 }

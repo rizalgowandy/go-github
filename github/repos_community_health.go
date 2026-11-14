@@ -8,7 +8,6 @@ package github
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
 // Metric represents the different fields for one file in community health files.
@@ -38,22 +37,24 @@ type CommunityHealthMetrics struct {
 	Description           *string               `json:"description"`
 	Documentation         *string               `json:"documentation"`
 	Files                 *CommunityHealthFiles `json:"files"`
-	UpdatedAt             *time.Time            `json:"updated_at"`
+	UpdatedAt             *Timestamp            `json:"updated_at"`
 	ContentReportsEnabled *bool                 `json:"content_reports_enabled"`
 }
 
 // GetCommunityHealthMetrics retrieves all the community health  metrics for a  repository.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/repos#get-community-profile-metrics
+// GitHub API docs: https://docs.github.com/rest/metrics/community?apiVersion=2022-11-28#get-community-profile-metrics
+//
+//meta:operation GET /repos/{owner}/{repo}/community/profile
 func (s *RepositoriesService) GetCommunityHealthMetrics(ctx context.Context, owner, repo string) (*CommunityHealthMetrics, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/community/profile", owner, repo)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	metrics := &CommunityHealthMetrics{}
-	resp, err := s.client.Do(ctx, req, metrics)
+	var metrics *CommunityHealthMetrics
+	resp, err := s.client.Do(req, &metrics)
 	if err != nil {
 		return nil, resp, err
 	}

@@ -7,6 +7,7 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -22,7 +23,9 @@ type createOrgRequest struct {
 // Note that only a subset of the org fields are used and org must
 // not be nil.
 //
-// GitHub Enterprise API docs: https://developer.github.com/enterprise/v3/enterprise-admin/orgs/#create-an-organization
+// GitHub API docs: https://docs.github.com/enterprise-server@3.22/rest/enterprise-admin/orgs#create-an-organization
+//
+//meta:operation POST /admin/organizations
 func (s *AdminService) CreateOrg(ctx context.Context, org *Organization, admin string) (*Organization, *Response, error) {
 	u := "admin/organizations"
 
@@ -31,13 +34,13 @@ func (s *AdminService) CreateOrg(ctx context.Context, org *Organization, admin s
 		Admin: &admin,
 	}
 
-	req, err := s.client.NewRequest("POST", u, orgReq)
+	req, err := s.client.NewRequest(ctx, "POST", u, orgReq)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	o := new(Organization)
-	resp, err := s.client.Do(ctx, req, o)
+	var o *Organization
+	resp, err := s.client.Do(req, &o)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -59,14 +62,25 @@ type RenameOrgResponse struct {
 
 // RenameOrg renames an organization in GitHub Enterprise.
 //
-// GitHub Enterprise API docs: https://developer.github.com/enterprise/v3/enterprise-admin/orgs/#rename-an-organization
+// GitHub API docs: https://docs.github.com/enterprise-server@3.22/rest/enterprise-admin/orgs#update-an-organization-name
+//
+//meta:operation PATCH /admin/organizations/{org}
 func (s *AdminService) RenameOrg(ctx context.Context, org *Organization, newName string) (*RenameOrgResponse, *Response, error) {
+	if org == nil {
+		return nil, nil, errors.New("organization must be provided")
+	}
+	if org.Login == nil {
+		return nil, nil, errors.New("login must be provided")
+	}
+
 	return s.RenameOrgByName(ctx, *org.Login, newName)
 }
 
 // RenameOrgByName renames an organization in GitHub Enterprise using its current name.
 //
-// GitHub Enterprise API docs: https://developer.github.com/enterprise/v3/enterprise-admin/orgs/#rename-an-organization
+// GitHub API docs: https://docs.github.com/enterprise-server@3.22/rest/enterprise-admin/orgs#update-an-organization-name
+//
+//meta:operation PATCH /admin/organizations/{org}
 func (s *AdminService) RenameOrgByName(ctx context.Context, org, newName string) (*RenameOrgResponse, *Response, error) {
 	u := fmt.Sprintf("admin/organizations/%v", org)
 
@@ -74,13 +88,13 @@ func (s *AdminService) RenameOrgByName(ctx context.Context, org, newName string)
 		Login: &newName,
 	}
 
-	req, err := s.client.NewRequest("PATCH", u, orgReq)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, orgReq)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	o := new(RenameOrgResponse)
-	resp, err := s.client.Do(ctx, req, o)
+	var o *RenameOrgResponse
+	resp, err := s.client.Do(req, &o)
 	if err != nil {
 		return nil, resp, err
 	}

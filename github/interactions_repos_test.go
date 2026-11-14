@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -16,8 +14,8 @@ import (
 )
 
 func TestInteractionsService_GetRestrictionsForRepo(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/interaction-limits", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -25,13 +23,13 @@ func TestInteractionsService_GetRestrictionsForRepo(t *testing.T) {
 		fmt.Fprint(w, `{"origin":"repository"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	repoInteractions, _, err := client.Interactions.GetRestrictionsForRepo(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("Interactions.GetRestrictionsForRepo returned error: %v", err)
 	}
 
-	want := &InteractionRestriction{Origin: String("repository")}
+	want := &InteractionRestriction{Origin: new("repository")}
 	if !cmp.Equal(repoInteractions, want) {
 		t.Errorf("Interactions.GetRestrictionsForRepo returned %+v, want %+v", repoInteractions, want)
 	}
@@ -52,30 +50,25 @@ func TestInteractionsService_GetRestrictionsForRepo(t *testing.T) {
 }
 
 func TestInteractionsService_UpdateRestrictionsForRepo(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &InteractionRestriction{Limit: String("existing_users")}
+	input := &InteractionRestriction{Limit: new("existing_users")}
 
 	mux.HandleFunc("/repos/o/r/interaction-limits", func(w http.ResponseWriter, r *http.Request) {
-		v := new(InteractionRestriction)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PUT")
 		testHeader(t, r, "Accept", mediaTypeInteractionRestrictionsPreview)
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"origin":"repository"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	repoInteractions, _, err := client.Interactions.UpdateRestrictionsForRepo(ctx, "o", "r", input.GetLimit())
 	if err != nil {
 		t.Errorf("Interactions.UpdateRestrictionsForRepo returned error: %v", err)
 	}
 
-	want := &InteractionRestriction{Origin: String("repository")}
+	want := &InteractionRestriction{Origin: new("repository")}
 	if !cmp.Equal(repoInteractions, want) {
 		t.Errorf("Interactions.UpdateRestrictionsForRepo returned %+v, want %+v", repoInteractions, want)
 	}
@@ -96,15 +89,15 @@ func TestInteractionsService_UpdateRestrictionsForRepo(t *testing.T) {
 }
 
 func TestInteractionsService_RemoveRestrictionsFromRepo(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/interaction-limits", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/interaction-limits", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 		testHeader(t, r, "Accept", mediaTypeInteractionRestrictionsPreview)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Interactions.RemoveRestrictionsFromRepo(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("Interactions.RemoveRestrictionsFromRepo returned error: %v", err)

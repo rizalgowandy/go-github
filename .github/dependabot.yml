@@ -4,15 +4,41 @@ updates:
   directory: /
   schedule:
     interval: weekly
+  cooldown:
+    default-days: 7
+- package-ecosystem: gomod
+  directory: otel
+  schedule:
+    interval: weekly
+  cooldown:
+    default-days: 7
 - package-ecosystem: gomod
   directory: scrape
   schedule:
     interval: weekly
+  cooldown:
+    default-days: 7
 - package-ecosystem: gomod
-  directory: update-urls
+  directories:
+    - /tools
+    - /tools/**
   schedule:
     interval: weekly
+  cooldown:
+    default-days: 7
+- package-ecosystem: gomod
+  directory: example
+  schedule:
+    interval: weekly
+  cooldown:
+    default-days: 7
 - package-ecosystem: github-actions
   directory: /
   schedule:
     interval: weekly
+  groups:
+    actions:
+      patterns:
+      - "actions/*"
+  cooldown:
+    default-days: 7

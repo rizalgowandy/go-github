@@ -8,11 +8,14 @@ package github
 import (
 	"context"
 	"fmt"
+	"net/url"
 )
 
-// List the packages for an organization.
+// ListPackages lists the packages for an organization.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#list-packages-for-an-organization
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#list-packages-for-an-organization
+//
+//meta:operation GET /orgs/{org}/packages
 func (s *OrganizationsService) ListPackages(ctx context.Context, org string, opts *PackageListOptions) ([]*Package, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/packages", org)
 	u, err := addOptions(u, opts)
@@ -20,13 +23,13 @@ func (s *OrganizationsService) ListPackages(ctx context.Context, org string, opt
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var packages []*Package
-	resp, err := s.client.Do(ctx, req, &packages)
+	resp, err := s.client.Do(req, &packages)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -34,18 +37,22 @@ func (s *OrganizationsService) ListPackages(ctx context.Context, org string, opt
 	return packages, resp, nil
 }
 
-// Get a package by name from an organization.
+// GetPackage gets a package by name from an organization.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#get-a-package-for-an-organization
+// Note that packageName is escaped for the URL path so that you don't need to.
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#get-a-package-for-an-organization
+//
+//meta:operation GET /orgs/{org}/packages/{package_type}/{package_name}
 func (s *OrganizationsService) GetPackage(ctx context.Context, org, packageType, packageName string) (*Package, *Response, error) {
-	u := fmt.Sprintf("orgs/%v/packages/%v/%v", org, packageType, packageName)
-	req, err := s.client.NewRequest("GET", u, nil)
+	u := fmt.Sprintf("orgs/%v/packages/%v/%v", org, packageType, url.PathEscape(packageName))
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var pack *Package
-	resp, err := s.client.Do(ctx, req, &pack)
+	resp, err := s.client.Do(req, &pack)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -53,49 +60,61 @@ func (s *OrganizationsService) GetPackage(ctx context.Context, org, packageType,
 	return pack, resp, nil
 }
 
-// Delete a package from an organization.
+// DeletePackage deletes a package from an organization.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#delete-a-package-for-an-organization
+// Note that packageName is escaped for the URL path so that you don't need to.
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#delete-a-package-for-an-organization
+//
+//meta:operation DELETE /orgs/{org}/packages/{package_type}/{package_name}
 func (s *OrganizationsService) DeletePackage(ctx context.Context, org, packageType, packageName string) (*Response, error) {
-	u := fmt.Sprintf("orgs/%v/packages/%v/%v", org, packageType, packageName)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	u := fmt.Sprintf("orgs/%v/packages/%v/%v", org, packageType, url.PathEscape(packageName))
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
-// Restore a package to an organization.
+// RestorePackage restores a package to an organization.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#restore-a-package-for-an-organization
+// Note that packageName is escaped for the URL path so that you don't need to.
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#restore-a-package-for-an-organization
+//
+//meta:operation POST /orgs/{org}/packages/{package_type}/{package_name}/restore
 func (s *OrganizationsService) RestorePackage(ctx context.Context, org, packageType, packageName string) (*Response, error) {
-	u := fmt.Sprintf("orgs/%v/packages/%v/%v/restore", org, packageType, packageName)
-	req, err := s.client.NewRequest("POST", u, nil)
+	u := fmt.Sprintf("orgs/%v/packages/%v/%v/restore", org, packageType, url.PathEscape(packageName))
+	req, err := s.client.NewRequest(ctx, "POST", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
-// Get all versions of a package in an organization.
+// PackageGetAllVersions gets all versions of a package in an organization.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#get-all-package-versions-for-a-package-owned-by-an-organization
+// Note that packageName is escaped for the URL path so that you don't need to.
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#list-package-versions-for-a-package-owned-by-an-organization
+//
+//meta:operation GET /orgs/{org}/packages/{package_type}/{package_name}/versions
 func (s *OrganizationsService) PackageGetAllVersions(ctx context.Context, org, packageType, packageName string, opts *PackageListOptions) ([]*PackageVersion, *Response, error) {
-	u := fmt.Sprintf("orgs/%v/packages/%v/%v/versions", org, packageType, packageName)
+	u := fmt.Sprintf("orgs/%v/packages/%v/%v/versions", org, packageType, url.PathEscape(packageName))
 	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var versions []*PackageVersion
-	resp, err := s.client.Do(ctx, req, &versions)
+	resp, err := s.client.Do(req, &versions)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -103,18 +122,22 @@ func (s *OrganizationsService) PackageGetAllVersions(ctx context.Context, org, p
 	return versions, resp, nil
 }
 
-// Get a specific version of a package in an organization.
+// PackageGetVersion gets a specific version of a package in an organization.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#get-a-package-version-for-an-organization
+// Note that packageName is escaped for the URL path so that you don't need to.
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#get-a-package-version-for-an-organization
+//
+//meta:operation GET /orgs/{org}/packages/{package_type}/{package_name}/versions/{package_version_id}
 func (s *OrganizationsService) PackageGetVersion(ctx context.Context, org, packageType, packageName string, packageVersionID int64) (*PackageVersion, *Response, error) {
-	u := fmt.Sprintf("orgs/%v/packages/%v/%v/versions/%v", org, packageType, packageName, packageVersionID)
-	req, err := s.client.NewRequest("GET", u, nil)
+	u := fmt.Sprintf("orgs/%v/packages/%v/%v/versions/%v", org, packageType, url.PathEscape(packageName), packageVersionID)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var version *PackageVersion
-	resp, err := s.client.Do(ctx, req, &version)
+	resp, err := s.client.Do(req, &version)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -122,28 +145,59 @@ func (s *OrganizationsService) PackageGetVersion(ctx context.Context, org, packa
 	return version, resp, nil
 }
 
-// Delete a package version from an organization.
+// PackageDeleteVersion deletes a package version from an organization.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#delete-package-version-for-an-organization
+// Note that packageName is escaped for the URL path so that you don't need to.
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#delete-package-version-for-an-organization
+//
+//meta:operation DELETE /orgs/{org}/packages/{package_type}/{package_name}/versions/{package_version_id}
 func (s *OrganizationsService) PackageDeleteVersion(ctx context.Context, org, packageType, packageName string, packageVersionID int64) (*Response, error) {
-	u := fmt.Sprintf("orgs/%v/packages/%v/%v/versions/%v", org, packageType, packageName, packageVersionID)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	u := fmt.Sprintf("orgs/%v/packages/%v/%v/versions/%v", org, packageType, url.PathEscape(packageName), packageVersionID)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
-// Restore a package version to an organization.
+// PackageRestoreVersion restores a package version to an organization.
 //
-// GitHub API docs: https://docs.github.com/en/rest/reference/packages#restore-package-version-for-an-organization
+// Note that packageName is escaped for the URL path so that you don't need to.
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#restore-package-version-for-an-organization
+//
+//meta:operation POST /orgs/{org}/packages/{package_type}/{package_name}/versions/{package_version_id}/restore
 func (s *OrganizationsService) PackageRestoreVersion(ctx context.Context, org, packageType, packageName string, packageVersionID int64) (*Response, error) {
-	u := fmt.Sprintf("orgs/%v/packages/%v/%v/versions/%v/restore", org, packageType, packageName, packageVersionID)
-	req, err := s.client.NewRequest("POST", u, nil)
+	u := fmt.Sprintf("orgs/%v/packages/%v/%v/versions/%v/restore", org, packageType, url.PathEscape(packageName), packageVersionID)
+	req, err := s.client.NewRequest(ctx, "POST", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
+}
+
+// ListDockerMigrationConflictingPackages lists all packages in an organization,
+// readable by the requesting user, that encountered a conflict during a Docker migration.
+//
+// GitHub API docs: https://docs.github.com/rest/packages/packages?apiVersion=2022-11-28#get-list-of-conflicting-packages-during-docker-migration-for-organization
+//
+//meta:operation GET /orgs/{org}/docker/conflicts
+func (s *OrganizationsService) ListDockerMigrationConflictingPackages(ctx context.Context, org string) ([]*Package, *Response, error) {
+	u := fmt.Sprintf("orgs/%v/docker/conflicts", org)
+
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var packages []*Package
+	resp, err := s.client.Do(req, &packages)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return packages, resp, nil
 }

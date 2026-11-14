@@ -7,7 +7,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -16,8 +15,8 @@ import (
 )
 
 func TestIssuesService_ListLabels(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/labels", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -26,13 +25,13 @@ func TestIssuesService_ListLabels(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	labels, _, err := client.Issues.ListLabels(ctx, "o", "r", opt)
 	if err != nil {
 		t.Errorf("Issues.ListLabels returned error: %v", err)
 	}
 
-	want := []*Label{{Name: String("a")}, {Name: String("b")}}
+	want := []*Label{{Name: "a"}, {Name: "b"}}
 	if !cmp.Equal(labels, want) {
 		t.Errorf("Issues.ListLabels returned %+v, want %+v", labels, want)
 	}
@@ -53,30 +52,30 @@ func TestIssuesService_ListLabels(t *testing.T) {
 }
 
 func TestIssuesService_ListLabels_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Issues.ListLabels(ctx, "%", "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_GetLabel(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/labels/n", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"url":"u", "name": "n", "color": "c", "description": "d"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	label, _, err := client.Issues.GetLabel(ctx, "o", "r", "n")
 	if err != nil {
 		t.Errorf("Issues.GetLabel returned error: %v", err)
 	}
 
-	want := &Label{URL: String("u"), Name: String("n"), Color: String("c"), Description: String("d")}
+	want := &Label{URL: "u", Name: "n", Color: "c", Description: new("d")}
 	if !cmp.Equal(label, want) {
 		t.Errorf("Issues.GetLabel returned %+v, want %+v", label, want)
 	}
@@ -97,39 +96,33 @@ func TestIssuesService_GetLabel(t *testing.T) {
 }
 
 func TestIssuesService_GetLabel_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Issues.GetLabel(ctx, "%", "%", "%")
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_CreateLabel(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &Label{Name: String("n")}
+	input := CreateIssueLabelRequest{Name: "n"}
 
 	mux.HandleFunc("/repos/o/r/labels", func(w http.ResponseWriter, r *http.Request) {
-		v := new(Label)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"url":"u"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	label, _, err := client.Issues.CreateLabel(ctx, "o", "r", input)
 	if err != nil {
 		t.Errorf("Issues.CreateLabel returned error: %v", err)
 	}
 
-	want := &Label{URL: String("u")}
+	want := &Label{URL: "u"}
 	if !cmp.Equal(label, want) {
 		t.Errorf("Issues.CreateLabel returned %+v, want %+v", label, want)
 	}
@@ -150,51 +143,45 @@ func TestIssuesService_CreateLabel(t *testing.T) {
 }
 
 func TestIssuesService_CreateLabel_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
-	_, _, err := client.Issues.CreateLabel(ctx, "%", "%", nil)
+	ctx := t.Context()
+	_, _, err := client.Issues.CreateLabel(ctx, "%", "%", CreateIssueLabelRequest{})
 	testURLParseError(t, err)
 }
 
-func TestIssuesService_EditLabel(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestIssuesService_UpdateLabel(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &Label{Name: String("z")}
+	input := UpdateIssueLabelRequest{NewName: new("z")}
 
 	mux.HandleFunc("/repos/o/r/labels/n", func(w http.ResponseWriter, r *http.Request) {
-		v := new(Label)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testPlainBody(t, r, `{"new_name":"z"}`+"\n")
 		fmt.Fprint(w, `{"url":"u"}`)
 	})
 
-	ctx := context.Background()
-	label, _, err := client.Issues.EditLabel(ctx, "o", "r", "n", input)
+	ctx := t.Context()
+	label, _, err := client.Issues.UpdateLabel(ctx, "o", "r", "n", input)
 	if err != nil {
-		t.Errorf("Issues.EditLabel returned error: %v", err)
+		t.Errorf("Issues.UpdateLabel returned error: %v", err)
 	}
 
-	want := &Label{URL: String("u")}
+	want := &Label{URL: "u"}
 	if !cmp.Equal(label, want) {
-		t.Errorf("Issues.EditLabel returned %+v, want %+v", label, want)
+		t.Errorf("Issues.UpdateLabel returned %+v, want %+v", label, want)
 	}
 
-	const methodName = "EditLabel"
+	const methodName = "UpdateLabel"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Issues.EditLabel(ctx, "\n", "\n", "\n", input)
+		_, _, err = client.Issues.UpdateLabel(ctx, "\n", "\n", "\n", UpdateIssueLabelRequest{})
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Issues.EditLabel(ctx, "o", "r", "n", input)
+		got, resp, err := client.Issues.UpdateLabel(ctx, "o", "r", "n", input)
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -202,24 +189,24 @@ func TestIssuesService_EditLabel(t *testing.T) {
 	})
 }
 
-func TestIssuesService_EditLabel_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+func TestIssuesService_UpdateLabel_invalidOwner(t *testing.T) {
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
-	_, _, err := client.Issues.EditLabel(ctx, "%", "%", "%", nil)
+	ctx := t.Context()
+	_, _, err := client.Issues.UpdateLabel(ctx, "%", "%", "%", UpdateIssueLabelRequest{})
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_DeleteLabel(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/labels/n", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/labels/n", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Issues.DeleteLabel(ctx, "o", "r", "n")
 	if err != nil {
 		t.Errorf("Issues.DeleteLabel returned error: %v", err)
@@ -237,17 +224,17 @@ func TestIssuesService_DeleteLabel(t *testing.T) {
 }
 
 func TestIssuesService_DeleteLabel_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Issues.DeleteLabel(ctx, "%", "%", "%")
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_ListLabelsByIssue(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/issues/1/labels", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -256,15 +243,15 @@ func TestIssuesService_ListLabelsByIssue(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	labels, _, err := client.Issues.ListLabelsByIssue(ctx, "o", "r", 1, opt)
 	if err != nil {
 		t.Errorf("Issues.ListLabelsByIssue returned error: %v", err)
 	}
 
 	want := []*Label{
-		{Name: String("a"), ID: Int64(1)},
-		{Name: String("b"), ID: Int64(2)},
+		{Name: "a", ID: 1},
+		{Name: "b", ID: 2},
 	}
 	if !cmp.Equal(labels, want) {
 		t.Errorf("Issues.ListLabelsByIssue returned %+v, want %+v", labels, want)
@@ -286,39 +273,33 @@ func TestIssuesService_ListLabelsByIssue(t *testing.T) {
 }
 
 func TestIssuesService_ListLabelsByIssue_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Issues.ListLabelsByIssue(ctx, "%", "%", 1, nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_AddLabelsToIssue(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	input := []string{"a", "b"}
 
 	mux.HandleFunc("/repos/o/r/issues/1/labels", func(w http.ResponseWriter, r *http.Request) {
-		var v []string
-		json.NewDecoder(r.Body).Decode(&v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `[{"url":"u"}]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	labels, _, err := client.Issues.AddLabelsToIssue(ctx, "o", "r", 1, input)
 	if err != nil {
 		t.Errorf("Issues.AddLabelsToIssue returned error: %v", err)
 	}
 
-	want := []*Label{{URL: String("u")}}
+	want := []*Label{{URL: "u"}}
 	if !cmp.Equal(labels, want) {
 		t.Errorf("Issues.AddLabelsToIssue returned %+v, want %+v", labels, want)
 	}
@@ -339,23 +320,23 @@ func TestIssuesService_AddLabelsToIssue(t *testing.T) {
 }
 
 func TestIssuesService_AddLabelsToIssue_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Issues.AddLabelsToIssue(ctx, "%", "%", 1, nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_RemoveLabelForIssue(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/issues/1/labels/l", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/issues/1/labels/l", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Issues.RemoveLabelForIssue(ctx, "o", "r", 1, "l")
 	if err != nil {
 		t.Errorf("Issues.RemoveLabelForIssue returned error: %v", err)
@@ -373,39 +354,117 @@ func TestIssuesService_RemoveLabelForIssue(t *testing.T) {
 }
 
 func TestIssuesService_RemoveLabelForIssue_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Issues.RemoveLabelForIssue(ctx, "%", "%", 1, "%")
 	testURLParseError(t, err)
 }
 
+func TestIssuesService_labelName_isEscaped(t *testing.T) {
+	t.Parallel()
+	for _, label := range []struct {
+		name        string
+		escapedName string
+	}{
+		{name: "bug", escapedName: "bug"},
+		{name: "good first issue", escapedName: "good%20first%20issue"},
+		{name: "kind/bug", escapedName: "kind%2Fbug"},
+		{name: "bug?", escapedName: "bug%3F"},
+		{name: "C#", escapedName: "C%23"},
+		{name: "100%", escapedName: "100%25"},
+	} {
+		for _, tt := range []struct {
+			method     string
+			wantPath   string
+			wantMethod string
+			body       string
+			call       func(ctx context.Context, client *Client) error
+		}{
+			{
+				method:     "GetLabel",
+				wantPath:   "/repos/o/r/labels/",
+				wantMethod: "GET",
+				body:       `{}`,
+				call: func(ctx context.Context, client *Client) error {
+					_, _, err := client.Issues.GetLabel(ctx, "o", "r", label.name)
+					return err
+				},
+			},
+			{
+				method:     "UpdateLabel",
+				wantPath:   "/repos/o/r/labels/",
+				wantMethod: "PATCH",
+				body:       `{}`,
+				call: func(ctx context.Context, client *Client) error {
+					_, _, err := client.Issues.UpdateLabel(ctx, "o", "r", label.name, UpdateIssueLabelRequest{})
+					return err
+				},
+			},
+			{
+				method:     "DeleteLabel",
+				wantPath:   "/repos/o/r/labels/",
+				wantMethod: "DELETE",
+				call: func(ctx context.Context, client *Client) error {
+					_, err := client.Issues.DeleteLabel(ctx, "o", "r", label.name)
+					return err
+				},
+			},
+			{
+				method:     "RemoveLabelForIssue",
+				wantPath:   "/repos/o/r/issues/1/labels/",
+				wantMethod: "DELETE",
+				call: func(ctx context.Context, client *Client) error {
+					_, err := client.Issues.RemoveLabelForIssue(ctx, "o", "r", 1, label.name)
+					return err
+				},
+			},
+		} {
+			t.Run(tt.method+"/"+label.name, func(t *testing.T) {
+				t.Parallel()
+				client, mux, _ := setup(t)
+
+				mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+					testMethod(t, r, tt.wantMethod)
+					if got, want := r.URL.EscapedPath(), tt.wantPath+label.escapedName; got != want {
+						t.Errorf("Request path = %q, want %q", got, want)
+					}
+					if got, want := r.URL.Path, tt.wantPath+label.name; got != want {
+						t.Errorf("Decoded request path = %q, want %q", got, want)
+					}
+					if tt.body != "" {
+						fmt.Fprint(w, tt.body)
+					}
+				})
+
+				if err := tt.call(t.Context(), client); err != nil {
+					t.Fatalf("Issues.%v returned error: %v", tt.method, err)
+				}
+			})
+		}
+	}
+}
+
 func TestIssuesService_ReplaceLabelsForIssue(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	input := []string{"a", "b"}
 
 	mux.HandleFunc("/repos/o/r/issues/1/labels", func(w http.ResponseWriter, r *http.Request) {
-		var v []string
-		json.NewDecoder(r.Body).Decode(&v)
-
 		testMethod(t, r, "PUT")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `[{"url":"u"}]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	labels, _, err := client.Issues.ReplaceLabelsForIssue(ctx, "o", "r", 1, input)
 	if err != nil {
 		t.Errorf("Issues.ReplaceLabelsForIssue returned error: %v", err)
 	}
 
-	want := []*Label{{URL: String("u")}}
+	want := []*Label{{URL: "u"}}
 	if !cmp.Equal(labels, want) {
 		t.Errorf("Issues.ReplaceLabelsForIssue returned %+v, want %+v", labels, want)
 	}
@@ -426,23 +485,23 @@ func TestIssuesService_ReplaceLabelsForIssue(t *testing.T) {
 }
 
 func TestIssuesService_ReplaceLabelsForIssue_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Issues.ReplaceLabelsForIssue(ctx, "%", "%", 1, nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_RemoveLabelsForIssue(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/issues/1/labels", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/issues/1/labels", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Issues.RemoveLabelsForIssue(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Issues.RemoveLabelsForIssue returned error: %v", err)
@@ -460,17 +519,17 @@ func TestIssuesService_RemoveLabelsForIssue(t *testing.T) {
 }
 
 func TestIssuesService_RemoveLabelsForIssue_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Issues.RemoveLabelsForIssue(ctx, "%", "%", 1)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_ListLabelsForMilestone(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/milestones/1/labels", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -479,13 +538,13 @@ func TestIssuesService_ListLabelsForMilestone(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	labels, _, err := client.Issues.ListLabelsForMilestone(ctx, "o", "r", 1, opt)
 	if err != nil {
 		t.Errorf("Issues.ListLabelsForMilestone returned error: %v", err)
 	}
 
-	want := []*Label{{Name: String("a")}, {Name: String("b")}}
+	want := []*Label{{Name: "a"}, {Name: "b"}}
 	if !cmp.Equal(labels, want) {
 		t.Errorf("Issues.ListLabelsForMilestone returned %+v, want %+v", labels, want)
 	}
@@ -506,36 +565,10 @@ func TestIssuesService_ListLabelsForMilestone(t *testing.T) {
 }
 
 func TestIssuesService_ListLabelsForMilestone_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Issues.ListLabelsForMilestone(ctx, "%", "%", 1, nil)
 	testURLParseError(t, err)
-}
-
-func TestLabel_Marshal(t *testing.T) {
-	testJSONMarshal(t, &Label{}, "{}")
-
-	u := &Label{
-		ID:          Int64(1),
-		URL:         String("url"),
-		Name:        String("name"),
-		Color:       String("color"),
-		Description: String("desc"),
-		Default:     Bool(false),
-		NodeID:      String("nid"),
-	}
-
-	want := `{
-		"id": 1,
-		"url": "url",
-		"name": "name",
-		"color": "color",
-		"description": "desc",
-		"default": false,
-		"node_id": "nid"
-	}`
-
-	testJSONMarshal(t, u, want)
 }

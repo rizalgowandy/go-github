@@ -6,37 +6,35 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestRepositoriesService_ListTrafficReferrers(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/traffic/popular/referrers", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprintf(w, `[{
+		fmt.Fprint(w, `[{
 			"referrer": "Google",
 			"count": 4,
 			"uniques": 3
  		}]`)
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Repositories.ListTrafficReferrers(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("Repositories.ListTrafficReferrers returned error: %+v", err)
 	}
 
 	want := []*TrafficReferrer{{
-		Referrer: String("Google"),
-		Count:    Int(4),
-		Uniques:  Int(3),
+		Referrer: new("Google"),
+		Count:    new(4),
+		Uniques:  new(3),
 	}}
 	if !cmp.Equal(got, want) {
 		t.Errorf("Repositories.ListTrafficReferrers returned %+v, want %+v", got, want)
@@ -58,29 +56,29 @@ func TestRepositoriesService_ListTrafficReferrers(t *testing.T) {
 }
 
 func TestRepositoriesService_ListTrafficPaths(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/traffic/popular/paths", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprintf(w, `[{
+		fmt.Fprint(w, `[{
 			"path": "/github/hubot",
 			"title": "github/hubot: A customizable life embetterment robot.",
 			"count": 3542,
 			"uniques": 2225
  		}]`)
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Repositories.ListTrafficPaths(ctx, "o", "r")
 	if err != nil {
 		t.Errorf("Repositories.ListTrafficPaths returned error: %+v", err)
 	}
 
 	want := []*TrafficPath{{
-		Path:    String("/github/hubot"),
-		Title:   String("github/hubot: A customizable life embetterment robot."),
-		Count:   Int(3542),
-		Uniques: Int(2225),
+		Path:    new("/github/hubot"),
+		Title:   new("github/hubot: A customizable life embetterment robot."),
+		Count:   new(3542),
+		Uniques: new(2225),
 	}}
 	if !cmp.Equal(got, want) {
 		t.Errorf("Repositories.ListTrafficPaths returned %+v, want %+v", got, want)
@@ -102,21 +100,21 @@ func TestRepositoriesService_ListTrafficPaths(t *testing.T) {
 }
 
 func TestRepositoriesService_ListTrafficViews(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/traffic/views", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprintf(w, `{"count": 7,
+		fmt.Fprint(w, `{"count": 7,
 			"uniques": 6,
 			"views": [{
-				"timestamp": "2016-05-31T16:00:00.000Z",
+				"timestamp": `+referenceTimeStr+`,
 				"count": 7,
 				"uniques": 6
 		}]}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Repositories.ListTrafficViews(ctx, "o", "r", nil)
 	if err != nil {
 		t.Errorf("Repositories.ListTrafficViews returned error: %+v", err)
@@ -124,12 +122,12 @@ func TestRepositoriesService_ListTrafficViews(t *testing.T) {
 
 	want := &TrafficViews{
 		Views: []*TrafficData{{
-			Timestamp: &Timestamp{time.Date(2016, time.May, 31, 16, 0, 0, 0, time.UTC)},
-			Count:     Int(7),
-			Uniques:   Int(6),
+			Timestamp: &referenceTimestamp,
+			Count:     new(7),
+			Uniques:   new(6),
 		}},
-		Count:   Int(7),
-		Uniques: Int(6),
+		Count:   new(7),
+		Uniques: new(6),
 	}
 
 	if !cmp.Equal(got, want) {
@@ -152,21 +150,21 @@ func TestRepositoriesService_ListTrafficViews(t *testing.T) {
 }
 
 func TestRepositoriesService_ListTrafficClones(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/traffic/clones", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprintf(w, `{"count": 7,
+		fmt.Fprint(w, `{"count": 7,
 			"uniques": 6,
 			"clones": [{
-				"timestamp": "2016-05-31T16:00:00.00Z",
+				"timestamp": `+referenceTimeStr+`,
 				"count": 7,
 				"uniques": 6
 		}]}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Repositories.ListTrafficClones(ctx, "o", "r", nil)
 	if err != nil {
 		t.Errorf("Repositories.ListTrafficClones returned error: %+v", err)
@@ -174,12 +172,12 @@ func TestRepositoriesService_ListTrafficClones(t *testing.T) {
 
 	want := &TrafficClones{
 		Clones: []*TrafficData{{
-			Timestamp: &Timestamp{time.Date(2016, time.May, 31, 16, 0, 0, 0, time.UTC)},
-			Count:     Int(7),
-			Uniques:   Int(6),
+			Timestamp: &referenceTimestamp,
+			Count:     new(7),
+			Uniques:   new(6),
 		}},
-		Count:   Int(7),
-		Uniques: Int(6),
+		Count:   new(7),
+		Uniques: new(6),
 	}
 
 	if !cmp.Equal(got, want) {

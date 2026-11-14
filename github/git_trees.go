@@ -30,6 +30,13 @@ func (t Tree) String() string {
 // TreeEntry represents the contents of a tree structure. TreeEntry can
 // represent either a blob, a commit (in the case of a submodule), or another
 // tree.
+//
+// When used with [GitService.CreateTree], set Content for small text files,
+// or set SHA to reference an existing blob (use [GitService.CreateBlob] for
+// binary files or large content). To delete an entry, set both Content and SHA
+// to nil; the entry will be serialized with `"sha": null` which the API interprets
+// as a deletion. When deleting, the Type and Mode fields are ignored; only Path
+// is required.
 type TreeEntry struct {
 	SHA     *string `json:"sha,omitempty"`
 	Path    *string `json:"path,omitempty"`
@@ -58,7 +65,8 @@ type treeEntryWithFileDelete struct {
 	URL     *string `json:"url,omitempty"`
 }
 
-func (t *TreeEntry) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements the json.Marshaler interface.
+func (t TreeEntry) MarshalJSON() ([]byte, error) {
 	if t.SHA == nil && t.Content == nil {
 		return json.Marshal(struct {
 			SHA  *string `json:"sha"`
@@ -93,20 +101,22 @@ func (t *TreeEntry) MarshalJSON() ([]byte, error) {
 
 // GetTree fetches the Tree object for a given sha hash from a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/git/#get-a-tree
-func (s *GitService) GetTree(ctx context.Context, owner string, repo string, sha string, recursive bool) (*Tree, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/git/trees?apiVersion=2022-11-28#get-a-tree
+//
+//meta:operation GET /repos/{owner}/{repo}/git/trees/{tree_sha}
+func (s *GitService) GetTree(ctx context.Context, owner, repo, sha string, recursive bool) (*Tree, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/git/trees/%v", owner, repo, sha)
 	if recursive {
 		u += "?recursive=1"
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	t := new(Tree)
-	resp, err := s.client.Do(ctx, req, t)
+	var t *Tree
+	resp, err := s.client.Do(req, &t)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -116,19 +126,27 @@ func (s *GitService) GetTree(ctx context.Context, owner string, repo string, sha
 
 // createTree represents the body of a CreateTree request.
 type createTree struct {
-	BaseTree string        `json:"base_tree,omitempty"`
-	Entries  []interface{} `json:"tree"`
+	BaseTree string `json:"base_tree,omitempty"`
+	Entries  []any  `json:"tree"`
 }
 
 // CreateTree creates a new tree in a repository. If both a tree and a nested
 // path modifying that tree are specified, it will overwrite the contents of
 // that tree with the new path contents and write a new tree out.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/git/#create-a-tree
-func (s *GitService) CreateTree(ctx context.Context, owner string, repo string, baseTree string, entries []*TreeEntry) (*Tree, *Response, error) {
+// When baseTree is provided, entries are merged with that tree: paths not
+// mentioned in entries are preserved from the base tree. If the same path
+// appears multiple times in entries, the last entry wins. To delete an entry,
+// include a [TreeEntry] with the path and both SHA and Content set to nil.
+// Entire directories can be deleted this way.
+//
+// GitHub API docs: https://docs.github.com/rest/git/trees?apiVersion=2022-11-28#create-a-tree
+//
+//meta:operation POST /repos/{owner}/{repo}/git/trees
+func (s *GitService) CreateTree(ctx context.Context, owner, repo, baseTree string, entries []*TreeEntry) (*Tree, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/git/trees", owner, repo)
 
-	newEntries := make([]interface{}, 0, len(entries))
+	newEntries := make([]any, 0, len(entries))
 	for _, entry := range entries {
 		if entry.Content == nil && entry.SHA == nil {
 			newEntries = append(newEntries, treeEntryWithFileDelete{
@@ -147,13 +165,13 @@ func (s *GitService) CreateTree(ctx context.Context, owner string, repo string, 
 		BaseTree: baseTree,
 		Entries:  newEntries,
 	}
-	req, err := s.client.NewRequest("POST", u, body)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	t := new(Tree)
-	resp, err := s.client.Do(ctx, req, t)
+	var t *Tree
+	resp, err := s.client.Do(req, &t)
 	if err != nil {
 		return nil, resp, err
 	}

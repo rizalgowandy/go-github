@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -15,34 +13,27 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestAdminOrgs_Create(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestAdminService_CreateOrg(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	input := &Organization{
-		Login: String("github"),
+		Login: new("github"),
 	}
 
 	mux.HandleFunc("/admin/organizations", func(w http.ResponseWriter, r *http.Request) {
-		v := new(createOrgRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		want := &createOrgRequest{Login: String("github"), Admin: String("ghAdmin")}
-		if !cmp.Equal(v, want) {
-			t.Errorf("Request body = %+v, want %+v", v, want)
-		}
-
+		testJSONBody(t, r, &createOrgRequest{Login: new("github"), Admin: new("ghAdmin")})
 		fmt.Fprint(w, `{"login":"github","id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	org, _, err := client.Admin.CreateOrg(ctx, input, "ghAdmin")
 	if err != nil {
 		t.Errorf("Admin.CreateOrg returned error: %v", err)
 	}
 
-	want := &Organization{ID: Int64(1), Login: String("github")}
+	want := &Organization{ID: new(int64(1)), Login: new("github")}
 	if !cmp.Equal(org, want) {
 		t.Errorf("Admin.CreateOrg returned %+v, want %+v", org, want)
 	}
@@ -57,39 +48,42 @@ func TestAdminOrgs_Create(t *testing.T) {
 	})
 }
 
-func TestAdminOrgs_Rename(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestAdminService_RenameOrg(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	input := &Organization{
-		Login: String("o"),
+		Login: new("o"),
 	}
 
 	mux.HandleFunc("/admin/organizations/o", func(w http.ResponseWriter, r *http.Request) {
-		v := new(renameOrgRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		want := &renameOrgRequest{Login: String("the-new-octocats")}
-		if !cmp.Equal(v, want) {
-			t.Errorf("Request body = %+v, want %+v", v, want)
-		}
-
+		want := &renameOrgRequest{Login: new("the-new-octocats")}
+		testJSONBody(t, r, want)
 		fmt.Fprint(w, `{"message":"Job queued to rename organization. It may take a few minutes to complete.","url":"https://<hostname>/api/v3/organizations/1"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	resp, _, err := client.Admin.RenameOrg(ctx, input, "the-new-octocats")
 	if err != nil {
-		t.Errorf("Admin.RenameOrg returned error: %v", err)
+		t.Errorf("Admin.RenameOrgByName returned error: %v", err)
 	}
 
-	want := &RenameOrgResponse{Message: String("Job queued to rename organization. It may take a few minutes to complete."), URL: String("https://<hostname>/api/v3/organizations/1")}
+	want := &RenameOrgResponse{Message: new("Job queued to rename organization. It may take a few minutes to complete."), URL: new("https://<hostname>/api/v3/organizations/1")}
 	if !cmp.Equal(resp, want) {
-		t.Errorf("Admin.RenameOrg returned %+v, want %+v", resp, want)
+		t.Errorf("Admin.RenameOrgByName returned %+v, want %+v", resp, want)
 	}
 
 	const methodName = "RenameOrg"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Admin.RenameOrg(ctx, nil, "the-new-octocats")
+		return err
+	})
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Admin.RenameOrg(ctx, &Organization{Login: nil}, "the-new-octocats")
+		return err
+	})
+
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
 		got, resp, err := client.Admin.RenameOrg(ctx, input, "the-new-octocats")
 		if got != nil {
@@ -99,32 +93,26 @@ func TestAdminOrgs_Rename(t *testing.T) {
 	})
 }
 
-func TestAdminOrgs_RenameByName(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestAdminService_RenameOrgByName(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/admin/organizations/o", func(w http.ResponseWriter, r *http.Request) {
-		v := new(renameOrgRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		want := &renameOrgRequest{Login: String("the-new-octocats")}
-		if !cmp.Equal(v, want) {
-			t.Errorf("Request body = %+v, want %+v", v, want)
-		}
-
+		want := &renameOrgRequest{Login: new("the-new-octocats")}
+		testJSONBody(t, r, want)
 		fmt.Fprint(w, `{"message":"Job queued to rename organization. It may take a few minutes to complete.","url":"https://<hostname>/api/v3/organizations/1"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	resp, _, err := client.Admin.RenameOrgByName(ctx, "o", "the-new-octocats")
 	if err != nil {
-		t.Errorf("Admin.RenameOrg returned error: %v", err)
+		t.Errorf("Admin.RenameOrgByName returned error: %v", err)
 	}
 
-	want := &RenameOrgResponse{Message: String("Job queued to rename organization. It may take a few minutes to complete."), URL: String("https://<hostname>/api/v3/organizations/1")}
+	want := &RenameOrgResponse{Message: new("Job queued to rename organization. It may take a few minutes to complete."), URL: new("https://<hostname>/api/v3/organizations/1")}
 	if !cmp.Equal(resp, want) {
-		t.Errorf("Admin.RenameOrg returned %+v, want %+v", resp, want)
+		t.Errorf("Admin.RenameOrgByName returned %+v, want %+v", resp, want)
 	}
 
 	const methodName = "RenameOrgByName"
@@ -140,50 +128,4 @@ func TestAdminOrgs_RenameByName(t *testing.T) {
 		}
 		return resp, err
 	})
-}
-
-func TestCreateOrgRequest_Marshal(t *testing.T) {
-	testJSONMarshal(t, &createOrgRequest{}, "{}")
-
-	u := &createOrgRequest{
-		Login: String("l"),
-		Admin: String("a"),
-	}
-
-	want := `{
-		"login": "l",
-		"admin": "a"
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestRenameOrgRequest_Marshal(t *testing.T) {
-	testJSONMarshal(t, &renameOrgRequest{}, "{}")
-
-	u := &renameOrgRequest{
-		Login: String("l"),
-	}
-
-	want := `{
-		"login": "l"
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestRenameOrgResponse_Marshal(t *testing.T) {
-	testJSONMarshal(t, &renameOrgRequest{}, "{}")
-
-	u := &RenameOrgResponse{
-		Message: String("m"),
-		URL:     String("u"),
-	}
-
-	want := `{
-		"message": "m",
-		"url": "u"
-	}`
-
-	testJSONMarshal(t, u, want)
 }

@@ -31,16 +31,18 @@ type AppConfig struct {
 // CompleteAppManifest completes the App manifest handshake flow for the given
 // code.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/apps/#create-a-github-app-from-a-manifest
+// GitHub API docs: https://docs.github.com/rest/apps/apps?apiVersion=2022-11-28#create-a-github-app-from-a-manifest
+//
+//meta:operation POST /app-manifests/{code}/conversions
 func (s *AppsService) CompleteAppManifest(ctx context.Context, code string) (*AppConfig, *Response, error) {
-	u := fmt.Sprintf("app-manifests/%s/conversions", code)
-	req, err := s.client.NewRequest("POST", u, nil)
+	u := fmt.Sprintf("app-manifests/%v/conversions", code)
+	req, err := s.client.NewRequest(ctx, "POST", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	cfg := new(AppConfig)
-	resp, err := s.client.Do(ctx, req, cfg)
+	var cfg *AppConfig
+	resp, err := s.client.Do(req, &cfg)
 	if err != nil {
 		return nil, resp, err
 	}

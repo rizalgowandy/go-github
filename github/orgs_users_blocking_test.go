@@ -6,7 +6,6 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -15,8 +14,8 @@ import (
 )
 
 func TestOrganizationsService_ListBlockedUsers(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/blocks", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -28,13 +27,13 @@ func TestOrganizationsService_ListBlockedUsers(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	blockedUsers, _, err := client.Organizations.ListBlockedUsers(ctx, "o", opt)
 	if err != nil {
 		t.Errorf("Organizations.ListBlockedUsers returned error: %v", err)
 	}
 
-	want := []*User{{Login: String("octocat")}}
+	want := []*User{{Login: new("octocat")}}
 	if !cmp.Equal(blockedUsers, want) {
 		t.Errorf("Organizations.ListBlockedUsers returned %+v, want %+v", blockedUsers, want)
 	}
@@ -55,8 +54,8 @@ func TestOrganizationsService_ListBlockedUsers(t *testing.T) {
 }
 
 func TestOrganizationsService_IsBlocked(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/blocks/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -64,7 +63,7 @@ func TestOrganizationsService_IsBlocked(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	isBlocked, _, err := client.Organizations.IsBlocked(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.IsBlocked returned error: %v", err)
@@ -89,8 +88,8 @@ func TestOrganizationsService_IsBlocked(t *testing.T) {
 }
 
 func TestOrganizationsService_BlockUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/blocks/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
@@ -98,7 +97,7 @@ func TestOrganizationsService_BlockUser(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.BlockUser(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.BlockUser returned error: %v", err)
@@ -116,8 +115,8 @@ func TestOrganizationsService_BlockUser(t *testing.T) {
 }
 
 func TestOrganizationsService_UnblockUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/orgs/o/blocks/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
@@ -125,7 +124,7 @@ func TestOrganizationsService_UnblockUser(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Organizations.UnblockUser(ctx, "o", "u")
 	if err != nil {
 		t.Errorf("Organizations.UnblockUser returned error: %v", err)

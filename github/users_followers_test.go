@@ -6,7 +6,6 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -15,8 +14,8 @@ import (
 )
 
 func TestUsersService_ListFollowers_authenticatedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/followers", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -25,13 +24,13 @@ func TestUsersService_ListFollowers_authenticatedUser(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	users, _, err := client.Users.ListFollowers(ctx, "", opt)
 	if err != nil {
 		t.Errorf("Users.ListFollowers returned error: %v", err)
 	}
 
-	want := []*User{{ID: Int64(1)}}
+	want := []*User{{ID: new(int64(1))}}
 	if !cmp.Equal(users, want) {
 		t.Errorf("Users.ListFollowers returned %+v, want %+v", users, want)
 	}
@@ -52,21 +51,21 @@ func TestUsersService_ListFollowers_authenticatedUser(t *testing.T) {
 }
 
 func TestUsersService_ListFollowers_specifiedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/followers", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `[{"id":1}]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	users, _, err := client.Users.ListFollowers(ctx, "u", nil)
 	if err != nil {
 		t.Errorf("Users.ListFollowers returned error: %v", err)
 	}
 
-	want := []*User{{ID: Int64(1)}}
+	want := []*User{{ID: new(int64(1))}}
 	if !cmp.Equal(users, want) {
 		t.Errorf("Users.ListFollowers returned %+v, want %+v", users, want)
 	}
@@ -87,17 +86,17 @@ func TestUsersService_ListFollowers_specifiedUser(t *testing.T) {
 }
 
 func TestUsersService_ListFollowers_invalidUser(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Users.ListFollowers(ctx, "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestUsersService_ListFollowing_authenticatedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/following", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -106,13 +105,13 @@ func TestUsersService_ListFollowing_authenticatedUser(t *testing.T) {
 	})
 
 	opts := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	users, _, err := client.Users.ListFollowing(ctx, "", opts)
 	if err != nil {
 		t.Errorf("Users.ListFollowing returned error: %v", err)
 	}
 
-	want := []*User{{ID: Int64(1)}}
+	want := []*User{{ID: new(int64(1))}}
 	if !cmp.Equal(users, want) {
 		t.Errorf("Users.ListFollowing returned %+v, want %+v", users, want)
 	}
@@ -133,21 +132,21 @@ func TestUsersService_ListFollowing_authenticatedUser(t *testing.T) {
 }
 
 func TestUsersService_ListFollowing_specifiedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/following", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `[{"id":1}]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	users, _, err := client.Users.ListFollowing(ctx, "u", nil)
 	if err != nil {
 		t.Errorf("Users.ListFollowing returned error: %v", err)
 	}
 
-	want := []*User{{ID: Int64(1)}}
+	want := []*User{{ID: new(int64(1))}}
 	if !cmp.Equal(users, want) {
 		t.Errorf("Users.ListFollowing returned %+v, want %+v", users, want)
 	}
@@ -168,24 +167,24 @@ func TestUsersService_ListFollowing_specifiedUser(t *testing.T) {
 }
 
 func TestUsersService_ListFollowing_invalidUser(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Users.ListFollowing(ctx, "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestUsersService_IsFollowing_authenticatedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/following/t", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	following, _, err := client.Users.IsFollowing(ctx, "", "t")
 	if err != nil {
 		t.Errorf("Users.IsFollowing returned error: %v", err)
@@ -210,15 +209,15 @@ func TestUsersService_IsFollowing_authenticatedUser(t *testing.T) {
 }
 
 func TestUsersService_IsFollowing_specifiedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/following/t", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	following, _, err := client.Users.IsFollowing(ctx, "u", "t")
 	if err != nil {
 		t.Errorf("Users.IsFollowing returned error: %v", err)
@@ -243,15 +242,15 @@ func TestUsersService_IsFollowing_specifiedUser(t *testing.T) {
 }
 
 func TestUsersService_IsFollowing_false(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/following/t", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		w.WriteHeader(http.StatusNotFound)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	following, _, err := client.Users.IsFollowing(ctx, "u", "t")
 	if err != nil {
 		t.Errorf("Users.IsFollowing returned error: %v", err)
@@ -276,18 +275,18 @@ func TestUsersService_IsFollowing_false(t *testing.T) {
 }
 
 func TestUsersService_IsFollowing_error(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/following/t", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		http.Error(w, "BadRequest", http.StatusBadRequest)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	following, _, err := client.Users.IsFollowing(ctx, "u", "t")
 	if err == nil {
-		t.Errorf("Expected HTTP 400 response")
+		t.Error("Expected HTTP 400 response")
 	}
 	if want := false; following != want {
 		t.Errorf("Users.IsFollowing returned %+v, want %+v", following, want)
@@ -309,23 +308,23 @@ func TestUsersService_IsFollowing_error(t *testing.T) {
 }
 
 func TestUsersService_IsFollowing_invalidUser(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Users.IsFollowing(ctx, "%", "%")
 	testURLParseError(t, err)
 }
 
 func TestUsersService_Follow(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/user/following/u", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/user/following/u", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Users.Follow(ctx, "u")
 	if err != nil {
 		t.Errorf("Users.Follow returned error: %v", err)
@@ -343,26 +342,26 @@ func TestUsersService_Follow(t *testing.T) {
 }
 
 func TestUsersService_Follow_invalidUser(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Users.Follow(ctx, "%")
 	testURLParseError(t, err)
 }
 
 func TestUsersService_Unfollow(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/user/following/u", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/user/following/u", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Users.Unfollow(ctx, "u")
 	if err != nil {
-		t.Errorf("Users.Follow returned error: %v", err)
+		t.Errorf("Users.Unfollow returned error: %v", err)
 	}
 
 	const methodName = "Unfollow"
@@ -377,10 +376,10 @@ func TestUsersService_Unfollow(t *testing.T) {
 }
 
 func TestUsersService_Unfollow_invalidUser(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Users.Unfollow(ctx, "%")
 	testURLParseError(t, err)
 }

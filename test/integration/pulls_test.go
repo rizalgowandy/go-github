@@ -4,23 +4,21 @@
 // license that can be found in the LICENSE file.
 
 //go:build integration
-// +build integration
 
 package integration
 
 import (
-	"context"
 	"testing"
 )
 
 func TestPullRequests_ListCommits(t *testing.T) {
-	commits, _, err := client.PullRequests.ListCommits(context.Background(), "google", "go-github", 2, nil)
+	commits, _, err := client.PullRequests.ListCommits(t.Context(), "google", "go-github", 2, nil)
 	if err != nil {
 		t.Fatalf("PullRequests.ListCommits() returned error: %v", err)
 	}
 
 	if got, want := len(commits), 3; got != want {
-		t.Fatalf("PullRequests.ListCommits() returned %d commits, want %d", got, want)
+		t.Fatalf("PullRequests.ListCommits() returned %v commits, want %v", got, want)
 	}
 
 	if got, want := *commits[0].Author.Login, "sqs"; got != want {

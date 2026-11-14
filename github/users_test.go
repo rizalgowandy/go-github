@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -15,68 +13,22 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestUser_Marshal(t *testing.T) {
-	testJSONMarshal(t, &User{}, "{}")
-
-	u := &User{
-		Login:           String("l"),
-		ID:              Int64(1),
-		URL:             String("u"),
-		AvatarURL:       String("a"),
-		GravatarID:      String("g"),
-		Name:            String("n"),
-		Company:         String("c"),
-		Blog:            String("b"),
-		Location:        String("l"),
-		Email:           String("e"),
-		Hireable:        Bool(true),
-		Bio:             String("b"),
-		TwitterUsername: String("t"),
-		PublicRepos:     Int(1),
-		Followers:       Int(1),
-		Following:       Int(1),
-		CreatedAt:       &Timestamp{referenceTime},
-		SuspendedAt:     &Timestamp{referenceTime},
-	}
-	want := `{
-		"login": "l",
-		"id": 1,
-		"avatar_url": "a",
-		"gravatar_id": "g",
-		"name": "n",
-		"company": "c",
-		"blog": "b",
-		"location": "l",
-		"email": "e",
-		"hireable": true,
-		"bio": "b",
-		"twitter_username": "t",
-		"public_repos": 1,
-		"followers": 1,
-		"following": 1,
-		"created_at": ` + referenceTimeStr + `,
-		"suspended_at": ` + referenceTimeStr + `,
-		"url": "u"
-	}`
-	testJSONMarshal(t, u, want)
-}
-
 func TestUsersService_Get_authenticatedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	user, _, err := client.Users.Get(ctx, "")
 	if err != nil {
 		t.Errorf("Users.Get returned error: %v", err)
 	}
 
-	want := &User{ID: Int64(1)}
+	want := &User{ID: new(int64(1))}
 	if !cmp.Equal(user, want) {
 		t.Errorf("Users.Get returned %+v, want %+v", user, want)
 	}
@@ -97,51 +49,51 @@ func TestUsersService_Get_authenticatedUser(t *testing.T) {
 }
 
 func TestUsersService_Get_specifiedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	user, _, err := client.Users.Get(ctx, "u")
 	if err != nil {
 		t.Errorf("Users.Get returned error: %v", err)
 	}
 
-	want := &User{ID: Int64(1)}
+	want := &User{ID: new(int64(1))}
 	if !cmp.Equal(user, want) {
 		t.Errorf("Users.Get returned %+v, want %+v", user, want)
 	}
 }
 
 func TestUsersService_Get_invalidUser(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Users.Get(ctx, "%")
 	testURLParseError(t, err)
 }
 
 func TestUsersService_GetByID(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	user, _, err := client.Users.GetByID(ctx, 1)
 	if err != nil {
 		t.Fatalf("Users.GetByID returned error: %v", err)
 	}
 
-	want := &User{ID: Int64(1)}
+	want := &User{ID: new(int64(1))}
 	if !cmp.Equal(user, want) {
 		t.Errorf("Users.GetByID returned %+v, want %+v", user, want)
 	}
@@ -161,38 +113,32 @@ func TestUsersService_GetByID(t *testing.T) {
 	})
 }
 
-func TestUsersService_Edit(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestUsersService_Update(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &User{Name: String("n")}
+	input := UserUpdateRequest{Name: new("n")}
 
 	mux.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
-		v := new(User)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
-	user, _, err := client.Users.Edit(ctx, input)
+	ctx := t.Context()
+	user, _, err := client.Users.Update(ctx, input)
 	if err != nil {
-		t.Errorf("Users.Edit returned error: %v", err)
+		t.Errorf("Users.Update returned error: %v", err)
 	}
 
-	want := &User{ID: Int64(1)}
+	want := &User{ID: new(int64(1))}
 	if !cmp.Equal(user, want) {
-		t.Errorf("Users.Edit returned %+v, want %+v", user, want)
+		t.Errorf("Users.Update returned %+v, want %+v", user, want)
 	}
 
-	const methodName = "Edit"
+	const methodName = "Update"
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Users.Edit(ctx, input)
+		got, resp, err := client.Users.Update(ctx, input)
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -201,8 +147,8 @@ func TestUsersService_Edit(t *testing.T) {
 }
 
 func TestUsersService_GetHovercard(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/hovercard", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -211,13 +157,13 @@ func TestUsersService_GetHovercard(t *testing.T) {
 	})
 
 	opt := &HovercardOptions{SubjectType: "repository", SubjectID: "20180408"}
-	ctx := context.Background()
+	ctx := t.Context()
 	hovercard, _, err := client.Users.GetHovercard(ctx, "u", opt)
 	if err != nil {
 		t.Errorf("Users.GetHovercard returned error: %v", err)
 	}
 
-	want := &Hovercard{Contexts: []*UserContext{{Message: String("Owns this repository"), Octicon: String("repo")}}}
+	want := &Hovercard{Contexts: []*UserContext{{Message: new("Owns this repository"), Octicon: new("repo")}}}
 	if !cmp.Equal(hovercard, want) {
 		t.Errorf("Users.GetHovercard returned %+v, want %+v", hovercard, want)
 	}
@@ -238,23 +184,23 @@ func TestUsersService_GetHovercard(t *testing.T) {
 }
 
 func TestUsersService_ListAll(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		testFormValues(t, r, values{"since": "1", "page": "2"})
+		testFormValues(t, r, values{"since": "1", "per_page": "30"})
 		fmt.Fprint(w, `[{"id":2}]`)
 	})
 
-	opt := &UserListOptions{1, ListOptions{Page: 2}}
-	ctx := context.Background()
+	opt := &UserListOptions{Since: 1, PerPage: 30}
+	ctx := t.Context()
 	users, _, err := client.Users.ListAll(ctx, opt)
 	if err != nil {
-		t.Errorf("Users.Get returned error: %v", err)
+		t.Errorf("Users.ListAll returned error: %v", err)
 	}
 
-	want := []*User{{ID: Int64(2)}}
+	want := []*User{{ID: new(int64(2))}}
 	if !cmp.Equal(users, want) {
 		t.Errorf("Users.ListAll returned %+v, want %+v", users, want)
 	}
@@ -270,21 +216,21 @@ func TestUsersService_ListAll(t *testing.T) {
 }
 
 func TestUsersService_ListInvitations(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/repository_invitations", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprintf(w, `[{"id":1}, {"id":2}]`)
+		fmt.Fprint(w, `[{"id":1}, {"id":2}]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Users.ListInvitations(ctx, nil)
 	if err != nil {
 		t.Errorf("Users.ListInvitations returned error: %v", err)
 	}
 
-	want := []*RepositoryInvitation{{ID: Int64(1)}, {ID: Int64(2)}}
+	want := []*RepositoryInvitation{{ID: new(int64(1))}, {ID: new(int64(2))}}
 	if !cmp.Equal(got, want) {
 		t.Errorf("Users.ListInvitations = %+v, want %+v", got, want)
 	}
@@ -300,18 +246,18 @@ func TestUsersService_ListInvitations(t *testing.T) {
 }
 
 func TestUsersService_ListInvitations_withOptions(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/repository_invitations", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testFormValues(t, r, values{
 			"page": "2",
 		})
-		fmt.Fprintf(w, `[{"id":1}, {"id":2}]`)
+		fmt.Fprint(w, `[{"id":1}, {"id":2}]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Users.ListInvitations(ctx, &ListOptions{Page: 2})
 	if err != nil {
 		t.Errorf("Users.ListInvitations returned error: %v", err)
@@ -319,15 +265,15 @@ func TestUsersService_ListInvitations_withOptions(t *testing.T) {
 }
 
 func TestUsersService_AcceptInvitation(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/repository_invitations/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PATCH")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, err := client.Users.AcceptInvitation(ctx, 1); err != nil {
 		t.Errorf("Users.AcceptInvitation returned error: %v", err)
 	}
@@ -344,15 +290,15 @@ func TestUsersService_AcceptInvitation(t *testing.T) {
 }
 
 func TestUsersService_DeclineInvitation(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/repository_invitations/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, err := client.Users.DeclineInvitation(ctx, 1); err != nil {
 		t.Errorf("Users.DeclineInvitation returned error: %v", err)
 	}

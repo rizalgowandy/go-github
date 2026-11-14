@@ -6,12 +6,9 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -26,8 +23,8 @@ func tdcEndpointByID(orgID, teamID, discussionNumber, commentNumber string) stri
 }
 
 // "Team Discussion Comments" endpoint, when using a team slug.
-func tdcEndpointBySlug(org, slug, dicsuccionsNumber, commentNumber string) string {
-	out := fmt.Sprintf("/orgs/%v/teams/%v/discussions/%v/comments", org, slug, dicsuccionsNumber)
+func tdcEndpointBySlug(org, slug, discussionNumber, commentNumber string) string {
+	out := fmt.Sprintf("/orgs/%v/teams/%v/discussions/%v/comments", org, slug, discussionNumber)
 	if commentNumber != "" {
 		return fmt.Sprintf("%v/%v", out, commentNumber)
 	}
@@ -35,15 +32,15 @@ func tdcEndpointBySlug(org, slug, dicsuccionsNumber, commentNumber string) strin
 }
 
 func TestTeamsService_ListComments(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	handleFunc := func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testFormValues(t, r, values{
 			"direction": "desc",
 		})
-		fmt.Fprintf(w,
+		fmt.Fprint(w,
 			`[
 				{
 					"author": {
@@ -68,13 +65,13 @@ func TestTeamsService_ListComments(t *testing.T) {
 					"body": "comment",
 					"body_html": "<p>comment</p>",
 					"body_version": "version",
-					"created_at": "2018-01-01T00:00:00Z",
+					"created_at": `+refTimeStr(1136178000)+`,
 					"last_edited_at": null,
 					"discussion_url": "https://api.github.com/teams/2/discussions/3",
 					"html_url": "https://github.com/orgs/1/teams/2/discussions/3/comments/4",
 					"node_id": "node",
 					"number": 4,
-					"updated_at": "2018-01-01T00:00:00Z",
+					"updated_at": `+refTimeStr(1136178001)+`,
 					"url": "https://api.github.com/teams/2/discussions/3/comments/4"
 				}
 			]`)
@@ -83,42 +80,42 @@ func TestTeamsService_ListComments(t *testing.T) {
 	want := []*DiscussionComment{
 		{
 			Author: &User{
-				Login:             String("author"),
-				ID:                Int64(0),
-				AvatarURL:         String("https://avatars1.githubusercontent.com/u/0?v=4"),
-				GravatarID:        String(""),
-				URL:               String("https://api.github.com/users/author"),
-				HTMLURL:           String("https://github.com/author"),
-				FollowersURL:      String("https://api.github.com/users/author/followers"),
-				FollowingURL:      String("https://api.github.com/users/author/following{/other_user}"),
-				GistsURL:          String("https://api.github.com/users/author/gists{/gist_id}"),
-				StarredURL:        String("https://api.github.com/users/author/starred{/owner}{/repo}"),
-				SubscriptionsURL:  String("https://api.github.com/users/author/subscriptions"),
-				OrganizationsURL:  String("https://api.github.com/users/author/orgs"),
-				ReposURL:          String("https://api.github.com/users/author/repos"),
-				EventsURL:         String("https://api.github.com/users/author/events{/privacy}"),
-				ReceivedEventsURL: String("https://api.github.com/users/author/received_events"),
-				Type:              String("User"),
-				SiteAdmin:         Bool(false),
+				Login:             new("author"),
+				ID:                new(int64(0)),
+				AvatarURL:         new("https://avatars1.githubusercontent.com/u/0?v=4"),
+				GravatarID:        new(""),
+				URL:               new("https://api.github.com/users/author"),
+				HTMLURL:           new("https://github.com/author"),
+				FollowersURL:      new("https://api.github.com/users/author/followers"),
+				FollowingURL:      new("https://api.github.com/users/author/following{/other_user}"),
+				GistsURL:          new("https://api.github.com/users/author/gists{/gist_id}"),
+				StarredURL:        new("https://api.github.com/users/author/starred{/owner}{/repo}"),
+				SubscriptionsURL:  new("https://api.github.com/users/author/subscriptions"),
+				OrganizationsURL:  new("https://api.github.com/users/author/orgs"),
+				ReposURL:          new("https://api.github.com/users/author/repos"),
+				EventsURL:         new("https://api.github.com/users/author/events{/privacy}"),
+				ReceivedEventsURL: new("https://api.github.com/users/author/received_events"),
+				Type:              new("User"),
+				SiteAdmin:         new(false),
 			},
-			Body:          String("comment"),
-			BodyHTML:      String("<p>comment</p>"),
-			BodyVersion:   String("version"),
-			CreatedAt:     &Timestamp{time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC)},
+			Body:          new("comment"),
+			BodyHTML:      new("<p>comment</p>"),
+			BodyVersion:   new("version"),
+			CreatedAt:     refTimestamp(1136178000),
 			LastEditedAt:  nil,
-			DiscussionURL: String("https://api.github.com/teams/2/discussions/3"),
-			HTMLURL:       String("https://github.com/orgs/1/teams/2/discussions/3/comments/4"),
-			NodeID:        String("node"),
-			Number:        Int(4),
-			UpdatedAt:     &Timestamp{time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC)},
-			URL:           String("https://api.github.com/teams/2/discussions/3/comments/4"),
+			DiscussionURL: new("https://api.github.com/teams/2/discussions/3"),
+			HTMLURL:       new("https://github.com/orgs/1/teams/2/discussions/3/comments/4"),
+			NodeID:        new("node"),
+			Number:        new(4),
+			UpdatedAt:     refTimestamp(1136178001),
+			URL:           new("https://api.github.com/teams/2/discussions/3/comments/4"),
 		},
 	}
 
 	e := tdcEndpointByID("1", "2", "3", "")
 	mux.HandleFunc(e, handleFunc)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	commentsByID, _, err := client.Teams.ListCommentsByID(ctx, 1, 2, 3,
 		&DiscussionCommentListOptions{Direction: "desc"})
 	if err != nil {
@@ -176,19 +173,19 @@ func TestTeamsService_ListComments(t *testing.T) {
 }
 
 func TestTeamsService_GetComment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	handlerFunc := func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"number":4}`)
 	}
-	want := &DiscussionComment{Number: Int(4)}
+	want := &DiscussionComment{Number: new(4)}
 
 	e := tdcEndpointByID("1", "2", "3", "4")
 	mux.HandleFunc(e, handlerFunc)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	commentByID, _, err := client.Teams.GetCommentByID(ctx, 1, 2, 3, 4)
 	if err != nil {
 		t.Errorf("Teams.GetCommentByID returned error: %v", err)
@@ -240,28 +237,22 @@ func TestTeamsService_GetComment(t *testing.T) {
 }
 
 func TestTeamsService_CreateComment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := DiscussionComment{Body: String("c")}
+	input := DiscussionComment{Body: new("c")}
 
 	handlerFunc := func(w http.ResponseWriter, r *http.Request) {
-		v := new(DiscussionComment)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, &input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"number":4}`)
 	}
-	want := &DiscussionComment{Number: Int(4)}
+	want := &DiscussionComment{Number: new(4)}
 
 	e := tdcEndpointByID("1", "2", "3", "")
 	mux.HandleFunc(e, handlerFunc)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	commentByID, _, err := client.Teams.CreateCommentByID(ctx, 1, 2, 3, input)
 	if err != nil {
 		t.Errorf("Teams.CreateCommentByID returned error: %v", err)
@@ -313,27 +304,21 @@ func TestTeamsService_CreateComment(t *testing.T) {
 }
 
 func TestTeamsService_EditComment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := DiscussionComment{Body: String("e")}
+	input := DiscussionComment{Body: new("e")}
 	handlerFunc := func(w http.ResponseWriter, r *http.Request) {
-		v := new(DiscussionComment)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, &input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"number":4}`)
 	}
-	want := &DiscussionComment{Number: Int(4)}
+	want := &DiscussionComment{Number: new(4)}
 
 	e := tdcEndpointByID("1", "2", "3", "4")
 	mux.HandleFunc(e, handlerFunc)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	commentByID, _, err := client.Teams.EditCommentByID(ctx, 1, 2, 3, 4, input)
 	if err != nil {
 		t.Errorf("Teams.EditCommentByID returned error: %v", err)
@@ -385,17 +370,17 @@ func TestTeamsService_EditComment(t *testing.T) {
 }
 
 func TestTeamsService_DeleteComment(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	handlerFunc := func(w http.ResponseWriter, r *http.Request) {
+	handlerFunc := func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	}
 
 	e := tdcEndpointByID("1", "2", "3", "4")
 	mux.HandleFunc(e, handlerFunc)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Teams.DeleteCommentByID(ctx, 1, 2, 3, 4)
 	if err != nil {
 		t.Errorf("Teams.DeleteCommentByID returned error: %v", err)

@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -17,15 +15,15 @@ import (
 )
 
 func TestActivityService_ListNotification(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/notifications", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testFormValues(t, r, values{
 			"all":           "true",
 			"participating": "true",
-			"since":         "2006-01-02T15:04:05Z",
+			"since":         referenceTimeRaw,
 			"before":        "2007-03-04T15:04:05Z",
 		})
 
@@ -35,16 +33,16 @@ func TestActivityService_ListNotification(t *testing.T) {
 	opt := &NotificationListOptions{
 		All:           true,
 		Participating: true,
-		Since:         time.Date(2006, time.January, 02, 15, 04, 05, 0, time.UTC),
-		Before:        time.Date(2007, time.March, 04, 15, 04, 05, 0, time.UTC),
+		Since:         referenceTime,
+		Before:        time.Date(2007, time.March, 4, 15, 4, 5, 0, time.UTC),
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	notifications, _, err := client.Activity.ListNotifications(ctx, opt)
 	if err != nil {
 		t.Errorf("Activity.ListNotifications returned error: %v", err)
 	}
 
-	want := []*Notification{{ID: String("1"), Subject: &NotificationSubject{Title: String("t")}}}
+	want := []*Notification{{ID: new("1"), Subject: &NotificationSubject{Title: new("t")}}}
 	if !cmp.Equal(notifications, want) {
 		t.Errorf("Activity.ListNotifications returned %+v, want %+v", notifications, want)
 	}
@@ -59,29 +57,29 @@ func TestActivityService_ListNotification(t *testing.T) {
 	})
 }
 
-func TestActivityService_ListRepositoryNotification(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestActivityService_ListRepositoryNotifications(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/notifications", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `[{"id":"1"}]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	notifications, _, err := client.Activity.ListRepositoryNotifications(ctx, "o", "r", nil)
 	if err != nil {
 		t.Errorf("Activity.ListRepositoryNotifications returned error: %v", err)
 	}
 
-	want := []*Notification{{ID: String("1")}}
+	want := []*Notification{{ID: new("1")}}
 	if !cmp.Equal(notifications, want) {
 		t.Errorf("Activity.ListRepositoryNotifications returned %+v, want %+v", notifications, want)
 	}
 
 	const methodName = "ListRepositoryNotifications"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Activity.ListRepositoryNotifications(ctx, "\n", "\n", nil)
+		_, _, err = client.Activity.ListRepositoryNotifications(ctx, "\n", "\n", &NotificationListOptions{})
 		return err
 	})
 
@@ -95,74 +93,123 @@ func TestActivityService_ListRepositoryNotification(t *testing.T) {
 }
 
 func TestActivityService_MarkNotificationsRead(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/notifications", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
 		testHeader(t, r, "Content-Type", "application/json")
-		testBody(t, r, `{"last_read_at":"2006-01-02T15:04:05Z"}`+"\n")
+		want := markReadOptions{
+			LastReadAt: referenceTimestamp,
+		}
+		testJSONBody(t, r, want)
 
 		w.WriteHeader(http.StatusResetContent)
 	})
 
-	ctx := context.Background()
-	_, err := client.Activity.MarkNotificationsRead(ctx, time.Date(2006, time.January, 02, 15, 04, 05, 0, time.UTC))
+	ctx := t.Context()
+	_, err := client.Activity.MarkNotificationsRead(ctx, referenceTimestamp)
 	if err != nil {
 		t.Errorf("Activity.MarkNotificationsRead returned error: %v", err)
 	}
 
 	const methodName = "MarkNotificationsRead"
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		return client.Activity.MarkNotificationsRead(ctx, time.Date(2006, time.January, 02, 15, 04, 05, 0, time.UTC))
+		return client.Activity.MarkNotificationsRead(ctx, referenceTimestamp)
 	})
 }
 
-func TestActivityService_MarkRepositoryNotificationsRead(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+func TestActivityService_MarkNotificationsRead_EmptyLastReadAt(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/notifications", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/notifications", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PUT")
 		testHeader(t, r, "Content-Type", "application/json")
-		testBody(t, r, `{"last_read_at":"2006-01-02T15:04:05Z"}`+"\n")
+		want := markReadOptions{
+			LastReadAt: referenceTimestamp,
+		}
+		testJSONBody(t, r, want)
 
 		w.WriteHeader(http.StatusResetContent)
 	})
 
-	ctx := context.Background()
-	_, err := client.Activity.MarkRepositoryNotificationsRead(ctx, "o", "r", time.Date(2006, time.January, 02, 15, 04, 05, 0, time.UTC))
+	ctx := t.Context()
+	_, err := client.Activity.MarkNotificationsRead(ctx, referenceTimestamp)
+	if err != nil {
+		t.Errorf("Activity.MarkNotificationsRead returned error: %v", err)
+	}
+}
+
+func TestActivityService_MarkRepositoryNotificationsRead(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/notifications", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		testHeader(t, r, "Content-Type", "application/json")
+		want := markReadOptions{
+			LastReadAt: referenceTimestamp,
+		}
+		testJSONBody(t, r, want)
+		w.WriteHeader(http.StatusResetContent)
+	})
+
+	ctx := t.Context()
+	_, err := client.Activity.MarkRepositoryNotificationsRead(ctx, "o", "r", referenceTimestamp)
 	if err != nil {
 		t.Errorf("Activity.MarkRepositoryNotificationsRead returned error: %v", err)
 	}
 
 	const methodName = "MarkRepositoryNotificationsRead"
 	testBadOptions(t, methodName, func() (err error) {
-		_, err = client.Activity.MarkRepositoryNotificationsRead(ctx, "\n", "\n", time.Date(2006, time.January, 02, 15, 04, 05, 0, time.UTC))
+		_, err = client.Activity.MarkRepositoryNotificationsRead(ctx, "\n", "\n", referenceTimestamp)
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		return client.Activity.MarkRepositoryNotificationsRead(ctx, "o", "r", time.Date(2006, time.January, 02, 15, 04, 05, 0, time.UTC))
+		return client.Activity.MarkRepositoryNotificationsRead(ctx, "o", "r", referenceTimestamp)
 	})
 }
 
+func TestActivityService_MarkRepositoryNotificationsRead_EmptyLastReadAt(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/repos/o/r/notifications", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		testHeader(t, r, "Content-Type", "application/json")
+		want := markReadOptions{
+			LastReadAt: referenceTimestamp,
+		}
+		testJSONBody(t, r, want)
+
+		w.WriteHeader(http.StatusResetContent)
+	})
+
+	ctx := t.Context()
+	_, err := client.Activity.MarkRepositoryNotificationsRead(ctx, "o", "r", referenceTimestamp)
+	if err != nil {
+		t.Errorf("Activity.MarkRepositoryNotificationsRead returned error: %v", err)
+	}
+}
+
 func TestActivityService_GetThread(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/notifications/threads/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":"1"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	notification, _, err := client.Activity.GetThread(ctx, "1")
 	if err != nil {
 		t.Errorf("Activity.GetThread returned error: %v", err)
 	}
 
-	want := &Notification{ID: String("1")}
+	want := &Notification{ID: new("1")}
 	if !cmp.Equal(notification, want) {
 		t.Errorf("Activity.GetThread returned %+v, want %+v", notification, want)
 	}
@@ -183,15 +230,15 @@ func TestActivityService_GetThread(t *testing.T) {
 }
 
 func TestActivityService_MarkThreadRead(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/notifications/threads/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PATCH")
 		w.WriteHeader(http.StatusResetContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Activity.MarkThreadRead(ctx, "1")
 	if err != nil {
 		t.Errorf("Activity.MarkThreadRead returned error: %v", err)
@@ -208,22 +255,48 @@ func TestActivityService_MarkThreadRead(t *testing.T) {
 	})
 }
 
+func TestActivityService_MarkThreadDone(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/notifications/threads/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "DELETE")
+		w.WriteHeader(http.StatusResetContent)
+	})
+
+	ctx := t.Context()
+	_, err := client.Activity.MarkThreadDone(ctx, "1")
+	if err != nil {
+		t.Errorf("Activity.MarkThreadDone returned error: %v", err)
+	}
+
+	const methodName = "MarkThreadDone"
+	testBadOptions(t, methodName, func() (err error) {
+		_, err = client.Activity.MarkThreadDone(ctx, "\n")
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		return client.Activity.MarkThreadDone(ctx, "1")
+	})
+}
+
 func TestActivityService_GetThreadSubscription(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/notifications/threads/1/subscription", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"subscribed":true}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	sub, _, err := client.Activity.GetThreadSubscription(ctx, "1")
 	if err != nil {
 		t.Errorf("Activity.GetThreadSubscription returned error: %v", err)
 	}
 
-	want := &Subscription{Subscribed: Bool(true)}
+	want := &Subscription{Subscribed: new(true)}
 	if !cmp.Equal(sub, want) {
 		t.Errorf("Activity.GetThreadSubscription returned %+v, want %+v", sub, want)
 	}
@@ -244,42 +317,36 @@ func TestActivityService_GetThreadSubscription(t *testing.T) {
 }
 
 func TestActivityService_SetThreadSubscription(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &Subscription{Subscribed: Bool(true)}
+	body := SetThreadSubscriptionRequest{Ignored: new(true)}
 
 	mux.HandleFunc("/notifications/threads/1/subscription", func(w http.ResponseWriter, r *http.Request) {
-		v := new(Subscription)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PUT")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, body)
 		fmt.Fprint(w, `{"ignored":true}`)
 	})
 
-	ctx := context.Background()
-	sub, _, err := client.Activity.SetThreadSubscription(ctx, "1", input)
+	ctx := t.Context()
+	sub, _, err := client.Activity.SetThreadSubscription(ctx, "1", body)
 	if err != nil {
 		t.Errorf("Activity.SetThreadSubscription returned error: %v", err)
 	}
 
-	want := &Subscription{Ignored: Bool(true)}
+	want := &Subscription{Ignored: new(true)}
 	if !cmp.Equal(sub, want) {
 		t.Errorf("Activity.SetThreadSubscription returned %+v, want %+v", sub, want)
 	}
 
 	const methodName = "SetThreadSubscription"
 	testBadOptions(t, methodName, func() (err error) {
-		_, _, err = client.Activity.SetThreadSubscription(ctx, "\n", input)
+		_, _, err = client.Activity.SetThreadSubscription(ctx, "\n", body)
 		return err
 	})
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Activity.SetThreadSubscription(ctx, "1", input)
+		got, resp, err := client.Activity.SetThreadSubscription(ctx, "1", body)
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -288,15 +355,15 @@ func TestActivityService_SetThreadSubscription(t *testing.T) {
 }
 
 func TestActivityService_DeleteThreadSubscription(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/notifications/threads/1/subscription", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Activity.DeleteThreadSubscription(ctx, "1")
 	if err != nil {
 		t.Errorf("Activity.DeleteThreadSubscription returned error: %v", err)
@@ -311,84 +378,4 @@ func TestActivityService_DeleteThreadSubscription(t *testing.T) {
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
 		return client.Activity.DeleteThreadSubscription(ctx, "1")
 	})
-}
-
-func TestNotification_Marshal(t *testing.T) {
-	testJSONMarshal(t, &Notification{}, "{}")
-
-	u := &Notification{
-		ID: String("id"),
-		Repository: &Repository{
-			ID:   Int64(1),
-			URL:  String("u"),
-			Name: String("n"),
-		},
-		Subject: &NotificationSubject{
-			Title:            String("t"),
-			URL:              String("u"),
-			LatestCommentURL: String("l"),
-			Type:             String("t"),
-		},
-		Reason:     String("r"),
-		Unread:     Bool(true),
-		UpdatedAt:  &referenceTime,
-		LastReadAt: &referenceTime,
-		URL:        String("u"),
-	}
-
-	want := `{
-		"id": "id",
-		"repository": {
-			"id": 1,
-			"url": "u",
-			"name": "n"
-		},
-		"subject": {
-			"title": "t",
-			"url": "u",
-			"latest_comment_url": "l",
-			"type": "t"
-		},
-		"reason": "r",
-		"unread": true,
-		"updated_at": ` + referenceTimeStr + `,
-		"last_read_at": ` + referenceTimeStr + `,
-		"url": "u"
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestNotificationSubject_Marshal(t *testing.T) {
-	testJSONMarshal(t, &NotificationSubject{}, "{}")
-
-	u := &NotificationSubject{
-		Title:            String("t"),
-		URL:              String("u"),
-		LatestCommentURL: String("l"),
-		Type:             String("t"),
-	}
-
-	want := `{
-		"title": "t",
-		"url": "u",
-		"latest_comment_url": "l",
-		"type": "t"
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestMarkReadOptions_Marshal(t *testing.T) {
-	testJSONMarshal(t, &markReadOptions{}, "{}")
-
-	u := &markReadOptions{
-		LastReadAt: referenceTime,
-	}
-
-	want := `{
-		"last_read_at": ` + referenceTimeStr + `
-	}`
-
-	testJSONMarshal(t, u, want)
 }

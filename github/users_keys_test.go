@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -16,8 +14,8 @@ import (
 )
 
 func TestUsersService_ListKeys_authenticatedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/keys", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -26,13 +24,13 @@ func TestUsersService_ListKeys_authenticatedUser(t *testing.T) {
 	})
 
 	opt := &ListOptions{Page: 2}
-	ctx := context.Background()
+	ctx := t.Context()
 	keys, _, err := client.Users.ListKeys(ctx, "", opt)
 	if err != nil {
 		t.Errorf("Users.ListKeys returned error: %v", err)
 	}
 
-	want := []*Key{{ID: Int64(1)}}
+	want := []*Key{{ID: new(int64(1))}}
 	if !cmp.Equal(keys, want) {
 		t.Errorf("Users.ListKeys returned %+v, want %+v", keys, want)
 	}
@@ -53,51 +51,51 @@ func TestUsersService_ListKeys_authenticatedUser(t *testing.T) {
 }
 
 func TestUsersService_ListKeys_specifiedUser(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/users/u/keys", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `[{"id":1}]`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	keys, _, err := client.Users.ListKeys(ctx, "u", nil)
 	if err != nil {
 		t.Errorf("Users.ListKeys returned error: %v", err)
 	}
 
-	want := []*Key{{ID: Int64(1)}}
+	want := []*Key{{ID: new(int64(1))}}
 	if !cmp.Equal(keys, want) {
 		t.Errorf("Users.ListKeys returned %+v, want %+v", keys, want)
 	}
 }
 
 func TestUsersService_ListKeys_invalidUser(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Users.ListKeys(ctx, "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestUsersService_GetKey(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/keys/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	key, _, err := client.Users.GetKey(ctx, 1)
 	if err != nil {
 		t.Errorf("Users.GetKey returned error: %v", err)
 	}
 
-	want := &Key{ID: Int64(1)}
+	want := &Key{ID: new(int64(1))}
 	if !cmp.Equal(key, want) {
 		t.Errorf("Users.GetKey returned %+v, want %+v", key, want)
 	}
@@ -118,32 +116,26 @@ func TestUsersService_GetKey(t *testing.T) {
 }
 
 func TestUsersService_CreateKey(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &Key{Key: String("k"), Title: String("t")}
+	input := CreateUserKeyRequest{Key: "k", Title: new("t")}
 
 	mux.HandleFunc("/user/keys", func(w http.ResponseWriter, r *http.Request) {
-		v := new(Key)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	key, _, err := client.Users.CreateKey(ctx, input)
 	if err != nil {
-		t.Errorf("Users.GetKey returned error: %v", err)
+		t.Errorf("Users.CreateKey returned error: %v", err)
 	}
 
-	want := &Key{ID: Int64(1)}
+	want := &Key{ID: new(int64(1))}
 	if !cmp.Equal(key, want) {
-		t.Errorf("Users.GetKey returned %+v, want %+v", key, want)
+		t.Errorf("Users.CreateKey returned %+v, want %+v", key, want)
 	}
 
 	const methodName = "CreateKey"
@@ -157,14 +149,14 @@ func TestUsersService_CreateKey(t *testing.T) {
 }
 
 func TestUsersService_DeleteKey(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/user/keys/1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/user/keys/1", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Users.DeleteKey(ctx, 1)
 	if err != nil {
 		t.Errorf("Users.DeleteKey returned error: %v", err)

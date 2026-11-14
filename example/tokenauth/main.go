@@ -3,7 +3,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// The tokenauth command demonstrates using the oauth2.StaticTokenSource.
+// The tokenauth command demonstrates using a Personal Access Token (PAT) to
+// authenticate with GitHub.
 // You can test out a GitHub Personal Access Token using this simple example.
 // You can generate them here: https://github.com/settings/tokens
 package main
@@ -12,31 +13,26 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"syscall"
+	"os"
 
-	"github.com/google/go-github/v39/github"
-	"golang.org/x/crypto/ssh/terminal"
-	"golang.org/x/oauth2"
+	"github.com/google/go-github/v93/github"
+	"golang.org/x/term"
 )
 
 func main() {
 	fmt.Print("GitHub Token: ")
-	byteToken, _ := terminal.ReadPassword(int(syscall.Stdin))
-	println()
-	token := string(byteToken)
+	token, _ := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Println()
 
 	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-
-	client := github.NewClient(tc)
+	client, err := github.NewClient(github.WithAuthToken(string(token)))
+	if err != nil {
+		log.Fatalf("Error creating GitHub client: %v", err)
+	}
 
 	user, resp, err := client.Users.Get(ctx, "")
 	if err != nil {
-		fmt.Printf("\nerror: %v\n", err)
-		return
+		log.Fatalf("Error fetching user: %v", err)
 	}
 
 	// Rate.Limit should most likely be 5000 when authorized.

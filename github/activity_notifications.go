@@ -19,12 +19,12 @@ type Notification struct {
 
 	// Reason identifies the event that triggered the notification.
 	//
-	// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity#notification-reasons
+	// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#notification-reasons
 	Reason *string `json:"reason,omitempty"`
 
 	Unread     *bool      `json:"unread,omitempty"`
-	UpdatedAt  *time.Time `json:"updated_at,omitempty"`
-	LastReadAt *time.Time `json:"last_read_at,omitempty"`
+	UpdatedAt  *Timestamp `json:"updated_at,omitempty"`
+	LastReadAt *Timestamp `json:"last_read_at,omitempty"`
 	URL        *string    `json:"url,omitempty"`
 }
 
@@ -49,7 +49,9 @@ type NotificationListOptions struct {
 
 // ListNotifications lists all notifications for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#list-notifications-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#list-notifications-for-the-authenticated-user
+//
+//meta:operation GET /notifications
 func (s *ActivityService) ListNotifications(ctx context.Context, opts *NotificationListOptions) ([]*Notification, *Response, error) {
 	u := "notifications"
 	u, err := addOptions(u, opts)
@@ -57,13 +59,13 @@ func (s *ActivityService) ListNotifications(ctx context.Context, opts *Notificat
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var notifications []*Notification
-	resp, err := s.client.Do(ctx, req, &notifications)
+	resp, err := s.client.Do(req, &notifications)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -74,7 +76,9 @@ func (s *ActivityService) ListNotifications(ctx context.Context, opts *Notificat
 // ListRepositoryNotifications lists all notifications in a given repository
 // for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#list-repository-notifications-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#list-repository-notifications-for-the-authenticated-user
+//
+//meta:operation GET /repos/{owner}/{repo}/notifications
 func (s *ActivityService) ListRepositoryNotifications(ctx context.Context, owner, repo string, opts *NotificationListOptions) ([]*Notification, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/notifications", owner, repo)
 	u, err := addOptions(u, opts)
@@ -82,13 +86,13 @@ func (s *ActivityService) ListRepositoryNotifications(ctx context.Context, owner
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var notifications []*Notification
-	resp, err := s.client.Do(ctx, req, &notifications)
+	resp, err := s.client.Do(req, &notifications)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -97,54 +101,62 @@ func (s *ActivityService) ListRepositoryNotifications(ctx context.Context, owner
 }
 
 type markReadOptions struct {
-	LastReadAt time.Time `json:"last_read_at,omitempty"`
+	LastReadAt Timestamp `json:"last_read_at,omitzero"`
 }
 
 // MarkNotificationsRead marks all notifications up to lastRead as read.
+// If lastRead is the zero value, all notifications in the repository are marked as read.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity#mark-as-read
-func (s *ActivityService) MarkNotificationsRead(ctx context.Context, lastRead time.Time) (*Response, error) {
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#mark-notifications-as-read
+//
+//meta:operation PUT /notifications
+func (s *ActivityService) MarkNotificationsRead(ctx context.Context, lastRead Timestamp) (*Response, error) {
 	opts := &markReadOptions{
 		LastReadAt: lastRead,
 	}
-	req, err := s.client.NewRequest("PUT", "notifications", opts)
+	req, err := s.client.NewRequest(ctx, "PUT", "notifications", opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // MarkRepositoryNotificationsRead marks all notifications up to lastRead in
 // the specified repository as read.
+// If lastRead is the zero value, all notifications in the repository are marked as read.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#mark-repository-notifications-as-read
-func (s *ActivityService) MarkRepositoryNotificationsRead(ctx context.Context, owner, repo string, lastRead time.Time) (*Response, error) {
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#mark-repository-notifications-as-read
+//
+//meta:operation PUT /repos/{owner}/{repo}/notifications
+func (s *ActivityService) MarkRepositoryNotificationsRead(ctx context.Context, owner, repo string, lastRead Timestamp) (*Response, error) {
 	opts := &markReadOptions{
 		LastReadAt: lastRead,
 	}
 	u := fmt.Sprintf("repos/%v/%v/notifications", owner, repo)
-	req, err := s.client.NewRequest("PUT", u, opts)
+	req, err := s.client.NewRequest(ctx, "PUT", u, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // GetThread gets the specified notification thread.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#get-a-thread
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#get-a-thread
+//
+//meta:operation GET /notifications/threads/{thread_id}
 func (s *ActivityService) GetThread(ctx context.Context, id string) (*Notification, *Response, error) {
 	u := fmt.Sprintf("notifications/threads/%v", id)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	notification := new(Notification)
-	resp, err := s.client.Do(ctx, req, notification)
+	var notification *Notification
+	resp, err := s.client.Do(req, &notification)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -154,32 +166,53 @@ func (s *ActivityService) GetThread(ctx context.Context, id string) (*Notificati
 
 // MarkThreadRead marks the specified thread as read.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#mark-a-thread-as-read
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#mark-a-thread-as-read
+//
+//meta:operation PATCH /notifications/threads/{thread_id}
 func (s *ActivityService) MarkThreadRead(ctx context.Context, id string) (*Response, error) {
 	u := fmt.Sprintf("notifications/threads/%v", id)
 
-	req, err := s.client.NewRequest("PATCH", u, nil)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
+}
+
+// MarkThreadDone marks the specified thread as done.
+// Marking a thread as "done" is equivalent to marking a notification in your notification inbox on GitHub as done.
+//
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#mark-a-thread-as-done
+//
+//meta:operation DELETE /notifications/threads/{thread_id}
+func (s *ActivityService) MarkThreadDone(ctx context.Context, id string) (*Response, error) {
+	u := fmt.Sprintf("notifications/threads/%v", id)
+
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
 }
 
 // GetThreadSubscription checks to see if the authenticated user is subscribed
 // to a thread.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#get-a-thread-subscription-for-the-authenticated-user
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#get-a-thread-subscription-for-the-authenticated-user
+//
+//meta:operation GET /notifications/threads/{thread_id}/subscription
 func (s *ActivityService) GetThreadSubscription(ctx context.Context, id string) (*Subscription, *Response, error) {
 	u := fmt.Sprintf("notifications/threads/%v/subscription", id)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sub := new(Subscription)
-	resp, err := s.client.Do(ctx, req, sub)
+	var sub *Subscription
+	resp, err := s.client.Do(req, &sub)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -187,20 +220,27 @@ func (s *ActivityService) GetThreadSubscription(ctx context.Context, id string) 
 	return sub, resp, nil
 }
 
+// SetThreadSubscriptionRequest represents the request body for SetThreadSubscription.
+type SetThreadSubscriptionRequest struct {
+	Ignored *bool `json:"ignored,omitempty"`
+}
+
 // SetThreadSubscription sets the subscription for the specified thread for the
 // authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#set-a-thread-subscription
-func (s *ActivityService) SetThreadSubscription(ctx context.Context, id string, subscription *Subscription) (*Subscription, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#set-a-thread-subscription
+//
+//meta:operation PUT /notifications/threads/{thread_id}/subscription
+func (s *ActivityService) SetThreadSubscription(ctx context.Context, id string, body SetThreadSubscriptionRequest) (*Subscription, *Response, error) {
 	u := fmt.Sprintf("notifications/threads/%v/subscription", id)
 
-	req, err := s.client.NewRequest("PUT", u, subscription)
+	req, err := s.client.NewRequest(ctx, "PUT", u, &body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sub := new(Subscription)
-	resp, err := s.client.Do(ctx, req, sub)
+	var sub *Subscription
+	resp, err := s.client.Do(req, &sub)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -211,13 +251,15 @@ func (s *ActivityService) SetThreadSubscription(ctx context.Context, id string, 
 // DeleteThreadSubscription deletes the subscription for the specified thread
 // for the authenticated user.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/activity/#delete-a-thread-subscription
+// GitHub API docs: https://docs.github.com/rest/activity/notifications?apiVersion=2022-11-28#delete-a-thread-subscription
+//
+//meta:operation DELETE /notifications/threads/{thread_id}/subscription
 func (s *ActivityService) DeleteThreadSubscription(ctx context.Context, id string) (*Response, error) {
 	u := fmt.Sprintf("notifications/threads/%v/subscription", id)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

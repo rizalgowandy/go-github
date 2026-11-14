@@ -1,11 +1,16 @@
 module github.com/google/go-github/scrape
 
-go 1.13
+go 1.26.0
 
 require (
-	github.com/PuerkitoBio/goquery v1.7.1
-	github.com/google/go-cmp v0.5.6
-	github.com/google/go-github/v39 v39.1.0
-	github.com/xlzd/gotp v0.0.0-20181030022105-c8557ba2c119
-	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
+	github.com/PuerkitoBio/goquery v1.13.0
+	github.com/google/go-cmp v0.7.0
+	github.com/google/go-github/v93 v93.0.0
+	github.com/xlzd/gotp v0.1.0
+	golang.org/x/net v0.62.0
+)
+
+require (
+	github.com/andybalholm/cascadia v1.3.4 // indirect
+	github.com/google/go-querystring v1.2.0 // indirect
 )

@@ -10,7 +10,7 @@ import (
 	"fmt"
 )
 
-// DiscussionComment represents a GitHub dicussion in a team.
+// DiscussionComment represents a GitHub discussion in a team.
 type DiscussionComment struct {
 	Author        *User      `json:"author,omitempty"`
 	Body          *string    `json:"body,omitempty"`
@@ -43,21 +43,25 @@ type DiscussionCommentListOptions struct {
 // ListCommentsByID lists all comments on a team discussion by team ID.
 // Authenticated user must grant read:discussion scope.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#list-discussion-comments
-func (s *TeamsService) ListCommentsByID(ctx context.Context, orgID, teamID int64, discussionNumber int, options *DiscussionCommentListOptions) ([]*DiscussionComment, *Response, error) {
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#list-discussion-comments
+//
+//meta:operation GET /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments
+func (s *TeamsService) ListCommentsByID(ctx context.Context, orgID, teamID int64, discussionNumber int, opts *DiscussionCommentListOptions) ([]*DiscussionComment, *Response, error) {
 	u := fmt.Sprintf("organizations/%v/team/%v/discussions/%v/comments", orgID, teamID, discussionNumber)
-	u, err := addOptions(u, options)
+	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var comments []*DiscussionComment
-	resp, err := s.client.Do(ctx, req, &comments)
+	resp, err := s.client.Do(req, &comments)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -68,21 +72,25 @@ func (s *TeamsService) ListCommentsByID(ctx context.Context, orgID, teamID int64
 // ListCommentsBySlug lists all comments on a team discussion by team slug.
 // Authenticated user must grant read:discussion scope.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#list-discussion-comments
-func (s *TeamsService) ListCommentsBySlug(ctx context.Context, org, slug string, discussionNumber int, options *DiscussionCommentListOptions) ([]*DiscussionComment, *Response, error) {
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#list-discussion-comments
+//
+//meta:operation GET /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments
+func (s *TeamsService) ListCommentsBySlug(ctx context.Context, org, slug string, discussionNumber int, opts *DiscussionCommentListOptions) ([]*DiscussionComment, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/teams/%v/discussions/%v/comments", org, slug, discussionNumber)
-	u, err := addOptions(u, options)
+	u, err := addOptions(u, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var comments []*DiscussionComment
-	resp, err := s.client.Do(ctx, req, &comments)
+	resp, err := s.client.Do(req, &comments)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -93,16 +101,20 @@ func (s *TeamsService) ListCommentsBySlug(ctx context.Context, org, slug string,
 // GetCommentByID gets a specific comment on a team discussion by team ID.
 // Authenticated user must grant read:discussion scope.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#get-a-discussion-comment
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#get-a-discussion-comment
+//
+//meta:operation GET /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments/{comment_number}
 func (s *TeamsService) GetCommentByID(ctx context.Context, orgID, teamID int64, discussionNumber, commentNumber int) (*DiscussionComment, *Response, error) {
 	u := fmt.Sprintf("organizations/%v/team/%v/discussions/%v/comments/%v", orgID, teamID, discussionNumber, commentNumber)
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	discussionComment := &DiscussionComment{}
-	resp, err := s.client.Do(ctx, req, discussionComment)
+	var discussionComment *DiscussionComment
+	resp, err := s.client.Do(req, &discussionComment)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -113,17 +125,21 @@ func (s *TeamsService) GetCommentByID(ctx context.Context, orgID, teamID int64, 
 // GetCommentBySlug gets a specific comment on a team discussion by team slug.
 // Authenticated user must grant read:discussion scope.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#get-a-discussion-comment
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#get-a-discussion-comment
+//
+//meta:operation GET /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments/{comment_number}
 func (s *TeamsService) GetCommentBySlug(ctx context.Context, org, slug string, discussionNumber, commentNumber int) (*DiscussionComment, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/teams/%v/discussions/%v/comments/%v", org, slug, discussionNumber, commentNumber)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	discussionComment := &DiscussionComment{}
-	resp, err := s.client.Do(ctx, req, discussionComment)
+	var discussionComment *DiscussionComment
+	resp, err := s.client.Do(req, &discussionComment)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -134,16 +150,20 @@ func (s *TeamsService) GetCommentBySlug(ctx context.Context, org, slug string, d
 // CreateCommentByID creates a new comment on a team discussion by team ID.
 // Authenticated user must grant write:discussion scope.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#create-a-discussion-comment
-func (s *TeamsService) CreateCommentByID(ctx context.Context, orgID, teamID int64, discsusionNumber int, comment DiscussionComment) (*DiscussionComment, *Response, error) {
-	u := fmt.Sprintf("organizations/%v/team/%v/discussions/%v/comments", orgID, teamID, discsusionNumber)
-	req, err := s.client.NewRequest("POST", u, comment)
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#create-a-discussion-comment
+//
+//meta:operation POST /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments
+func (s *TeamsService) CreateCommentByID(ctx context.Context, orgID, teamID int64, discussionNumber int, body DiscussionComment) (*DiscussionComment, *Response, error) {
+	u := fmt.Sprintf("organizations/%v/team/%v/discussions/%v/comments", orgID, teamID, discussionNumber)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	discussionComment := &DiscussionComment{}
-	resp, err := s.client.Do(ctx, req, discussionComment)
+	var discussionComment *DiscussionComment
+	resp, err := s.client.Do(req, &discussionComment)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -154,16 +174,20 @@ func (s *TeamsService) CreateCommentByID(ctx context.Context, orgID, teamID int6
 // CreateCommentBySlug creates a new comment on a team discussion by team slug.
 // Authenticated user must grant write:discussion scope.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#create-a-discussion-comment
-func (s *TeamsService) CreateCommentBySlug(ctx context.Context, org, slug string, discsusionNumber int, comment DiscussionComment) (*DiscussionComment, *Response, error) {
-	u := fmt.Sprintf("orgs/%v/teams/%v/discussions/%v/comments", org, slug, discsusionNumber)
-	req, err := s.client.NewRequest("POST", u, comment)
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#create-a-discussion-comment
+//
+//meta:operation POST /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments
+func (s *TeamsService) CreateCommentBySlug(ctx context.Context, org, slug string, discussionNumber int, body DiscussionComment) (*DiscussionComment, *Response, error) {
+	u := fmt.Sprintf("orgs/%v/teams/%v/discussions/%v/comments", org, slug, discussionNumber)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	discussionComment := &DiscussionComment{}
-	resp, err := s.client.Do(ctx, req, discussionComment)
+	var discussionComment *DiscussionComment
+	resp, err := s.client.Do(req, &discussionComment)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -175,16 +199,20 @@ func (s *TeamsService) CreateCommentBySlug(ctx context.Context, org, slug string
 // Authenticated user must grant write:discussion scope.
 // User is allowed to edit body of a comment only.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#update-a-discussion-comment
-func (s *TeamsService) EditCommentByID(ctx context.Context, orgID, teamID int64, discussionNumber, commentNumber int, comment DiscussionComment) (*DiscussionComment, *Response, error) {
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#update-a-discussion-comment
+//
+//meta:operation PATCH /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments/{comment_number}
+func (s *TeamsService) EditCommentByID(ctx context.Context, orgID, teamID int64, discussionNumber, commentNumber int, body DiscussionComment) (*DiscussionComment, *Response, error) {
 	u := fmt.Sprintf("organizations/%v/team/%v/discussions/%v/comments/%v", orgID, teamID, discussionNumber, commentNumber)
-	req, err := s.client.NewRequest("PATCH", u, comment)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	discussionComment := &DiscussionComment{}
-	resp, err := s.client.Do(ctx, req, discussionComment)
+	var discussionComment *DiscussionComment
+	resp, err := s.client.Do(req, &discussionComment)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -196,16 +224,20 @@ func (s *TeamsService) EditCommentByID(ctx context.Context, orgID, teamID int64,
 // Authenticated user must grant write:discussion scope.
 // User is allowed to edit body of a comment only.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#update-a-discussion-comment
-func (s *TeamsService) EditCommentBySlug(ctx context.Context, org, slug string, discussionNumber, commentNumber int, comment DiscussionComment) (*DiscussionComment, *Response, error) {
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#update-a-discussion-comment
+//
+//meta:operation PATCH /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments/{comment_number}
+func (s *TeamsService) EditCommentBySlug(ctx context.Context, org, slug string, discussionNumber, commentNumber int, body DiscussionComment) (*DiscussionComment, *Response, error) {
 	u := fmt.Sprintf("orgs/%v/teams/%v/discussions/%v/comments/%v", org, slug, discussionNumber, commentNumber)
-	req, err := s.client.NewRequest("PATCH", u, comment)
+	req, err := s.client.NewRequest(ctx, "PATCH", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	discussionComment := &DiscussionComment{}
-	resp, err := s.client.Do(ctx, req, discussionComment)
+	var discussionComment *DiscussionComment
+	resp, err := s.client.Do(req, &discussionComment)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -216,27 +248,35 @@ func (s *TeamsService) EditCommentBySlug(ctx context.Context, org, slug string, 
 // DeleteCommentByID deletes a comment on a team discussion by team ID.
 // Authenticated user must grant write:discussion scope.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#delete-a-discussion-comment
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#delete-a-discussion-comment
+//
+//meta:operation DELETE /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments/{comment_number}
 func (s *TeamsService) DeleteCommentByID(ctx context.Context, orgID, teamID int64, discussionNumber, commentNumber int) (*Response, error) {
 	u := fmt.Sprintf("organizations/%v/team/%v/discussions/%v/comments/%v", orgID, teamID, discussionNumber, commentNumber)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // DeleteCommentBySlug deletes a comment on a team discussion by team slug.
 // Authenticated user must grant write:discussion scope.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/teams/#delete-a-discussion-comment
+// Deprecated: This endpoint has been deprecated by GitHub.
+//
+// GitHub API docs: https://docs.github.com/enterprise-server@3.13/rest/teams/discussion-comments#delete-a-discussion-comment
+//
+//meta:operation DELETE /orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments/{comment_number}
 func (s *TeamsService) DeleteCommentBySlug(ctx context.Context, org, slug string, discussionNumber, commentNumber int) (*Response, error) {
 	u := fmt.Sprintf("orgs/%v/teams/%v/discussions/%v/comments/%v", org, slug, discussionNumber, commentNumber)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }

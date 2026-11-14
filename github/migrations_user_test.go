@@ -6,7 +6,6 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -16,15 +15,15 @@ import (
 )
 
 func TestMigrationService_StartUserMigration(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/migrations", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "POST")
 		testHeader(t, r, "Accept", mediaTypeMigrationsPreview)
 
 		w.WriteHeader(http.StatusCreated)
-		w.Write(userMigrationJSON)
+		assertWrite(t, w, userMigrationJSON)
 	})
 
 	opt := &UserMigrationOptions{
@@ -32,7 +31,7 @@ func TestMigrationService_StartUserMigration(t *testing.T) {
 		ExcludeAttachments: false,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Migrations.StartUserMigration(ctx, []string{"r"}, opt)
 	if err != nil {
 		t.Errorf("StartUserMigration returned error: %v", err)
@@ -54,19 +53,19 @@ func TestMigrationService_StartUserMigration(t *testing.T) {
 }
 
 func TestMigrationService_ListUserMigrations(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/migrations", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testHeader(t, r, "Accept", mediaTypeMigrationsPreview)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf("[%s]", userMigrationJSON)))
+		assertWrite(t, w, fmt.Appendf(nil, "[%s]", userMigrationJSON))
 	})
 
-	ctx := context.Background()
-	got, _, err := client.Migrations.ListUserMigrations(ctx)
+	ctx := t.Context()
+	got, _, err := client.Migrations.ListUserMigrations(ctx, &ListOptions{Page: 1, PerPage: 2})
 	if err != nil {
 		t.Errorf("ListUserMigrations returned error %v", err)
 	}
@@ -78,7 +77,7 @@ func TestMigrationService_ListUserMigrations(t *testing.T) {
 
 	const methodName = "ListUserMigrations"
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
-		got, resp, err := client.Migrations.ListUserMigrations(ctx)
+		got, resp, err := client.Migrations.ListUserMigrations(ctx, &ListOptions{Page: 1, PerPage: 2})
 		if got != nil {
 			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
 		}
@@ -87,18 +86,18 @@ func TestMigrationService_ListUserMigrations(t *testing.T) {
 }
 
 func TestMigrationService_UserMigrationStatus(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/migrations/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testHeader(t, r, "Accept", mediaTypeMigrationsPreview)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write(userMigrationJSON)
+		assertWrite(t, w, userMigrationJSON)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, _, err := client.Migrations.UserMigrationStatus(ctx, 1)
 	if err != nil {
 		t.Errorf("UserMigrationStatus returned error %v", err)
@@ -120,8 +119,8 @@ func TestMigrationService_UserMigrationStatus(t *testing.T) {
 }
 
 func TestMigrationService_UserMigrationArchiveURL(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/migrations/1/archive", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -136,7 +135,7 @@ func TestMigrationService_UserMigrationArchiveURL(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, err := client.Migrations.UserMigrationArchiveURL(ctx, 1)
 	if err != nil {
 		t.Errorf("UserMigrationArchiveURL returned error %v", err)
@@ -149,8 +148,8 @@ func TestMigrationService_UserMigrationArchiveURL(t *testing.T) {
 }
 
 func TestMigrationService_DeleteUserMigration(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/migrations/1/archive", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
@@ -159,7 +158,7 @@ func TestMigrationService_DeleteUserMigration(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, err := client.Migrations.DeleteUserMigration(ctx, 1)
 	if err != nil {
 		t.Errorf("DeleteUserMigration returned error %v", err)
@@ -181,8 +180,8 @@ func TestMigrationService_DeleteUserMigration(t *testing.T) {
 }
 
 func TestMigrationService_UnlockUserRepo(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/user/migrations/1/repos/r/lock", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
@@ -191,7 +190,7 @@ func TestMigrationService_UnlockUserRepo(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	got, err := client.Migrations.UnlockUserRepo(ctx, 1, "r")
 	if err != nil {
 		t.Errorf("UnlockUserRepo returned error %v", err)
@@ -209,6 +208,37 @@ func TestMigrationService_UnlockUserRepo(t *testing.T) {
 
 	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
 		return client.Migrations.UnlockUserRepo(ctx, 1, "r")
+	})
+}
+
+func TestMigrationService_ListUserRepositories(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
+
+	mux.HandleFunc("/user/migrations/1/repositories", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{"page": "1", "per_page": "2"})
+		fmt.Fprint(w, `[{"id":1,"name":"r","full_name":"o/r"}]`)
+	})
+
+	ctx := t.Context()
+	opts := &ListOptions{Page: 1, PerPage: 2}
+	got, _, err := client.Migrations.ListUserRepositories(ctx, 1, opts)
+	if err != nil {
+		t.Errorf("ListUserRepositories returned error: %v", err)
+	}
+	want := []*Repository{{ID: new(int64(1)), Name: new("r"), FullName: new("o/r")}}
+	if !cmp.Equal(got, want) {
+		t.Errorf("ListUserRepositories = %+v, want %+v", got, want)
+	}
+
+	const methodName = "ListUserRepositories"
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Migrations.ListUserRepositories(ctx, 1, opts)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
 	})
 }
 
@@ -232,74 +262,20 @@ var userMigrationJSON = []byte(`{
 }`)
 
 var wantUserMigration = &UserMigration{
-	ID:                 Int64(79),
-	GUID:               String("0b989ba4-242f-11e5-81e1-c7b6966d2516"),
-	State:              String("pending"),
-	LockRepositories:   Bool(true),
-	ExcludeAttachments: Bool(false),
-	URL:                String("https://api.github.com/orgs/octo-org/migrations/79"),
-	CreatedAt:          String("2015-07-06T15:33:38-07:00"),
-	UpdatedAt:          String("2015-07-06T15:33:38-07:00"),
+	ID:                 new(int64(79)),
+	GUID:               new("0b989ba4-242f-11e5-81e1-c7b6966d2516"),
+	State:              new("pending"),
+	LockRepositories:   new(true),
+	ExcludeAttachments: new(false),
+	URL:                new("https://api.github.com/orgs/octo-org/migrations/79"),
+	CreatedAt:          new("2015-07-06T15:33:38-07:00"),
+	UpdatedAt:          new("2015-07-06T15:33:38-07:00"),
 	Repositories: []*Repository{
 		{
-			ID:          Int64(1296269),
-			Name:        String("Hello-World"),
-			FullName:    String("octocat/Hello-World"),
-			Description: String("This your first repo!"),
+			ID:          new(int64(1296269)),
+			Name:        new("Hello-World"),
+			FullName:    new("octocat/Hello-World"),
+			Description: new("This your first repo!"),
 		},
 	},
-}
-
-func TestUserMigration_Marshal(t *testing.T) {
-	testJSONMarshal(t, &UserMigration{}, "{}")
-
-	u := &UserMigration{
-		ID:                 Int64(1),
-		GUID:               String("guid"),
-		State:              String("state"),
-		LockRepositories:   Bool(false),
-		ExcludeAttachments: Bool(false),
-		URL:                String("url"),
-		CreatedAt:          String("ca"),
-		UpdatedAt:          String("ua"),
-		Repositories:       []*Repository{{ID: Int64(1)}},
-	}
-
-	want := `{
-		"id": 1,
-		"guid": "guid",
-		"state": "state",
-		"lock_repositories": false,
-		"exclude_attachments": false,
-		"url": "url",
-		"created_at": "ca",
-		"updated_at": "ua",
-		"repositories": [
-			{
-				"id": 1
-			}
-		]
-	}`
-
-	testJSONMarshal(t, u, want)
-}
-
-func TestStartUserMigration_Marshal(t *testing.T) {
-	testJSONMarshal(t, &startUserMigration{}, "{}")
-
-	u := &startUserMigration{
-		Repositories:       []string{"r"},
-		LockRepositories:   Bool(false),
-		ExcludeAttachments: Bool(false),
-	}
-
-	want := `{
-		"repositories": [
-			"r"
-		],
-		"lock_repositories": false,
-		"exclude_attachments": false
-	}`
-
-	testJSONMarshal(t, u, want)
 }

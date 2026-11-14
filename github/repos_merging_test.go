@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -16,34 +14,28 @@ import (
 )
 
 func TestRepositoriesService_Merge(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &RepositoryMergeRequest{
-		Base:          String("b"),
-		Head:          String("h"),
-		CommitMessage: String("c"),
+	input := RepositoryMergeRequest{
+		Base:          "b",
+		Head:          "h",
+		CommitMessage: new("c"),
 	}
 
 	mux.HandleFunc("/repos/o/r/merges", func(w http.ResponseWriter, r *http.Request) {
-		v := new(RepositoryMergeRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
-
+		testJSONBody(t, r, input)
 		fmt.Fprint(w, `{"sha":"s"}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	commit, _, err := client.Repositories.Merge(ctx, "o", "r", input)
 	if err != nil {
 		t.Errorf("Repositories.Merge returned error: %v", err)
 	}
 
-	want := &RepositoryCommit{SHA: String("s")}
+	want := &RepositoryCommit{SHA: new("s")}
 	if !cmp.Equal(commit, want) {
 		t.Errorf("Repositories.Merge returned %+v, want %+v", commit, want)
 	}
@@ -63,20 +55,42 @@ func TestRepositoriesService_Merge(t *testing.T) {
 	})
 }
 
-func TestRepositoryMergeRequest_Marshal(t *testing.T) {
-	testJSONMarshal(t, &RepositoryMergeRequest{}, "{}")
+func TestRepositoriesService_MergeUpstream(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	u := &RepositoryMergeRequest{
-		Base:          String("base"),
-		Head:          String("head"),
-		CommitMessage: String("cm"),
+	input := RepoMergeUpstreamRequest{
+		Branch: "b",
 	}
 
-	want := `{
-		"base": "base",
-		"head": "head",
-		"commit_message": "cm"
-	}`
+	mux.HandleFunc("/repos/o/r/merge-upstream", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testJSONBody(t, r, input)
+		fmt.Fprint(w, `{"merge_type":"m"}`)
+	})
 
-	testJSONMarshal(t, u, want)
+	ctx := t.Context()
+	result, _, err := client.Repositories.MergeUpstream(ctx, "o", "r", input)
+	if err != nil {
+		t.Errorf("Repositories.MergeUpstream returned error: %v", err)
+	}
+
+	want := &RepoMergeUpstreamResult{MergeType: new("m")}
+	if !cmp.Equal(result, want) {
+		t.Errorf("Repositories.MergeUpstream returned %+v, want %+v", result, want)
+	}
+
+	const methodName = "MergeUpstream"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Repositories.MergeUpstream(ctx, "\n", "\n", input)
+		return err
+	})
+
+	testNewRequestAndDoFailure(t, methodName, client, func() (*Response, error) {
+		got, resp, err := client.Repositories.MergeUpstream(ctx, "o", "r", input)
+		if got != nil {
+			t.Errorf("testNewRequestAndDoFailure %v = %#v, want nil", methodName, got)
+		}
+		return resp, err
+	})
 }

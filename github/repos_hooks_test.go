@@ -6,8 +6,6 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -16,36 +14,34 @@ import (
 )
 
 func TestRepositoriesService_CreateHook(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	input := &Hook{CreatedAt: &referenceTime}
+	input := &Hook{CreatedAt: &Timestamp{referenceTime}}
 
 	mux.HandleFunc("/repos/o/r/hooks", func(w http.ResponseWriter, r *http.Request) {
-		v := new(createHookRequest)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "POST")
 		want := &createHookRequest{Name: "web"}
-		if !cmp.Equal(v, want) {
-			t.Errorf("Request body = %+v, want %+v", v, want)
-		}
-
+		testJSONBody(t, r, want)
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	hook, _, err := client.Repositories.CreateHook(ctx, "o", "r", input)
 	if err != nil {
 		t.Errorf("Repositories.CreateHook returned error: %v", err)
 	}
 
-	want := &Hook{ID: Int64(1)}
+	want := &Hook{ID: new(int64(1))}
 	if !cmp.Equal(hook, want) {
 		t.Errorf("Repositories.CreateHook returned %+v, want %+v", hook, want)
 	}
 
 	const methodName = "CreateHook"
+	testBadOptions(t, methodName, func() (err error) {
+		_, _, err = client.Repositories.CreateHook(ctx, "o", "r", nil)
+		return err
+	})
 	testBadOptions(t, methodName, func() (err error) {
 		_, _, err = client.Repositories.CreateHook(ctx, "\n", "\n", input)
 		return err
@@ -61,8 +57,8 @@ func TestRepositoriesService_CreateHook(t *testing.T) {
 }
 
 func TestRepositoriesService_ListHooks(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/hooks", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
@@ -72,13 +68,13 @@ func TestRepositoriesService_ListHooks(t *testing.T) {
 
 	opt := &ListOptions{Page: 2}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	hooks, _, err := client.Repositories.ListHooks(ctx, "o", "r", opt)
 	if err != nil {
 		t.Errorf("Repositories.ListHooks returned error: %v", err)
 	}
 
-	want := []*Hook{{ID: Int64(1)}, {ID: Int64(2)}}
+	want := []*Hook{{ID: new(int64(1))}, {ID: new(int64(2))}}
 	if !cmp.Equal(hooks, want) {
 		t.Errorf("Repositories.ListHooks returned %+v, want %+v", hooks, want)
 	}
@@ -99,38 +95,40 @@ func TestRepositoriesService_ListHooks(t *testing.T) {
 }
 
 func TestRepositoriesService_ListHooks_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Repositories.ListHooks(ctx, "%", "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_ListHooks_403_code_no_rate_limit(t *testing.T) {
+	t.Parallel()
 	testErrorResponseForStatusCode(t, http.StatusForbidden)
 }
 
 func TestRepositoriesService_ListHooks_404_code(t *testing.T) {
+	t.Parallel()
 	testErrorResponseForStatusCode(t, http.StatusNotFound)
 }
 
 func TestRepositoriesService_GetHook(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	mux.HandleFunc("/repos/o/r/hooks/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	hook, _, err := client.Repositories.GetHook(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.GetHook returned error: %v", err)
 	}
 
-	want := &Hook{ID: Int64(1)}
+	want := &Hook{ID: new(int64(1))}
 	if !cmp.Equal(hook, want) {
 		t.Errorf("Repositories.GetHook returned %+v, want %+v", hook, want)
 	}
@@ -151,39 +149,34 @@ func TestRepositoriesService_GetHook(t *testing.T) {
 }
 
 func TestRepositoriesService_GetHook_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Repositories.GetHook(ctx, "%", "%", 1)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_EditHook(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
 	input := &Hook{}
 
 	mux.HandleFunc("/repos/o/r/hooks/1", func(w http.ResponseWriter, r *http.Request) {
-		v := new(Hook)
-		json.NewDecoder(r.Body).Decode(v)
-
 		testMethod(t, r, "PATCH")
-		if !cmp.Equal(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
-		}
+		testJSONBody(t, r, input)
 
 		fmt.Fprint(w, `{"id":1}`)
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	hook, _, err := client.Repositories.EditHook(ctx, "o", "r", 1, input)
 	if err != nil {
 		t.Errorf("Repositories.EditHook returned error: %v", err)
 	}
 
-	want := &Hook{ID: Int64(1)}
+	want := &Hook{ID: new(int64(1))}
 	if !cmp.Equal(hook, want) {
 		t.Errorf("Repositories.EditHook returned %+v, want %+v", hook, want)
 	}
@@ -204,23 +197,23 @@ func TestRepositoriesService_EditHook(t *testing.T) {
 }
 
 func TestRepositoriesService_EditHook_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, _, err := client.Repositories.EditHook(ctx, "%", "%", 1, nil)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_DeleteHook(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/hooks/1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/hooks/1", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.DeleteHook(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.DeleteHook returned error: %v", err)
@@ -238,23 +231,23 @@ func TestRepositoriesService_DeleteHook(t *testing.T) {
 }
 
 func TestRepositoriesService_DeleteHook_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.DeleteHook(ctx, "%", "%", 1)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_PingHook(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/hooks/1/pings", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/hooks/1/pings", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "POST")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.PingHook(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.PingHook returned error: %v", err)
@@ -272,14 +265,14 @@ func TestRepositoriesService_PingHook(t *testing.T) {
 }
 
 func TestRepositoriesService_TestHook(t *testing.T) {
-	client, mux, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	mux.HandleFunc("/repos/o/r/hooks/1/tests", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/o/r/hooks/1/tests", func(_ http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "POST")
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.TestHook(ctx, "o", "r", 1)
 	if err != nil {
 		t.Errorf("Repositories.TestHook returned error: %v", err)
@@ -297,270 +290,76 @@ func TestRepositoriesService_TestHook(t *testing.T) {
 }
 
 func TestRepositoriesService_TestHook_invalidOwner(t *testing.T) {
-	client, _, _, teardown := setup()
-	defer teardown()
+	t.Parallel()
+	client, _, _ := setup(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := client.Repositories.TestHook(ctx, "%", "%", 1)
 	testURLParseError(t, err)
 }
 
-func TestBranchWebHookPayload_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WebHookPayload{}, "{}")
+func TestRepositoriesService_Subscribe(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	v := &WebHookPayload{
-		Action: String("action"),
-		After:  String("after"),
-		Before: String("before"),
-		Commits: []*WebHookCommit{
-			{
-				Added: []string{"1", "2", "3"},
-				Author: &WebHookAuthor{
-					Email:    String("abc@gmail.com"),
-					Name:     String("abc"),
-					Username: String("abc_12"),
-				},
-				Committer: &WebHookAuthor{
-					Email:    String("abc@gmail.com"),
-					Name:     String("abc"),
-					Username: String("abc_12"),
-				},
-				ID:       String("1"),
-				Message:  String("WebHookCommit"),
-				Modified: []string{"abc", "efg", "erd"},
-				Removed:  []string{"cmd", "rti", "duv"},
-			},
-		},
-		Compare: String("compare"),
-		Created: Bool(true),
-		Forced:  Bool(false),
-		HeadCommit: &WebHookCommit{
-			Added: []string{"1", "2", "3"},
-			Author: &WebHookAuthor{
-				Email:    String("abc@gmail.com"),
-				Name:     String("abc"),
-				Username: String("abc_12"),
-			},
-			Committer: &WebHookAuthor{
-				Email:    String("abc@gmail.com"),
-				Name:     String("abc"),
-				Username: String("abc_12"),
-			},
-			ID:       String("1"),
-			Message:  String("WebHookCommit"),
-			Modified: []string{"abc", "efg", "erd"},
-			Removed:  []string{"cmd", "rti", "duv"},
-		},
-		Installation: &Installation{
-			ID: Int64(12),
-		},
-		Organization: &Organization{
-			ID: Int64(22),
-		},
-		Pusher: &User{
-			Login: String("rd@yahoo.com"),
-			ID:    Int64(112),
-		},
-		Repo: &Repository{
-			ID:     Int64(321),
-			NodeID: String("node_321"),
-		},
-		Sender: &User{
-			Login: String("st@gmail.com"),
-			ID:    Int64(202),
-		},
+	mux.HandleFunc("/hub", func(_ http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testHeader(t, r, "Content-Type", "application/x-www-form-urlencoded")
+		testFormValues(t, r, values{
+			"hub.mode":     "subscribe",
+			"hub.topic":    "https://github.com/o/r/events/push",
+			"hub.callback": "http://localhost:8080/callback",
+			"hub.secret":   "test secret",
+		})
+	})
+
+	ctx := t.Context()
+	_, err := client.Repositories.Subscribe(
+		ctx,
+		"o",
+		"r",
+		"push",
+		"http://localhost:8080/callback",
+		[]byte("test secret"),
+	)
+	if err != nil {
+		t.Errorf("Repositories.Subscribe returned error: %v", err)
 	}
 
-	want := `{
-		"action": "action",
-		"after":  "after",
-		"before": "before",
-		"commits": [
-			{
-			"added":   ["1", "2", "3"],
-			"author":{
-				"email": "abc@gmail.com",
-				"name": "abc",
-				"username": "abc_12"
-			},
-			"committer": {
-				"email": "abc@gmail.com",
-				"name": "abc",
-				"username": "abc_12"
-			}, 
-			"id":       "1",
-			"message":  "WebHookCommit",
-			"modified": ["abc", "efg", "erd"],
-			"removed":  ["cmd", "rti", "duv"]
-			}
-		],
-		"compare": "compare",
-		"created": true,
-		"forced":  false,
-		"head_commit": {
-			"added":   ["1", "2", "3"],
-		"author":{
-			"email": "abc@gmail.com",
-			"name": "abc",
-			"username": "abc_12"
-		},
-		"committer": {
-			"email": "abc@gmail.com",
-			"name": "abc",
-			"username": "abc_12"
-		}, 
-		"id":       "1",
-		"message":  "WebHookCommit",
-		"modified": ["abc", "efg", "erd"],
-		"removed":  ["cmd", "rti", "duv"]
-		},
-		"installation": {
-			"id": 12
-		},
-		"organization": {
-			"id" : 22
-		},
-		"pusher":{
-			"login": "rd@yahoo.com",
-			"id": 112
-		},
-		"repository":{
-			"id": 321,
-			"node_id": "node_321"
-		},
-		"sender":{
-			"login": "st@gmail.com",
-			"id": 202
-		}
-	}`
-
-	testJSONMarshal(t, v, want)
+	testNewRequestAndDoFailure(t, "Subscribe", client, func() (*Response, error) {
+		return client.Repositories.Subscribe(ctx, "o", "r", "push", "http://localhost:8080", nil)
+	})
 }
 
-func TestBranchWebHookAuthor_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WebHookAuthor{}, "{}")
+func TestRepositoriesService_Unsubscribe(t *testing.T) {
+	t.Parallel()
+	client, mux, _ := setup(t)
 
-	v := &WebHookAuthor{
-		Email:    String("abc@gmail.com"),
-		Name:     String("abc"),
-		Username: String("abc_12"),
+	mux.HandleFunc("/hub", func(_ http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+		testHeader(t, r, "Content-Type", "application/x-www-form-urlencoded")
+		testFormValues(t, r, values{
+			"hub.mode":     "unsubscribe",
+			"hub.topic":    "https://github.com/o/r/events/push",
+			"hub.callback": "http://localhost:8080/callback",
+			"hub.secret":   "test secret",
+		})
+	})
+
+	ctx := t.Context()
+	_, err := client.Repositories.Unsubscribe(
+		ctx,
+		"o",
+		"r",
+		"push",
+		"http://localhost:8080/callback",
+		[]byte("test secret"),
+	)
+	if err != nil {
+		t.Errorf("Repositories.Unsubscribe returned error: %v", err)
 	}
 
-	want := `{
-			"email": "abc@gmail.com",
-			"name": "abc",
-			"username": "abc_12"
-	}`
-
-	testJSONMarshal(t, v, want)
-}
-
-func TestBranchWebHookCommit_Marshal(t *testing.T) {
-	testJSONMarshal(t, &WebHookCommit{}, "{}")
-
-	v := &WebHookCommit{
-		Added: []string{"1", "2", "3"},
-		Author: &WebHookAuthor{
-			Email:    String("abc@gmail.com"),
-			Name:     String("abc"),
-			Username: String("abc_12"),
-		},
-		Committer: &WebHookAuthor{
-			Email:    String("abc@gmail.com"),
-			Name:     String("abc"),
-			Username: String("abc_12"),
-		},
-		ID:       String("1"),
-		Message:  String("WebHookCommit"),
-		Modified: []string{"abc", "efg", "erd"},
-		Removed:  []string{"cmd", "rti", "duv"},
-	}
-
-	want := `{
-		"added":   ["1", "2", "3"],
-		"author":{
-			"email": "abc@gmail.com",
-			"name": "abc",
-			"username": "abc_12"
-		},
-		"committer": {
-			"email": "abc@gmail.com",
-			"name": "abc",
-			"username": "abc_12"
-		}, 
-		"id":       "1",
-		"message":  "WebHookCommit",
-		"modified": ["abc", "efg", "erd"],
-		"removed":  ["cmd", "rti", "duv"]
-	}`
-
-	testJSONMarshal(t, v, want)
-}
-
-func TestBranchCreateHookRequest_Marshal(t *testing.T) {
-	testJSONMarshal(t, &createHookRequest{}, "{}")
-
-	v := &createHookRequest{
-		Name:   "abc",
-		Events: []string{"1", "2", "3"},
-		Active: Bool(true),
-		Config: map[string]interface{}{
-			"thing": "@123",
-		},
-	}
-
-	want := `{
-		"name": "abc",
-		"active": true,
-		"events": ["1","2","3"],
-		"config":{
-			"thing": "@123"
-		}
-	}`
-
-	testJSONMarshal(t, v, want)
-}
-
-func TestBranchHook_Marshal(t *testing.T) {
-	testJSONMarshal(t, &Hook{}, "{}")
-
-	v := &Hook{
-		CreatedAt: &referenceTime,
-		UpdatedAt: &referenceTime,
-		URL:       String("url"),
-		ID:        Int64(1),
-		Type:      String("type"),
-		Name:      String("name"),
-		TestURL:   String("testurl"),
-		PingURL:   String("pingurl"),
-		LastResponse: map[string]interface{}{
-			"item": "item",
-		},
-		Config: map[string]interface{}{
-			"thing": "@123",
-		},
-		Events: []string{"1", "2", "3"},
-		Active: Bool(true),
-	}
-
-	want := `{
-		"created_at": ` + referenceTimeStr + `,
-		"updated_at": ` + referenceTimeStr + `,
-		"url": "url",
-		"id": 1,
-		"type": "type",
-		"name": "name",
-		"test_url": "testurl",
-		"ping_url": "pingurl",
-		"last_response":{
-			"item": "item"
-		},
-		"config":{
-			"thing": "@123"
-		},
-		"events": ["1","2","3"],
-		"active": true		
-	}`
-
-	testJSONMarshal(t, v, want)
+	testNewRequestAndDoFailure(t, "Unsubscribe", client, func() (*Response, error) {
+		return client.Repositories.Unsubscribe(ctx, "o", "r", "push", "http://localhost:8080/callback", nil)
+	})
 }

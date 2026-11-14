@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-// Deployment represents a deployment in a repo
+// Deployment represents a deployment in a repo.
 type Deployment struct {
 	URL           *string         `json:"url,omitempty"`
 	ID            *int64          `json:"id,omitempty"`
@@ -30,17 +30,17 @@ type Deployment struct {
 	NodeID        *string         `json:"node_id,omitempty"`
 }
 
-// DeploymentRequest represents a deployment request
+// DeploymentRequest represents a deployment request.
 type DeploymentRequest struct {
-	Ref                   *string     `json:"ref,omitempty"`
-	Task                  *string     `json:"task,omitempty"`
-	AutoMerge             *bool       `json:"auto_merge,omitempty"`
-	RequiredContexts      *[]string   `json:"required_contexts,omitempty"`
-	Payload               interface{} `json:"payload,omitempty"`
-	Environment           *string     `json:"environment,omitempty"`
-	Description           *string     `json:"description,omitempty"`
-	TransientEnvironment  *bool       `json:"transient_environment,omitempty"`
-	ProductionEnvironment *bool       `json:"production_environment,omitempty"`
+	Ref                   string   `json:"ref"`
+	Task                  *string  `json:"task,omitempty"`
+	AutoMerge             *bool    `json:"auto_merge,omitempty"`
+	RequiredContexts      []string `json:"required_contexts,omitzero"`
+	Payload               any      `json:"payload,omitempty"`
+	Environment           *string  `json:"environment,omitempty"`
+	Description           *string  `json:"description,omitempty"`
+	TransientEnvironment  *bool    `json:"transient_environment,omitempty"`
+	ProductionEnvironment *bool    `json:"production_environment,omitempty"`
 }
 
 // DeploymentsListOptions specifies the optional parameters to the
@@ -49,7 +49,7 @@ type DeploymentsListOptions struct {
 	// SHA of the Deployment.
 	SHA string `url:"sha,omitempty"`
 
-	// List deployments for a given ref.
+	// List deployments for a given ref. This can be a branch, tag, or SHA.
 	Ref string `url:"ref,omitempty"`
 
 	// List deployments for a given task.
@@ -63,7 +63,9 @@ type DeploymentsListOptions struct {
 
 // ListDeployments lists the deployments of a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#list-deployments
+// GitHub API docs: https://docs.github.com/rest/deployments/deployments?apiVersion=2022-11-28#list-deployments
+//
+//meta:operation GET /repos/{owner}/{repo}/deployments
 func (s *RepositoriesService) ListDeployments(ctx context.Context, owner, repo string, opts *DeploymentsListOptions) ([]*Deployment, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/deployments", owner, repo)
 	u, err := addOptions(u, opts)
@@ -71,13 +73,13 @@ func (s *RepositoriesService) ListDeployments(ctx context.Context, owner, repo s
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var deployments []*Deployment
-	resp, err := s.client.Do(ctx, req, &deployments)
+	resp, err := s.client.Do(req, &deployments)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -87,17 +89,19 @@ func (s *RepositoriesService) ListDeployments(ctx context.Context, owner, repo s
 
 // GetDeployment returns a single deployment of a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#get-a-deployment
+// GitHub API docs: https://docs.github.com/rest/deployments/deployments?apiVersion=2022-11-28#get-a-deployment
+//
+//meta:operation GET /repos/{owner}/{repo}/deployments/{deployment_id}
 func (s *RepositoriesService) GetDeployment(ctx context.Context, owner, repo string, deploymentID int64) (*Deployment, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/deployments/%v", owner, repo, deploymentID)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	deployment := new(Deployment)
-	resp, err := s.client.Do(ctx, req, deployment)
+	var deployment *Deployment
+	resp, err := s.client.Do(req, &deployment)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -107,21 +111,22 @@ func (s *RepositoriesService) GetDeployment(ctx context.Context, owner, repo str
 
 // CreateDeployment creates a new deployment for a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#create-a-deployment
-func (s *RepositoriesService) CreateDeployment(ctx context.Context, owner, repo string, request *DeploymentRequest) (*Deployment, *Response, error) {
+// GitHub API docs: https://docs.github.com/rest/deployments/deployments?apiVersion=2022-11-28#create-a-deployment
+//
+//meta:operation POST /repos/{owner}/{repo}/deployments
+func (s *RepositoriesService) CreateDeployment(ctx context.Context, owner, repo string, body DeploymentRequest) (*Deployment, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/deployments", owner, repo)
 
-	req, err := s.client.NewRequest("POST", u, request)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept headers when APIs fully launch.
 	acceptHeaders := []string{mediaTypeDeploymentStatusPreview, mediaTypeExpandDeploymentStatusPreview}
 	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
 
-	d := new(Deployment)
-	resp, err := s.client.Do(ctx, req, d)
+	var d *Deployment
+	resp, err := s.client.Do(req, &d)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -131,14 +136,16 @@ func (s *RepositoriesService) CreateDeployment(ctx context.Context, owner, repo 
 
 // DeleteDeployment deletes an existing deployment for a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#delete-a-deployment
+// GitHub API docs: https://docs.github.com/rest/deployments/deployments?apiVersion=2022-11-28#delete-a-deployment
+//
+//meta:operation DELETE /repos/{owner}/{repo}/deployments/{deployment_id}
 func (s *RepositoriesService) DeleteDeployment(ctx context.Context, owner, repo string, deploymentID int64) (*Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/deployments/%v", owner, repo, deploymentID)
-	req, err := s.client.NewRequest("DELETE", u, nil)
+	req, err := s.client.NewRequest(ctx, "DELETE", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.client.Do(ctx, req, nil)
+	return s.client.Do(req, nil)
 }
 
 // DeploymentStatus represents the status of a
@@ -163,9 +170,12 @@ type DeploymentStatus struct {
 	URL            *string    `json:"url,omitempty"`
 }
 
-// DeploymentStatusRequest represents a deployment request
+// DeploymentStatusRequest represents a deployment status request.
 type DeploymentStatusRequest struct {
-	State          *string `json:"state,omitempty"`
+	State string `json:"state"`
+	// TargetURL is the target URL to associate with this status.
+	// It's recommended to use LogURL instead, which replaces TargetURL.
+	TargetURL      *string `json:"target_url,omitempty"`
 	LogURL         *string `json:"log_url,omitempty"`
 	Description    *string `json:"description,omitempty"`
 	Environment    *string `json:"environment,omitempty"`
@@ -175,7 +185,9 @@ type DeploymentStatusRequest struct {
 
 // ListDeploymentStatuses lists the statuses of a given deployment of a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#list-deployment-statuses
+// GitHub API docs: https://docs.github.com/rest/deployments/statuses?apiVersion=2022-11-28#list-deployment-statuses
+//
+//meta:operation GET /repos/{owner}/{repo}/deployments/{deployment_id}/statuses
 func (s *RepositoriesService) ListDeploymentStatuses(ctx context.Context, owner, repo string, deployment int64, opts *ListOptions) ([]*DeploymentStatus, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/deployments/%v/statuses", owner, repo, deployment)
 	u, err := addOptions(u, opts)
@@ -183,17 +195,16 @@ func (s *RepositoriesService) ListDeploymentStatuses(ctx context.Context, owner,
 		return nil, nil, err
 	}
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept headers when APIs fully launch.
 	acceptHeaders := []string{mediaTypeDeploymentStatusPreview, mediaTypeExpandDeploymentStatusPreview}
 	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
 
 	var statuses []*DeploymentStatus
-	resp, err := s.client.Do(ctx, req, &statuses)
+	resp, err := s.client.Do(req, &statuses)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -203,21 +214,22 @@ func (s *RepositoriesService) ListDeploymentStatuses(ctx context.Context, owner,
 
 // GetDeploymentStatus returns a single deployment status of a repository.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#get-a-deployment-status
+// GitHub API docs: https://docs.github.com/rest/deployments/statuses?apiVersion=2022-11-28#get-a-deployment-status
+//
+//meta:operation GET /repos/{owner}/{repo}/deployments/{deployment_id}/statuses/{status_id}
 func (s *RepositoriesService) GetDeploymentStatus(ctx context.Context, owner, repo string, deploymentID, deploymentStatusID int64) (*DeploymentStatus, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/deployments/%v/statuses/%v", owner, repo, deploymentID, deploymentStatusID)
 
-	req, err := s.client.NewRequest("GET", u, nil)
+	req, err := s.client.NewRequest(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept headers when APIs fully launch.
 	acceptHeaders := []string{mediaTypeDeploymentStatusPreview, mediaTypeExpandDeploymentStatusPreview}
 	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
 
-	d := new(DeploymentStatus)
-	resp, err := s.client.Do(ctx, req, d)
+	var d *DeploymentStatus
+	resp, err := s.client.Do(req, &d)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -227,21 +239,22 @@ func (s *RepositoriesService) GetDeploymentStatus(ctx context.Context, owner, re
 
 // CreateDeploymentStatus creates a new status for a deployment.
 //
-// GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/repos/#create-a-deployment-status
-func (s *RepositoriesService) CreateDeploymentStatus(ctx context.Context, owner, repo string, deployment int64, request *DeploymentStatusRequest) (*DeploymentStatus, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/deployments/%v/statuses", owner, repo, deployment)
+// GitHub API docs: https://docs.github.com/rest/deployments/statuses?apiVersion=2022-11-28#create-a-deployment-status
+//
+//meta:operation POST /repos/{owner}/{repo}/deployments/{deployment_id}/statuses
+func (s *RepositoriesService) CreateDeploymentStatus(ctx context.Context, owner, repo string, deploymentID int64, body DeploymentStatusRequest) (*DeploymentStatus, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/deployments/%v/statuses", owner, repo, deploymentID)
 
-	req, err := s.client.NewRequest("POST", u, request)
+	req, err := s.client.NewRequest(ctx, "POST", u, body)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept headers when APIs fully launch.
 	acceptHeaders := []string{mediaTypeDeploymentStatusPreview, mediaTypeExpandDeploymentStatusPreview}
 	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
 
-	d := new(DeploymentStatus)
-	resp, err := s.client.Do(ctx, req, d)
+	var d *DeploymentStatus
+	resp, err := s.client.Do(req, &d)
 	if err != nil {
 		return nil, resp, err
 	}
